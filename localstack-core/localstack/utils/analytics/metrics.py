@@ -55,14 +55,14 @@ class CollectorRegistry:
 
         self._registry[collector.full_name] = collector
 
-    def collect(self) -> List[Dict[str, Union[str, int]]]:
+    def collect(self) -> Dict[str, List[Dict[str, Union[str, int]]]]:
         """
         Collects all registered metrics.
 
         Returns:
             List[Dict[str, Union[str, int]]]: A flat list of all collected metrics.
         """
-        return [metric for collector in self._registry.values() for metric in collector.collect()]
+        return {"metrics": [metric for collector in self._registry.values() for metric in collector.collect()]}
 
 
 def get_collector_registry() -> CollectorRegistry:
