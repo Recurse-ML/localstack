@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import datetime
+from abc import ABC, abstractmethod
 from collections import defaultdict
 import threading
 from typing import List, Tuple, Optional, Union, Dict
@@ -14,15 +15,96 @@ from localstack.utils.analytics.publisher import AnalyticsClientPublisher
 
 LOG = logging.getLogger(__name__)
 
-# Counters have to register with the registry
-collector_registry: dict[str, Counter] = dict()
-
 # TODO: introduce some base abstraction for the counters after gather some initial experience working with it
 #  we could probably do intermediate aggregations over time to avoid unbounded counters for very long LS sessions
-#  for now, we can recommend to use config.DISABLE_EVENTS=1
+#  for now, we can recommend to use config.DISABLE_EVENTS=
 
 
-class MockCounter:
+class CollectorRegistry:
+    """
+    A Singleton responsible for managing all registered collectors.
+
+    - Stores references to `Collector` instances.
+    - Provides methods for retrieving and collecting metrics.
+    """
+    _instance: Optional[CollectorRegistry] = None  # Singleton instance
+    _registry: Dict[str, Collector]  # Stores registered collectors
+
+    def __new__(cls) -> CollectorRegistry:
+        """Ensures only one instance of `CollectorRegistry` exists (Singleton Pattern)."""
+        if not cls._instance:
+            cls._instance = super(CollectorRegistry, cls).__new__(cls)
+            cls._instance._registry = dict()  # Registry initialized here
+        return cls._instance
+
+    def register(self, collector: Collector) -> None:
+        """
+        Registers a new collector (Counter, Gauge, etc.).
+
+        Args:
+            collector (Collector): The collector instance to register.
+
+        Raises:
+            ValueError: If a collector with the same name already exists.
+        """
+        if not isinstance(collector, Collector):
+            raise TypeError("Only subclasses of `Collector` can be registered.")
+
+        if collector.full_name in self._registry:
+            raise ValueError(f"Collector '{collector.full_name}' already exists.")
+
+        self._registry[collector.full_name] = collector
+
+    def collect(self) -> List[Dict[str, Union[str, int]]]:
+        """
+        Collects all registered metrics.
+
+        Returns:
+            List[Dict[str, Union[str, int]]]: A flat list of all collected metrics.
+        """
+        return [metric for collector in self._registry.values() for metric in collector.collect()]
+
+
+def get_collector_registry() -> CollectorRegistry:
+    """Ensures we always get the same instance of `CollectorRegistry`."""
+    return CollectorRegistry()
+
+
+class Collector(ABC):
+    """
+    Base class for all collectors (e.g., Counter, Gauge).
+
+    Each subclass must implement the `collect()` method.
+    """
+    _full_name: str = None
+
+    @property
+    def full_name(self) -> str:
+        """Returns the fully qualified metric name."""
+        return self._full_name
+
+    @full_name.setter
+    def full_name(self, value: str) -> None:
+        """
+        Validates and sets the full metric name.
+
+        Args:
+            value (str): The fully qualified name to be set.
+
+        Raises:
+            ValueError: If the name is empty or invalid.
+        """
+        if not value or value.strip() == "":
+            raise ValueError("Collector must have a valid name.")
+        self._full_name = value
+
+    @abstractmethod
+    def collect(self) -> List[Dict[str, Union[str, int]]]:
+        """Subclasses must implement this to return collected metric data."""
+        pass
+
+
+class MockCounter(Collector):
     """Mock implementation of the Counter class, used when events are disabled."""
 
     def labels(self, **kwargs: str) -> MockCounter:
@@ -36,15 +118,14 @@ class MockCounter:
     def reset(self, ) -> None:
         pass
 
-    @staticmethod
-    def collect() -> list[dict[str, int | str]]:
+    def collect(self) -> List[Dict[str, Union[str, int]]]:
         """Returns an empty list since no metrics are collected in mock mode."""
         return []
 
 
-class Counter:
+class Counter(Collector):
     """
-        A thread-safe counter for tracking metrics with optional labels.
+        A thread-safe counter for tracking occurrences of an event.
 
         Supports both:
         - **Labeled counters** (via `.labels()`).
@@ -91,10 +172,8 @@ class Counter:
         self._name = name.strip() if name else None
         self._namespace = namespace.strip() if namespace else None
 
-        # Construct the full metric name
-        self._full_name = "_".join(filter(None, [self._namespace, self._name])).strip(":")
-        if not self._full_name:
-            raise ValueError("Counter must have a valid name.")
+        # Construct the full metric name. Validated in the base class setter
+        self.full_name = "_".join(filter(None, [self._namespace, self._name])).strip("_")
 
         if labels:
             if len(labels) > 5:
@@ -105,16 +184,7 @@ class Counter:
             self._labels_origin = {}
             self._labels = []
 
-        # Avoid duplicate counters in the registry
-        if self._full_name in collector_registry:
-            raise ValueError(f"Counter '{self._full_name}' already exists.")
-
-        collector_registry[self._full_name] = self
-
-    @property
-    def full_name(self) -> str:
-        """Returns the fully qualified metric name."""
-        return self._full_name
+        get_collector_registry().register(self)
 
     def labels(self, **kwargs: str) -> LabeledCounter:
         """
@@ -151,7 +221,7 @@ class Counter:
             ValueError: If incrementing a labeled counter without labels.
         """
         if value <= 0:
-            raise ValueError("Metrics Counter: increment value must be positive.")
+            raise ValueError("Increment value must be positive.")
 
         if self._labels and label_key is None:
             raise ValueError("This counter requires labels, use .labels() instead.")
@@ -216,9 +286,24 @@ class Counter:
 
 class LabeledCounter:
     """
-    A labeled instance of a `Counter`.
+    A helper class that delegates label-specific operations to a `Counter`.
 
-    This allows calling `.inc(value)` or `.reset()` on a specific set of label values.
+    - **Composition Pattern** → Holds a reference to `Counter` (`_counter`) and delegates operations.
+
+    How to use:
+        ```python
+        # Create a counter with labels
+        counter = Counter(namespace="api", name="http_requests", labels=["method"])
+
+        # Get a delegate for a specific label
+        label_delegate = counter.labels(method="GET")
+
+        # Increment the labeled counter
+        label_delegate.inc(5)  # Internally calls counter.inc(label_key=("GET",), value=5)
+
+        # Reset the labeled counter
+        label_delegate.reset()  # Internally calls counter.reset(label_key=("GET",))
+        ```
 
     Attributes:
         _counter (Counter): Reference to the main counter.
@@ -248,17 +333,19 @@ class LabeledCounter:
         self._counter.reset(label_key=self._labels)
 
 
-def collect_metrics() -> List[Dict[str, Union[str, int]]]:
+@hooks.on_infra_start()
+def initialize_collector_registry() -> None:
     """
-    Collects usage metrics from all registered counters.
+    Ensures the `CollectorRegistry` is instantiated as a Singleton.
+
+    - This function is executed at infrastructure startup.
+    - The same `CollectorRegistry` instance will be used globally.
+    - All collectors (e.g., `Counter`, `Gauge`) will register themselves via `get_collector_registry()`.
 
     Returns:
-        List[Dict[str, Union[str, int]]]: A flat list of usage metrics.
+        None
     """
-    collected_metrics = []
-    for collector in collector_registry.values():
-        collected_metrics.extend(collector.collect())
-    return collected_metrics
+    CollectorRegistry()
 
 
 @hooks.on_infra_shutdown()
@@ -277,7 +364,7 @@ def publish_metrics():
         client_time=str(datetime.datetime.now()),
     )
 
-    collected_metrics = collect_metrics()
+    collected_metrics = get_collector_registry().collect()
 
     if collected_metrics:
         publisher = AnalyticsClientPublisher()
