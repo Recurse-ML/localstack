@@ -20,40 +20,40 @@ LOG = logging.getLogger(__name__)
 #  for now, we can recommend to use config.DISABLE_EVENTS=
 
 
-class CollectorRegistry:
+class MetricRegistry:
     """
-    A Singleton responsible for managing all registered collectors.
+    A Singleton responsible for managing all registered metrics.
 
-    - Stores references to `Collector` instances.
+    - Stores references to `Metric` instances.
     - Provides methods for retrieving and collecting metrics.
     """
-    _instance: Optional[CollectorRegistry] = None  # Singleton instance
-    _registry: Dict[str, Collector]  # Stores registered collectors
+    _instance: Optional[MetricRegistry] = None  # Singleton instance
+    _registry: Dict[str, Metric]  # Stores registered metrics
 
-    def __new__(cls) -> CollectorRegistry:
-        """Ensures only one instance of `CollectorRegistry` exists (Singleton Pattern)."""
+    def __new__(cls) -> MetricRegistry:
+        """Ensures only one instance of `MetricRegistry` exists"""
         if not cls._instance:
-            cls._instance = super(CollectorRegistry, cls).__new__(cls)
+            cls._instance = super(MetricRegistry, cls).__new__(cls)
             cls._instance._registry = dict()  # Registry initialized here
         return cls._instance
 
-    def register(self, collector: Collector) -> None:
+    def register(self, metric: Metric) -> None:
         """
-        Registers a new collector (Counter, Gauge, etc.).
+        Registers a new metric (Counter, Gauge, etc.).
 
         Args:
-            collector (Collector): The collector instance to register.
+            metric (Metric): The metric instance to register.
 
         Raises:
-            ValueError: If a collector with the same name already exists.
+            ValueError: If a metric with the same name already exists.
         """
-        if not isinstance(collector, Collector):
-            raise TypeError("Only subclasses of `Collector` can be registered.")
+        if not isinstance(metric, Metric):
+            raise TypeError("Only subclasses of `Metric` can be registered.")
 
-        if collector.full_name in self._registry:
-            raise ValueError(f"Collector '{collector.full_name}' already exists.")
+        if metric.full_name in self._registry:
+            raise ValueError(f"Metric '{metric.full_name}' already exists.")
 
-        self._registry[collector.full_name] = collector
+        self._registry[metric.full_name] = metric
 
     def collect(self) -> Dict[str, List[Dict[str, Union[str, int]]]]:
         """
@@ -62,17 +62,17 @@ class CollectorRegistry:
         Returns:
             List[Dict[str, Union[str, int]]]: A flat list of all collected metrics.
         """
-        return {"metrics": [metric for collector in self._registry.values() for metric in collector.collect()]}
+        return {"metrics": [metric for metric_instance in self._registry.values() for metric in metric_instance.collect()]}
 
 
-def get_collector_registry() -> CollectorRegistry:
-    """Ensures we always get the same instance of `CollectorRegistry`."""
-    return CollectorRegistry()
+def get_metric_registry() -> MetricRegistry:
+    """Ensures we always get the same instance of `MetricRegistry`."""
+    return MetricRegistry()
 
 
-class Collector(ABC):
+class Metric(ABC):
     """
-    Base class for all collectors (e.g., Counter, Gauge).
+    Base class for all metrics (e.g., Counter, Gauge).
 
     Each subclass must implement the `collect()` method.
     """
@@ -95,7 +95,7 @@ class Collector(ABC):
             ValueError: If the name is empty or invalid.
         """
         if not value or value.strip() == "":
-            raise ValueError("Collector must have a valid name.")
+            raise ValueError("Metric must have a valid name.")
         self._full_name = value
 
     @abstractmethod
@@ -104,7 +104,7 @@ class Collector(ABC):
         pass
 
 
-class MockCounter(Collector):
+class MockCounter(Metric):
     """Mock implementation of the Counter class, used when events are disabled."""
 
     def labels(self, **kwargs: str) -> MockCounter:
@@ -123,7 +123,7 @@ class MockCounter(Collector):
         return []
 
 
-class Counter(Collector):
+class Counter(Metric):
     """
         A thread-safe counter for tracking occurrences of an event.
 
@@ -138,7 +138,7 @@ class Counter(Collector):
             _full_name (str): The fully qualified metric name.
             _namespace (Optional[str]): The namespace for the metric.
             _labels (List[str]): The assigned label keys.
-            _labels_origin (Dict[str, str]): Maps original label names to generic `label_X` keys.
+            _labels_normalization (Dict[str, str]): Maps original label names to generic `label_X` keys.
     """
     _lock: threading.Lock
     _values: defaultdict[Tuple[Optional[str], ...], int]
@@ -146,7 +146,7 @@ class Counter(Collector):
     _full_name: str
     _namespace: Optional[str]
     _labels: Optional[List[str]]
-    _labels_origin: Dict[str, str]
+    __labels_normalization: Dict[str, str]
 
     def __new__(cls, name: str = "", labels: Optional[List[str]] = None, namespace: str = "") -> Union[Counter, MockCounter]:
         """Returns a real or mock instance based on the `DISABLE_EVENTS` config."""
@@ -178,13 +178,13 @@ class Counter(Collector):
         if labels:
             if len(labels) > 5:
                 raise ValueError("A maximum of 5 labels are allowed.")
-            self._labels_origin = {label_origin: f"label_{i + 1}" for i, label_origin in enumerate(labels or [])}
-            self._labels = list(self._labels_origin.values())
+            self._labels_normalization = {label_origin: f"label_{i + 1}" for i, label_origin in enumerate(labels or [])}
+            self._labels = list(self._labels_normalization.values())
         else:
-            self._labels_origin = {}
+            self._labels_normalization = {}
             self._labels = []
 
-        get_collector_registry().register(self)
+        get_metric_registry().register(self)
 
     def labels(self, **kwargs: str) -> LabeledCounter:
         """
@@ -202,10 +202,10 @@ class Counter(Collector):
         if not self._labels:
             raise ValueError("This counter does not support labels.")
 
-        if len(kwargs) != len(self._labels_origin.keys()):
-            raise ValueError(f"Expected labels {self._labels_origin.keys()}, got {list(kwargs.keys())}")
+        if len(kwargs) != len(self._labels_normalization.keys()):
+            raise ValueError(f"Expected labels {self._labels_normalization.keys()}, got {list(kwargs.keys())}")
 
-        labels = tuple(kwargs.get(label_key, None) for label_key in self._labels_origin.keys())
+        labels = tuple(kwargs.get(label_key, None) for label_key in self._labels_normalization.keys())
         return LabeledCounter(counter=self, labels=labels)
 
     def inc(self, value: int = 1, label_key: Optional[Tuple[Optional[str], ...]] = None) -> None:
@@ -263,8 +263,8 @@ class Counter(Collector):
             for labels, value in self._values.items():
                 label_dict = dict(zip(self._labels, labels))
 
-                # labels original names
-                label_origin_dict = {f"origin_{i + 1}": orig for i, orig in enumerate(self._labels_origin.keys()) or {}}
+                # labels descriptions
+                label_descriptions = {f"label_{i + 1}_des": label_des for i, label_des in enumerate(self._labels_normalization.keys()) or {}}
 
                 collected_data.append({
                     "name": self._full_name,
@@ -273,8 +273,8 @@ class Counter(Collector):
                     # it would generate: {"label_1": "sqs", "label_2": "error"}
                     **label_dict,
                     # Example: If labels=["service", "status"], it would generate:
-                    # {"origin_1": "service", "origin_2": "status"}
-                    **label_origin_dict
+                    # {"label_1_des": "service", "label_2_des": "status"}
+                    **label_descriptions
                 })
 
             return collected_data
@@ -334,18 +334,18 @@ class LabeledCounter:
 
 
 @hooks.on_infra_start()
-def initialize_collector_registry() -> None:
+def initialize_metric_registry() -> None:
     """
     Ensures the `CollectorRegistry` is instantiated as a Singleton.
 
     - This function is executed at infrastructure startup.
     - The same `CollectorRegistry` instance will be used globally.
-    - All collectors (e.g., `Counter`, `Gauge`) will register themselves via `get_collector_registry()`.
+    - All metrics (e.g., `Counter`, `Gauge`) will register themselves via `get_metric_registry()`.
 
     Returns:
         None
     """
-    CollectorRegistry()
+    MetricRegistry()
 
 
 @hooks.on_infra_shutdown()
@@ -364,9 +364,9 @@ def publish_metrics():
         client_time=str(datetime.datetime.now()),
     )
 
-    collected_metrics = get_collector_registry().collect()
+    collected_metrics = get_metric_registry().collect()
 
     if collected_metrics:
         publisher = AnalyticsClientPublisher()
-        publisher.publish([Event(name="metrics", metadata=metadata, payload=collected_metrics)])
+        publisher.publish([Event(name="ls_core", metadata=metadata, payload=collected_metrics)])
 
