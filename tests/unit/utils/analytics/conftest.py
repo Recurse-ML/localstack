@@ -1,7 +1,7 @@
 import pytest
 
 from localstack import config
-from localstack.utils.analytics.metrics import get_metric_registry, Counter
+from localstack.utils.analytics.metrics import Counter, get_metric_registry
 
 
 @pytest.fixture(autouse=True)
