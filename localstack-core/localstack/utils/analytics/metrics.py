@@ -28,7 +28,7 @@ class MetricRegistry:
     - Provides methods for retrieving and collecting metrics.
     """
     _instance: Optional[MetricRegistry] = None  # Singleton instance
-    _registry: Dict[str, Metric]  # Stores registered metrics
+    _registry: Dict[str, Metric]
 
     def __new__(cls) -> MetricRegistry:
         """Ensures only one instance of `MetricRegistry` exists"""
