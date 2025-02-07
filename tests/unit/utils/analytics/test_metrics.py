@@ -95,7 +95,7 @@ def test_max_labels_limit():
         Counter(name="test_counter", labels=["l1", "l2", "l3", "l4", "l5", "l6"])
 
 
-def test_labeled_counter_direct_inc_raises_error(labeled_counter):
+def test_labeled_counter_raises_error_if_inc_called_without_labels(labeled_counter):
     """Ensure calling inc() directly on a labeled counter raises a ValueError."""
     from re import escape  # Imported to escape special characters in the error message
     with pytest.raises(ValueError, match=escape("This counter requires labels, use .labels() instead.")):
