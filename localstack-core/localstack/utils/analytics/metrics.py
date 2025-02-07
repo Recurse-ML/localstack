@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import logging
 import datetime
+import logging
+import threading
 from abc import ABC, abstractmethod
 from collections import defaultdict
-import threading
-from typing import List, Tuple, Optional, Union, Dict
+from typing import Dict, List, Optional, Tuple, Union
 
 from localstack import config
 from localstack.runtime import hooks
@@ -27,6 +27,7 @@ class MetricRegistry:
     - Stores references to `Metric` instances.
     - Provides methods for retrieving and collecting metrics.
     """
+
     _instance: Optional[MetricRegistry] = None  # Singleton instance
     _registry: Dict[str, Metric]
 
@@ -62,7 +63,13 @@ class MetricRegistry:
         Returns:
             List[Dict[str, Union[str, int]]]: A flat list of all collected metrics.
         """
-        return {"metrics": [metric for metric_instance in self._registry.values() for metric in metric_instance.collect()]}
+        return {
+            "metrics": [
+                metric
+                for metric_instance in self._registry.values()
+                for metric in metric_instance.collect()
+            ]
+        }
 
 
 def get_metric_registry() -> MetricRegistry:
@@ -76,6 +83,7 @@ class Metric(ABC):
 
     Each subclass must implement the `collect()` method.
     """
+
     _full_name: str = None
 
     @property
@@ -115,7 +123,9 @@ class MockCounter(Metric):
         """Ignores increment operations when events are disabled."""
         pass
 
-    def reset(self, ) -> None:
+    def reset(
+        self,
+    ) -> None:
         pass
 
     def collect(self) -> List[Dict[str, Union[str, int]]]:
@@ -125,21 +135,22 @@ class MockCounter(Metric):
 
 class Counter(Metric):
     """
-        A thread-safe counter for tracking occurrences of an event.
+    A thread-safe counter for tracking occurrences of an event.
 
-        Supports both:
-        - **Labeled counters** (via `.labels()`).
-        - **Unlabeled counters** (direct `.inc()` calls).
+    Supports both:
+    - **Labeled counters** (via `.labels()`).
+    - **Unlabeled counters** (direct `.inc()` calls).
 
-        Attributes:
-            _lock (threading.Lock): Ensures thread-safe operations.
-            _values (defaultdict): Stores counter values, keyed by label tuples.
-            _name (Optional[str]): The metric name.
-            _full_name (str): The fully qualified metric name.
-            _namespace (Optional[str]): The namespace for the metric.
-            _labels (List[str]): The assigned label keys.
-            _labels_normalization (Dict[str, str]): Maps original label names to generic `label_X` keys.
+    Attributes:
+        _lock (threading.Lock): Ensures thread-safe operations.
+        _values (defaultdict): Stores counter values, keyed by label tuples.
+        _name (Optional[str]): The metric name.
+        _full_name (str): The fully qualified metric name.
+        _namespace (Optional[str]): The namespace for the metric.
+        _labels (List[str]): The assigned label keys.
+        _labels_normalization (Dict[str, str]): Maps original label names to generic `label_X` keys.
     """
+
     _lock: threading.Lock
     _values: defaultdict[Tuple[Optional[str], ...], int]
     _name: Optional[str]
@@ -148,7 +159,9 @@ class Counter(Metric):
     _labels: Optional[List[str]]
     __labels_normalization: Dict[str, str]
 
-    def __new__(cls, name: str = "", labels: Optional[List[str]] = None, namespace: str = "") -> Union[Counter, MockCounter]:
+    def __new__(
+        cls, name: str = "", labels: Optional[List[str]] = None, namespace: str = ""
+    ) -> Union[Counter, MockCounter]:
         """Returns a real or mock instance based on the `DISABLE_EVENTS` config."""
         if config.DISABLE_EVENTS:
             return MockCounter()
@@ -178,7 +191,9 @@ class Counter(Metric):
         if labels:
             if len(labels) > 5:
                 raise ValueError("A maximum of 5 labels are allowed.")
-            self._labels_normalization = {label_origin: f"label_{i + 1}" for i, label_origin in enumerate(labels or [])}
+            self._labels_normalization = {
+                label_origin: f"label_{i + 1}" for i, label_origin in enumerate(labels or [])
+            }
             self._labels = list(self._labels_normalization.values())
         else:
             self._labels_normalization = {}
@@ -203,9 +218,13 @@ class Counter(Metric):
             raise ValueError("This counter does not support labels.")
 
         if len(kwargs) != len(self._labels_normalization.keys()):
-            raise ValueError(f"Expected labels {self._labels_normalization.keys()}, got {list(kwargs.keys())}")
+            raise ValueError(
+                f"Expected labels {self._labels_normalization.keys()}, got {list(kwargs.keys())}"
+            )
 
-        labels = tuple(kwargs.get(label_key, None) for label_key in self._labels_normalization.keys())
+        labels = tuple(
+            kwargs.get(label_key, None) for label_key in self._labels_normalization.keys()
+        )
         return LabeledCounter(counter=self, labels=labels)
 
     def inc(self, value: int = 1, label_key: Optional[Tuple[Optional[str], ...]] = None) -> None:
@@ -264,18 +283,23 @@ class Counter(Metric):
                 label_dict = dict(zip(self._labels, labels))
 
                 # labels descriptions
-                label_descriptions = {f"label_{i + 1}_des": label_des for i, label_des in enumerate(self._labels_normalization.keys()) or {}}
+                label_descriptions = {
+                    f"label_{i + 1}_des": label_des
+                    for i, label_des in enumerate(self._labels_normalization.keys()) or {}
+                }
 
-                collected_data.append({
-                    "name": self._full_name,
-                    "value": value,
-                    # Example: If labels=["service", "status"], and values=("sqs", "error"),
-                    # it would generate: {"label_1": "sqs", "label_2": "error"}
-                    **label_dict,
-                    # Example: If labels=["service", "status"], it would generate:
-                    # {"label_1_des": "service", "label_2_des": "status"}
-                    **label_descriptions
-                })
+                collected_data.append(
+                    {
+                        "name": self._full_name,
+                        "value": value,
+                        # Example: If labels=["service", "status"], and values=("sqs", "error"),
+                        # it would generate: {"label_1": "sqs", "label_2": "error"}
+                        **label_dict,
+                        # Example: If labels=["service", "status"], it would generate:
+                        # {"label_1_des": "service", "label_2_des": "status"}
+                        **label_descriptions,
+                    }
+                )
 
             return collected_data
 
@@ -309,6 +333,7 @@ class LabeledCounter:
         _counter (Counter): Reference to the main counter.
         _labels (Tuple[Optional[str], ...]): The assigned label values.
     """
+
     _counter: Counter
     _labels: tuple[Optional[str], ...]
 
@@ -369,4 +394,3 @@ def publish_metrics():
     if collected_metrics:
         publisher = AnalyticsClientPublisher()
         publisher.publish([Event(name="ls_core", metadata=metadata, payload=collected_metrics)])
-
