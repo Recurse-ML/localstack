@@ -1,8 +1,14 @@
 import threading
+from re import escape
 
 import pytest
 
-from localstack.utils.analytics.metrics import Counter, MockCounter, get_metric_registry
+from localstack.utils.analytics.metrics import (
+    Counter,
+    MockCounter,
+    MultiLabelCounter,
+    get_metric_registry,
+)
 
 
 def test_metric_registry_singleton():
@@ -12,8 +18,8 @@ def test_metric_registry_singleton():
 
 
 def test_counter_increment(counter):
-    counter.inc()
-    counter.inc(value=3)
+    counter.increment()
+    counter.increment(value=3)
     collected = counter.collect()
     assert collected[0]["value"] == 4, (
         f"Unexpected counter value: expected 4, got {collected[0]['value']}"
@@ -21,7 +27,7 @@ def test_counter_increment(counter):
 
 
 def test_counter_reset(counter):
-    counter.inc(value=5)
+    counter.increment(value=5)
     counter.reset()
     collected = counter.collect()
     assert collected[0]["value"] == 0, (
@@ -29,10 +35,10 @@ def test_counter_reset(counter):
     )
 
 
-def test_labeled_counter_increment(labeled_counter):
-    labeled_counter.labels(status="success").inc(value=2)
-    labeled_counter.labels(status="error").inc(value=3)
-    collected = labeled_counter.collect()
+def test_multilabel_counter_increment(multilabel_counter):
+    multilabel_counter.labels(status="success").increment(value=2)
+    multilabel_counter.labels(status="error").increment(value=3)
+    collected = multilabel_counter.collect()
     assert any(metric["value"] == 2 for metric in collected if metric["label_1"] == "success"), (
         "Unexpected counter value for label success"
     )
@@ -41,13 +47,13 @@ def test_labeled_counter_increment(labeled_counter):
     )
 
 
-def test_labeled_counter_reset(labeled_counter):
-    labeled_counter.labels(status="success").inc(value=5)
-    labeled_counter.labels(status="error").inc(value=4)
+def test_multilabel_counter_reset(multilabel_counter):
+    multilabel_counter.labels(status="success").increment(value=5)
+    multilabel_counter.labels(status="error").increment(value=4)
 
-    labeled_counter.labels(status="success").reset()
+    multilabel_counter.labels(status="success").reset()
 
-    collected = labeled_counter.collect()
+    collected = multilabel_counter.collect()
     assert any(metric["value"] == 0 for metric in collected if metric["label_1"] == "success"), (
         "Unexpected counter value for label success"
     )
@@ -57,10 +63,18 @@ def test_labeled_counter_reset(labeled_counter):
     )
 
 
-def test_mock_counter_when_events_disabled(disable_analytics, counter):
+def test_mock_counter_no_label_when_events_disabled(disable_analytics, counter):
     assert isinstance(counter, MockCounter), "Should return a MockCounter when events are disabled"
-    counter.inc(value=10)
+    counter.increment(value=10)
     assert counter.collect() == [], "MockCounter should not collect any data"
+
+
+def test_mock_counter_multilabel_when_events_disabled_(disable_analytics, multilabel_counter):
+    assert isinstance(multilabel_counter, MockCounter), (
+        "Should return a MockCounter when events are disabled"
+    )
+    multilabel_counter.labels(status="status").increment(value=5)
+    assert multilabel_counter.collect() == [], "MockCounter should not collect any data"
 
 
 def test_metric_registry_register_and_collect(counter):
@@ -68,7 +82,7 @@ def test_metric_registry_register_and_collect(counter):
 
     # Ensure the counter is already registered
     assert counter.full_name in registry._registry, "Counter should automatically register itself"
-    counter.inc(value=7)
+    counter.increment(value=7)
     collected = registry.collect()
     assert any(metric["value"] == 7 for metric in collected["metrics"]), (
         f"Unexpected collected metrics: {collected}"
@@ -86,7 +100,7 @@ def test_metric_registry_register_duplicate_counter(counter):
 def test_thread_safety(counter):
     def increment():
         for _ in range(1000):
-            counter.inc()
+            counter.increment()
 
     threads = [threading.Thread(target=increment) for _ in range(5)]
     for thread in threads:
@@ -102,14 +116,36 @@ def test_thread_safety(counter):
 
 def test_max_labels_limit():
     with pytest.raises(ValueError, match="A maximum of 5 labels are allowed."):
-        Counter(name="test_counter", labels=["l1", "l2", "l3", "l4", "l5", "l6"])
+        MultiLabelCounter(name="test_counter", labels=["l1", "l2", "l3", "l4", "l5", "l6"])
 
 
-def test_labeled_counter_raises_error_if_inc_called_without_labels(labeled_counter):
+def test_labeled_counter_raises_error_if_increment_called_without_labels(multilabel_counter):
     """Ensure calling inc() directly on a labeled counter raises a ValueError."""
-    from re import escape  # Imported to escape special characters in the error message
-
     with pytest.raises(
-        ValueError, match=escape("This counter requires labels, use .labels() instead.")
+        ValueError, match=escape("Labels must be set using `.labels()` before incrementing.")
     ):
-        labeled_counter.inc(value=5)
+        multilabel_counter.increment()
+
+
+def test_counter_raises_error_if_labels_contain_empty_strings():
+    """Ensure that a labeled counter cannot be instantiated with empty or whitespace-only labels."""
+    with pytest.raises(ValueError, match="Labels must be non-empty strings."):
+        Counter(name="test_multilabel_counter_1", labels=["status", ""])
+
+
+def test_labels_method_raises_error_if_client_defined_label_is_empty(multilabel_counter):
+    """Ensure that the labels method raises an error if any client-defined label is empty."""
+    with pytest.raises(
+        ValueError, match=escape("Client defined Labels must be non-empty strings.")
+    ):
+        Counter(name="test_multilabel_counter_2", labels=["status"]).labels(status="")
+
+
+def test_counter_raises_error_if_name_is_missing():
+    with pytest.raises(ValueError, match="name is required and cannot be empty"):
+        Counter(namespace="test")
+
+
+def test_counter_raises_error_if_name_is_empty():
+    with pytest.raises(ValueError, match="name is required and cannot be empty"):
+        Counter(name="")

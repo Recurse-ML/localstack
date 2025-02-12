@@ -1,7 +1,12 @@
 import pytest
 
 from localstack import config
-from localstack.utils.analytics.metrics import Counter, get_metric_registry
+from localstack.utils.analytics.metrics import (
+    Counter,
+    MultiLabelCounter,
+    UnlabeledCounter,
+    get_metric_registry,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -20,14 +25,14 @@ def disable_analytics(monkeypatch):
 def reset_metric_registry() -> None:
     """Ensures each test starts with a fresh MetricRegistry."""
     registry = get_metric_registry()
-    registry._registry.clear()  # Reset all registered metrics before each test
+    registry.registry.clear()  # Reset all registered metrics before each test
 
 
 @pytest.fixture
-def counter() -> Counter:
+def counter() -> UnlabeledCounter:
     return Counter(name="test_counter")
 
 
 @pytest.fixture
-def labeled_counter() -> Counter:
-    return Counter(name="test_labeled_counter", labels=["status"])
+def multilabel_counter() -> MultiLabelCounter:
+    return Counter(name="test_multilabel_counter", labels=["status"])
