@@ -1,3 +1,7 @@
+"""
+[DEPRECATED] This module is deprecated in favor of `localstack.utils.analytics.metrics`.
+"""
+
 import datetime
 import math
 from collections import defaultdict
