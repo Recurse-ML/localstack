@@ -20,6 +20,7 @@ collector_registry: dict[str, Any] = dict()
 
 class UsageSetCounter:
     """
+    [DEPRECATED] Use `localstack.utils.analytics.metrics.Counter` instead.
     Use this counter to count occurrences of unique values
 
     Example:
@@ -51,6 +52,7 @@ class UsageSetCounter:
 
 class UsageCounter:
     """
+    [DEPRECATED] Use `localstack.utils.analytics.metrics.Counter` instead.
     Use this counter to count numeric values
 
     Example:
