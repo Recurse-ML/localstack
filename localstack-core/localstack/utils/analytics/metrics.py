@@ -377,9 +377,7 @@ class MultiLabelCounter(BaseCounter):
 
 class Counter:
     """
-    A factory-like constructor that abstracts counter type complexity, dynamically
-    instantiating the appropriate class. Instead of a separate factory (e.g., `CounterFactory.create()`),
-    it leverages `__new__` to transparently return the correct type, allowing direct use of `Counter()`.
+    A flexible entry point for creating counter instances.
     """
 
     def __new__(
