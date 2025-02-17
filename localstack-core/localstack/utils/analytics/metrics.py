@@ -235,7 +235,8 @@ class UnlabeledCounter(BaseCounter):
 
         :param name: The metric name.
         :type name: str
-        :param namespace: The prefix for the metric name.
+        :param namespace: An optional prefix that is prepended to the metric name to provide logical grouping.
+        If set, the full metric name will follow the format: `namespace_name`
         :type namespace: str
         """
         super().__init__(name=name, namespace=namespace)
@@ -254,6 +255,8 @@ class UnlabeledCounter(BaseCounter):
 
     def collect(self) -> List[Dict[str, Union[str, int]]]:
         with self._mutex:
+            if self._count == 0:  # Exclude zero-value metrics
+                return []
             return [{"namespace": self._namespace, "name": self._full_name, "value": self._count}]
 
 
@@ -348,6 +351,8 @@ class MultiLabelCounter(BaseCounter):
         with self._mutex:
             collected_data = []
             for client_defined_label, value in self._labeled_counts.items():
+                if value == 0:  # Exclude zero-value metrics
+                    continue
                 collected_data.append(
                     {
                         "namespace": self._namespace,
@@ -400,12 +405,14 @@ def publish_metrics():
     if config.DISABLE_EVENTS:
         return
 
+    collected_metrics = get_metric_registry().collect()
+    if not collected_metrics["metrics"]:  # Skip publishing if no metrics remain after filtering
+        return
+
     metadata = EventMetadata(
         session_id=get_session_id(),
         client_time=str(datetime.datetime.now()),
     )
-
-    collected_metrics = get_metric_registry().collect()
 
     if collected_metrics:
         publisher = AnalyticsClientPublisher()
