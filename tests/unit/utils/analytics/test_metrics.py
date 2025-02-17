@@ -30,21 +30,24 @@ def test_counter_reset(counter):
     counter.increment(value=5)
     counter.reset()
     collected = counter.collect()
-    assert collected[0]["value"] == 0, (
-        f"Unexpected counter value: expected 0, got {collected[0]['value']}"
-    )
+    assert collected == list(), f"Unexpected counter value: expected 0, got {collected}"
 
 
 def test_multilabel_counter_increment(multilabel_counter):
     multilabel_counter.labels(status="success").increment(value=2)
     multilabel_counter.labels(status="error").increment(value=3)
-    collected = multilabel_counter.collect()
-    assert any(metric["value"] == 2 for metric in collected if metric["label_1"] == "success"), (
-        "Unexpected counter value for label success"
-    )
-    assert any(metric["value"] == 3 for metric in collected if metric["label_1"] == "error"), (
-        "Unexpected counter value for label error"
-    )
+    collected_metrics = multilabel_counter.collect()
+
+    assert any(
+        metric["metric_value"] == 2
+        for metric in collected_metrics
+        if metric["label_1_value"] == "success"
+    ), "Unexpected counter value for label success"
+    assert any(
+        metric["metric_value"] == 3
+        for metric in collected_metrics
+        if metric["label_1_value"] == "error"
+    ), "Unexpected counter value for label error"
 
 
 def test_multilabel_counter_reset(multilabel_counter):
@@ -53,14 +56,17 @@ def test_multilabel_counter_reset(multilabel_counter):
 
     multilabel_counter.labels(status="success").reset()
 
-    collected = multilabel_counter.collect()
-    assert any(metric["value"] == 0 for metric in collected if metric["label_1"] == "success"), (
-        "Unexpected counter value for label success"
+    collected_metrics = multilabel_counter.collect()
+
+    assert all(metric["label_1_value"] != "success" for metric in collected_metrics), (
+        "Metric for label 'success' should not appear after reset."
     )
 
-    assert any(metric["value"] == 4 for metric in collected if metric["label_1"] == "error"), (
-        "Unexpected counter value for label error"
-    )
+    assert any(
+        metric["metric_value"] == 4
+        for metric in collected_metrics
+        if metric["label_1_value"] == "error"
+    ), "Unexpected counter value for label error"
 
 
 def test_mock_counter_no_label_when_events_disabled(disable_analytics, counter):
@@ -130,15 +136,13 @@ def test_labeled_counter_raises_error_if_increment_called_without_labels(multila
 def test_counter_raises_error_if_labels_contain_empty_strings():
     """Ensure that a labeled counter cannot be instantiated with empty or whitespace-only labels."""
     with pytest.raises(ValueError, match="Labels must be non-empty strings."):
-        Counter(name="test_multilabel_counter_1", labels=["status", ""])
+        Counter(name="test_multilabel_counter", labels=["status", ""])
 
 
-def test_labels_method_raises_error_if_client_defined_label_is_empty(multilabel_counter):
+def test_labels_method_raises_error_if_label_value_is_empty():
     """Ensure that the labels method raises an error if any client-defined label is empty."""
-    with pytest.raises(
-        ValueError, match=escape("Client defined Labels must be non-empty strings.")
-    ):
-        Counter(name="test_multilabel_counter_2", labels=["status"]).labels(status="")
+    with pytest.raises(ValueError, match=escape("Label values must be non-empty strings.")):
+        Counter(name="test_multilabel_counter", labels=["status"]).labels(status="")
 
 
 def test_counter_raises_error_if_name_is_missing():

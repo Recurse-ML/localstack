@@ -265,10 +265,9 @@ class MultiLabelCounter(BaseCounter):
     A labeled counter that tracks occurrences of an event across different label combinations.
     """
 
-    _labeled_counts: defaultdict[Tuple[str, ...], int]
-    _fixed_labels: List[str]
-    _client_defined_to_fixed_label_mapping: Dict[str, str]
-    _client_defined_labels: tuple[Optional[str], ...]
+    metric_value_by_label: defaultdict[Tuple[str, ...], int]
+    _label_values: tuple[Optional[str], ...]
+    _labels: List[str]
 
     def __init__(self, name: str = "", labels: List[str] = list, namespace: Optional[str] = ""):
         """
@@ -290,21 +289,18 @@ class MultiLabelCounter(BaseCounter):
         if len(labels) > 5:
             raise ValueError("A maximum of 5 labels are allowed.")
 
-        self._labeled_counts = defaultdict(int)
-        self._client_defined_labels = ()
-        self._client_defined_to_fixed_label_mapping = {
-            client_defined_labels: f"label_{i + 1}"
-            for i, client_defined_labels in enumerate(labels or [])
-        }
-        self._fixed_labels = list(self._client_defined_to_fixed_label_mapping.values())
+        self._metric_value_by_label = defaultdict(int)
+        self._labels = labels
+        self._label_values = tuple()
+
         get_metric_registry().register(self)
 
     def labels(self, **kwargs: str) -> MultiLabelCounter:
         """
-        Assign client defined labels to the counter instance.
+        Assign label values to the counter instance.
 
         :param kwargs:
-            Key-value pairs representing label names and their respective values.
+            Key-value pairs representing labels and their respective values.
 
         :return:
             The updated instance of `MultiLabelCounter` with assigned labels.
@@ -315,18 +311,13 @@ class MultiLabelCounter(BaseCounter):
             - If the number of provided labels does not match the expected count.
             - If any of the provided labels are empty strings.
         """
-        if len(kwargs) != len(self._client_defined_to_fixed_label_mapping.keys()):
-            raise ValueError(
-                f"Expected labels {self._client_defined_to_fixed_label_mapping.keys()}, got {list(kwargs.keys())}"
-            )
+        self._label_values = tuple(label_value.strip() for label_value in kwargs.values())
 
-        self._client_defined_labels = tuple(
-            kwargs.get(label_key, "").strip()
-            for label_key in self._client_defined_to_fixed_label_mapping.keys()
-        )
+        if len(kwargs) != len(self._label_values):
+            raise ValueError(f"Expected labels {self._label_values}, got {list(kwargs.values())}")
 
-        if any(not label for label in self._client_defined_labels):
-            raise ValueError("Client defined Labels must be non-empty strings.")
+        if any(not label for label in self._label_values):
+            raise ValueError("Label values must be non-empty strings.")
 
         return self
 
@@ -334,40 +325,54 @@ class MultiLabelCounter(BaseCounter):
         if value <= 0:
             raise ValueError("Increment value must be positive.")
 
-        if not self._client_defined_labels:
+        if not self._label_values:
             raise ValueError("Labels must be set using `.labels()` before incrementing.")
 
         with self._mutex:
-            self._labeled_counts[self._client_defined_labels] += value
+            self._metric_value_by_label[self._label_values] += value
 
     def reset(self) -> None:
-        if self._client_defined_labels is None:
+        if self._label_values is None:
             raise ValueError("Labels must be set using .labels() before resetting.")
 
         with self._mutex:
-            self._labeled_counts[self._client_defined_labels] = 0
+            self._metric_value_by_label[self._label_values] = 0
+
+    def as_dict_list(self) -> List[Dict[str, Union[str, int]]]:
+        num_labels = len(self._labels)
+
+        static_key_label_value = [f"label_{i + 1}_value" for i in range(num_labels)]
+        static_key_label = [f"label_{i + 1}" for i in range(num_labels)]
+
+        collected_metrics = []
+
+        for label_values, metric_value in self._metric_value_by_label.items():
+            if metric_value == 0:
+                continue  # Exclude zero-value metrics
+
+            if len(label_values) != num_labels:
+                raise ValueError(
+                    f"Label count mismatch: expected {num_labels} labels {self._labels}, "
+                    f"but got {len(label_values)} values {label_values}."
+                )
+
+            collected_metrics.append(
+                {
+                    "namespace": self._namespace,
+                    "name": self._full_name,
+                    "metric_value": metric_value,
+                    **dict(
+                        zip(static_key_label_value, label_values)
+                    ),  # maps 'label_1_value': 'label_value'
+                    **dict(zip(static_key_label, self._labels)),  # maps 'label_1': 'label'
+                }
+            )
+
+        return collected_metrics
 
     def collect(self) -> List[Dict[str, Union[str, int]]]:
         with self._mutex:
-            collected_data = []
-            for client_defined_label, value in self._labeled_counts.items():
-                if value == 0:  # Exclude zero-value metrics
-                    continue
-                collected_data.append(
-                    {
-                        "namespace": self._namespace,
-                        "name": self._full_name,
-                        "value": value,
-                        **dict(zip(self._fixed_labels, client_defined_label)),
-                        **{
-                            f"label_{i + 1}_des": label_key
-                            for i, label_key in enumerate(
-                                self._client_defined_to_fixed_label_mapping.keys()
-                            )
-                        },
-                    }
-                )
-            return collected_data
+            return self.as_dict_list()
 
 
 class Counter:
@@ -416,4 +421,4 @@ def publish_metrics():
 
     if collected_metrics:
         publisher = AnalyticsClientPublisher()
-        publisher.publish([Event(name="ls_core", metadata=metadata, payload=collected_metrics)])
+        publisher.publish([Event(name="ls_metrics", metadata=metadata, payload=collected_metrics)])
