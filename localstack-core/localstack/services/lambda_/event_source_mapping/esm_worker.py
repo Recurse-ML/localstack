@@ -8,6 +8,7 @@ from localstack.aws.api.lambda_ import (
 from localstack.services.lambda_.event_source_mapping.pollers.poller import Poller
 from localstack.services.lambda_.invocation.models import LambdaStore, lambda_stores
 from localstack.services.lambda_.provider_utils import get_function_version_from_arn
+from localstack.utils.backoff import ExponentialBackoff
 from localstack.utils.threads import FuncThread
 
 POLL_INTERVAL_SEC: float = 1
@@ -133,9 +134,12 @@ class EsmWorker:
             self.update_esm_state_in_store(EsmState.ENABLED)
             self.state_transition_reason = self.user_state_reason
 
+        boff = ExponentialBackoff(initial_interval=2)
         while not self._shutdown_event.is_set():
             try:
                 self.poller.poll_events()
+                # If no exception encountered, reset the backoff
+                boff.reset()
                 # TODO: update state transition reason?
                 # Wait for next short-polling interval
                 # MAYBE: read the poller interval from self.poller if we need the flexibility
@@ -148,9 +152,8 @@ class EsmWorker:
                     e,
                     exc_info=LOG.isEnabledFor(logging.DEBUG),
                 )
-                # TODO: implement some backoff here and stop poller upon continuous errors
                 # Wait some time between retries to avoid running into the problem right again
-                self._shutdown_event.wait(2)
+                self._shutdown_event.wait(boff.next_backoff())
 
         # Optionally closes internal components of Poller. This is a no-op for unimplemented pollers.
         self.poller.close()
