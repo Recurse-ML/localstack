@@ -5,8 +5,6 @@ import pytest
 
 from localstack.utils.analytics.metrics import (
     Counter,
-    MockCounter,
-    MultiLabelCounter,
     get_metric_registry,
 )
 
@@ -33,10 +31,10 @@ def test_counter_reset(counter):
     assert collected == list(), f"Unexpected counter value: expected 0, got {collected}"
 
 
-def test_multilabel_counter_increment(multilabel_counter):
-    multilabel_counter.labels(status="success").increment(value=2)
-    multilabel_counter.labels(status="error").increment(value=3)
-    collected_metrics = multilabel_counter.collect()
+def test_labeled_counter_increment(labeled_counter):
+    labeled_counter.labels(status="success").increment(value=2)
+    labeled_counter.labels(status="error").increment(value=3)
+    collected_metrics = labeled_counter.collect()
 
     assert any(
         metric["metric_value"] == 2
@@ -50,13 +48,13 @@ def test_multilabel_counter_increment(multilabel_counter):
     ), "Unexpected counter value for label error"
 
 
-def test_multilabel_counter_reset(multilabel_counter):
-    multilabel_counter.labels(status="success").increment(value=5)
-    multilabel_counter.labels(status="error").increment(value=4)
+def test_labeled_counter_reset(labeled_counter):
+    labeled_counter.labels(status="success").increment(value=5)
+    labeled_counter.labels(status="error").increment(value=4)
 
-    multilabel_counter.labels(status="success").reset()
+    labeled_counter.labels(status="success").reset()
 
-    collected_metrics = multilabel_counter.collect()
+    collected_metrics = labeled_counter.collect()
 
     assert all(metric["label_1_value"] != "success" for metric in collected_metrics), (
         "Metric for label 'success' should not appear after reset."
@@ -69,18 +67,14 @@ def test_multilabel_counter_reset(multilabel_counter):
     ), "Unexpected counter value for label error"
 
 
-def test_mock_counter_no_label_when_events_disabled(disable_analytics, counter):
-    assert isinstance(counter, MockCounter), "Should return a MockCounter when events are disabled"
+def test_counter_when_events_disabled(disable_analytics, counter):
     counter.increment(value=10)
-    assert counter.collect() == [], "MockCounter should not collect any data"
+    assert counter.collect() == [], "Counter should not collect any data"
 
 
-def test_mock_counter_multilabel_when_events_disabled_(disable_analytics, multilabel_counter):
-    assert isinstance(multilabel_counter, MockCounter), (
-        "Should return a MockCounter when events are disabled"
-    )
-    multilabel_counter.labels(status="status").increment(value=5)
-    assert multilabel_counter.collect() == [], "MockCounter should not collect any data"
+def test_labeled_counter_when_events_disabled_(disable_analytics, labeled_counter):
+    labeled_counter.labels(status="status").increment(value=5)
+    assert labeled_counter.collect() == [], "Counter should not collect any data"
 
 
 def test_metric_registry_register_and_collect(counter):
@@ -121,28 +115,28 @@ def test_thread_safety(counter):
 
 
 def test_max_labels_limit():
-    with pytest.raises(ValueError, match="A maximum of 5 labels are allowed."):
-        MultiLabelCounter(name="test_counter", labels=["l1", "l2", "l3", "l4", "l5", "l6"])
+    with pytest.raises(ValueError, match="A maximum of 8 labels are allowed."):
+        Counter(name="test_counter", labels=["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8"])
 
 
-def test_labeled_counter_raises_error_if_increment_called_without_labels(multilabel_counter):
+def test_labeled_counter_raises_error_if_increment_called_without_labels(labeled_counter):
     """Ensure calling inc() directly on a labeled counter raises a ValueError."""
     with pytest.raises(
         ValueError, match=escape("Labels must be set using `.labels()` before incrementing.")
     ):
-        multilabel_counter.increment()
+        labeled_counter.increment()
 
 
 def test_counter_raises_error_if_labels_contain_empty_strings():
     """Ensure that a labeled counter cannot be instantiated with empty or whitespace-only labels."""
     with pytest.raises(ValueError, match="Labels must be non-empty strings."):
-        Counter(name="test_multilabel_counter", labels=["status", ""])
+        Counter(name="test_labeled_counter", labels=["status", ""])
 
 
 def test_labels_method_raises_error_if_label_value_is_empty():
     """Ensure that the labels method raises an error if any client-defined label is empty."""
     with pytest.raises(ValueError, match=escape("Label values must be non-empty strings.")):
-        Counter(name="test_multilabel_counter", labels=["status"]).labels(status="")
+        Counter(name="test_labeled_counter", labels=["status"]).labels(status="")
 
 
 def test_counter_raises_error_if_name_is_missing():
