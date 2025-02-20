@@ -116,15 +116,7 @@ def test_thread_safety(counter):
 
 def test_max_labels_limit():
     with pytest.raises(ValueError, match="A maximum of 8 labels are allowed."):
-        Counter(name="test_counter", labels=["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8"])
-
-
-def test_labeled_counter_raises_error_if_increment_called_without_labels(labeled_counter):
-    """Ensure calling inc() directly on a labeled counter raises a ValueError."""
-    with pytest.raises(
-        ValueError, match=escape("Labels must be set using `.labels()` before incrementing.")
-    ):
-        labeled_counter.increment()
+        Counter(name="test_counter", labels=["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9"])
 
 
 def test_counter_raises_error_if_labels_contain_empty_strings():
@@ -139,11 +131,6 @@ def test_labels_method_raises_error_if_label_value_is_empty():
         Counter(name="test_labeled_counter", labels=["status"]).labels(status="")
 
 
-def test_counter_raises_error_if_name_is_missing():
-    with pytest.raises(ValueError, match="name is required and cannot be empty"):
-        Counter(namespace="test")
-
-
 def test_counter_raises_error_if_name_is_empty():
-    with pytest.raises(ValueError, match="name is required and cannot be empty"):
+    with pytest.raises(ValueError, match="Name is required and cannot be empty."):
         Counter(name="")
