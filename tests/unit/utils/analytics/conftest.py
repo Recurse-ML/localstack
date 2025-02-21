@@ -3,10 +3,7 @@ import pytest
 from localstack import config
 from localstack.runtime.current import get_current_runtime, set_current_runtime
 from localstack.utils.analytics.metrics import (
-    Counter,
     MetricRegistry,
-    _LabeledCounter,
-    _SimpleCounter,
 )
 
 
@@ -27,16 +24,6 @@ def reset_metric_registry() -> None:
     """Ensures each test starts with a fresh MetricRegistry."""
     registry = MetricRegistry()
     registry.registry.clear()  # Reset all registered metrics before each test
-
-
-@pytest.fixture
-def counter() -> _SimpleCounter:
-    return Counter(name="test_counter")
-
-
-@pytest.fixture
-def labeled_counter() -> _LabeledCounter:
-    return Counter(name="test_multilabel_counter", labels=["status"])
 
 
 class MockComponents:

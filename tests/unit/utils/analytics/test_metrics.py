@@ -15,7 +15,8 @@ def test_metric_registry_singleton():
     assert registry_1 is registry_2, "Only one instance of MetricRegistry should exist at any time"
 
 
-def test_counter_increment(counter):
+def test_counter_increment():
+    counter = Counter(name="test_counter")
     counter.increment()
     counter.increment(value=3)
     collected = counter.collect()
@@ -24,14 +25,16 @@ def test_counter_increment(counter):
     )
 
 
-def test_counter_reset(counter):
+def test_counter_reset():
+    counter = Counter(name="test_counter")
     counter.increment(value=5)
     counter.reset()
     collected = counter.collect()
     assert collected == list(), f"Unexpected counter value: expected 0, got {collected}"
 
 
-def test_labeled_counter_increment(labeled_counter):
+def test_labeled_counter_increment():
+    labeled_counter = Counter(name="test_multilabel_counter", labels=["status"])
     labeled_counter.labels(status="success").increment(value=2)
     labeled_counter.labels(status="error").increment(value=3)
     collected_metrics = labeled_counter.collect()
@@ -48,7 +51,8 @@ def test_labeled_counter_increment(labeled_counter):
     ), "Unexpected counter value for label error"
 
 
-def test_labeled_counter_reset(labeled_counter):
+def test_labeled_counter_reset():
+    labeled_counter = Counter(name="test_multilabel_counter", labels=["status"])
     labeled_counter.labels(status="success").increment(value=5)
     labeled_counter.labels(status="error").increment(value=4)
 
@@ -67,17 +71,20 @@ def test_labeled_counter_reset(labeled_counter):
     ), "Unexpected counter value for label error"
 
 
-def test_counter_when_events_disabled(disable_analytics, counter):
+def test_counter_when_events_disabled(disable_analytics):
+    counter = Counter(name="test_counter")
     counter.increment(value=10)
     assert counter.collect() == [], "Counter should not collect any data"
 
 
-def test_labeled_counter_when_events_disabled_(disable_analytics, labeled_counter):
+def test_labeled_counter_when_events_disabled_(disable_analytics):
+    labeled_counter = Counter(name="test_multilabel_counter", labels=["status"])
     labeled_counter.labels(status="status").increment(value=5)
     assert labeled_counter.collect() == [], "Counter should not collect any data"
 
 
-def test_metric_registry_register_and_collect(counter):
+def test_metric_registry_register_and_collect():
+    counter = Counter(name="test_counter")
     registry = MetricRegistry()
 
     # Ensure the counter is already registered
@@ -89,7 +96,8 @@ def test_metric_registry_register_and_collect(counter):
     )
 
 
-def test_metric_registry_register_duplicate_counter(counter):
+def test_metric_registry_register_duplicate_counter():
+    counter = Counter(name="test_counter")
     registry = MetricRegistry()
 
     # Attempt to manually register the counter again, expecting a ValueError
@@ -97,7 +105,9 @@ def test_metric_registry_register_duplicate_counter(counter):
         registry.register(counter)
 
 
-def test_thread_safety(counter):
+def test_thread_safety():
+    counter = Counter(name="test_counter")
+
     def increment():
         for _ in range(1000):
             counter.increment()
