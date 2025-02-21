@@ -717,24 +717,34 @@ class TransformerUtility:
     def stepfunctions_api():
         return [
             JsonpathTransformer(
-                "$..SdkHttpMetadata.AllHttpHeaders.Date",
+                "$..SdkHttpMetadata..Date",
                 "date",
                 replace_reference=False,
             ),
             JsonpathTransformer(
-                "$..SdkHttpMetadata.AllHttpHeaders.X-Amzn-Trace-Id",
+                "$..SdkResponseMetadata..RequestId",
+                "RequestId",
+                replace_reference=False,
+            ),
+            JsonpathTransformer(
+                "$..X-Amzn-Trace-Id",
                 "X-Amzn-Trace-Id",
                 replace_reference=False,
             ),
             JsonpathTransformer(
-                "$..SdkHttpMetadata.HttpHeaders.Date",
-                "date",
+                "$..X-Amzn-Trace-Id",
+                "X-Amzn-Trace-Id",
                 replace_reference=False,
             ),
             JsonpathTransformer(
-                "$..SdkHttpMetadata.HttpHeaders.X-Amzn-Trace-Id",
-                "X-Amzn-Trace-Id",
-                replace_reference=False,
+                "$..x-amz-crc32",
+                "x-amz-crc32",
+                replace_reference=True,
+            ),
+            JsonpathTransformer(
+                "$..x-amzn-RequestId",
+                "x-amzn-RequestId",
+                replace_reference=True,
             ),
             KeyValueBasedTransformer(_transform_stepfunctions_cause_details, "json-input"),
         ]
