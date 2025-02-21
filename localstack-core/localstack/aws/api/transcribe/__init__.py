@@ -206,11 +206,6 @@ class MedicalScribeLanguageCode(StrEnum):
     en_US = "en-US"
 
 
-class MedicalScribeNoteTemplate(StrEnum):
-    HISTORY_AND_PHYSICAL = "HISTORY_AND_PHYSICAL"
-    GIRPP = "GIRPP"
-
-
 class MedicalScribeParticipantRole(StrEnum):
     PATIENT = "PATIENT"
     CLINICIAN = "CLINICIAN"
@@ -519,10 +514,6 @@ class CategoryProperties(TypedDict, total=False):
 CategoryPropertiesList = List[CategoryProperties]
 
 
-class ClinicalNoteGenerationSettings(TypedDict, total=False):
-    NoteTemplate: Optional[MedicalScribeNoteTemplate]
-
-
 class CreateCallAnalyticsCategoryRequest(ServiceRequest):
     CategoryName: CategoryName
     Rules: RuleList
@@ -708,7 +699,6 @@ class MedicalScribeSettings(TypedDict, total=False):
     VocabularyName: Optional[VocabularyName]
     VocabularyFilterName: Optional[VocabularyFilterName]
     VocabularyFilterMethod: Optional[VocabularyFilterMethod]
-    ClinicalNoteGenerationSettings: Optional[ClinicalNoteGenerationSettings]
 
 
 class MedicalScribeOutput(TypedDict, total=False):

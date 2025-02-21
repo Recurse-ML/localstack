@@ -81,7 +81,6 @@ policyNameType = str
 policyNotAttachableMessage = str
 policyPathType = str
 policyVersionIdType = str
-privateKeyIdType = str
 privateKeyType = str
 publicKeyFingerprintType = str
 publicKeyIdType = str
@@ -185,11 +184,6 @@ class ReportStateType(StrEnum):
     STARTED = "STARTED"
     INPROGRESS = "INPROGRESS"
     COMPLETE = "COMPLETE"
-
-
-class assertionEncryptionModeType(StrEnum):
-    Required = "Required"
-    Allowed = "Allowed"
 
 
 class assignmentStatusType(StrEnum):
@@ -748,8 +742,6 @@ class CreateSAMLProviderRequest(ServiceRequest):
     SAMLMetadataDocument: SAMLMetadataDocumentType
     Name: SAMLProviderNameType
     Tags: Optional[tagListType]
-    AssertionEncryptionMode: Optional[assertionEncryptionModeType]
-    AddPrivateKey: Optional[privateKeyType]
 
 
 class CreateSAMLProviderResponse(TypedDict, total=False):
@@ -1381,22 +1373,11 @@ class GetSAMLProviderRequest(ServiceRequest):
     SAMLProviderArn: arnType
 
 
-class SAMLPrivateKey(TypedDict, total=False):
-    KeyId: Optional[privateKeyIdType]
-    Timestamp: Optional[dateType]
-
-
-privateKeyList = List[SAMLPrivateKey]
-
-
 class GetSAMLProviderResponse(TypedDict, total=False):
-    SAMLProviderUUID: Optional[privateKeyIdType]
     SAMLMetadataDocument: Optional[SAMLMetadataDocumentType]
     CreateDate: Optional[dateType]
     ValidUntil: Optional[dateType]
     Tags: Optional[tagListType]
-    AssertionEncryptionMode: Optional[assertionEncryptionModeType]
-    PrivateKeyList: Optional[privateKeyList]
 
 
 class GetSSHPublicKeyRequest(ServiceRequest):
@@ -2320,11 +2301,8 @@ class UpdateRoleResponse(TypedDict, total=False):
 
 
 class UpdateSAMLProviderRequest(ServiceRequest):
-    SAMLMetadataDocument: Optional[SAMLMetadataDocumentType]
+    SAMLMetadataDocument: SAMLMetadataDocumentType
     SAMLProviderArn: arnType
-    AssertionEncryptionMode: Optional[assertionEncryptionModeType]
-    AddPrivateKey: Optional[privateKeyType]
-    RemovePrivateKey: Optional[privateKeyIdType]
 
 
 class UpdateSAMLProviderResponse(TypedDict, total=False):
@@ -2553,8 +2531,6 @@ class IamApi:
         saml_metadata_document: SAMLMetadataDocumentType,
         name: SAMLProviderNameType,
         tags: tagListType = None,
-        assertion_encryption_mode: assertionEncryptionModeType = None,
-        add_private_key: privateKeyType = None,
         **kwargs,
     ) -> CreateSAMLProviderResponse:
         raise NotImplementedError
@@ -3826,11 +3802,8 @@ class IamApi:
     def update_saml_provider(
         self,
         context: RequestContext,
+        saml_metadata_document: SAMLMetadataDocumentType,
         saml_provider_arn: arnType,
-        saml_metadata_document: SAMLMetadataDocumentType = None,
-        assertion_encryption_mode: assertionEncryptionModeType = None,
-        add_private_key: privateKeyType = None,
-        remove_private_key: privateKeyIdType = None,
         **kwargs,
     ) -> UpdateSAMLProviderResponse:
         raise NotImplementedError

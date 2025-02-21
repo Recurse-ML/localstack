@@ -13928,7 +13928,6 @@ class Snapshot(TypedDict, total=False):
     TransferType: Optional[TransferType]
     CompletionDurationMinutes: Optional[SnapshotCompletionDurationMinutesResponse]
     CompletionTime: Optional[MillisecondDateTime]
-    FullSnapshotSizeInBytes: Optional[Long]
     SnapshotId: Optional[String]
     VolumeId: Optional[String]
     State: Optional[SnapshotState]
