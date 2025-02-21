@@ -62,9 +62,6 @@ class MetricRegistry:
     def collect(self) -> Dict[str, List[Dict[str, Union[str, int]]]]:
         """
         Collects all registered metrics.
-
-        :return: A dictionary containing all collected metrics.
-        :rtype: Dict[str, List[Dict[str, Union[str, int]]]]
         """
         return {
             "metrics": [
@@ -73,10 +70,6 @@ class MetricRegistry:
                 for metric in metric_instance.collect()
             ]
         }
-
-
-def get_metric_registry() -> MetricRegistry:
-    return MetricRegistry()
 
 
 class Metric(ABC):
@@ -92,9 +85,6 @@ class Metric(ABC):
     def full_name(self) -> str:
         """
         Retrieves the fully qualified metric name.
-
-        :return: The full name of the metric.
-        :rtype: str
         """
         return self._full_name
 
@@ -103,8 +93,6 @@ class Metric(ABC):
         """
         Validates and sets the full metric name.
 
-        :param value: The fully qualified name to be set.
-        :type value: str
         :raises ValueError: If the name is empty or invalid.
         """
         if not value or value.strip() == "":
@@ -115,9 +103,6 @@ class Metric(ABC):
     def collect(self) -> List[Dict[str, Union[str, int]]]:
         """
         Collects and returns metric data. Subclasses must implement this to return collected metric data.
-
-        :return: A list of collected metrics.
-        :rtype: List[Dict[str, Union[str, int]]]
         """
         pass
 
@@ -149,7 +134,7 @@ class _SimpleCounter(Metric):
         self._namespace = namespace.strip() if namespace else ""
         self._full_name = "_".join(filter(None, [self._namespace, self._name])).strip("_")
         self._count = 0
-        get_metric_registry().register(self)
+        MetricRegistry().register(self)
 
     def increment(self, value: int = 1) -> None:
         """Increments the counter unless events are disabled."""
@@ -176,9 +161,8 @@ class _SimpleCounter(Metric):
             return list()
 
         with self._mutex:
-            if (
-                self._count == 0
-            ):  # Entries with a count value of 0 will not be included in the final payload.
+            if self._count == 0:
+                # Return an empty list if the count is 0, as there are no metrics to send to the analytics backend.
                 return list()
             return [{"namespace": self._namespace, "name": self._full_name, "value": self._count}]
 
@@ -211,7 +195,7 @@ class _LabeledCounter(Metric):
         self._label_values = tuple()
         self._count_by_labels = defaultdict(int)
 
-        get_metric_registry().register(self)
+        MetricRegistry().register(self)
 
     @property
     def mutex(self) -> threading.Lock:
@@ -226,15 +210,14 @@ class _LabeledCounter(Metric):
 
     def labels(self, **kwargs: str) -> _LabeledCounterProxy:
         """
-        Assign label values to the counter instance.
+        Create a scoped counter instance with specific label values.
 
-        :param kwargs:
-            Key-value pairs representing labels and their respective values.
+        This method assigns values to the predefined labels of a labeled counter and returns
+        a proxy object (`_LabeledCounterProxy`) that allows tracking metrics for that specific
+        combination of label values.
 
-        :return:
-            The updated instance of `MultiLabelCounter` with assigned labels.
-
-        :rtype: MultiLabelCounter
+        The proxy ensures that increments and resets are scoped to the given label values,
+        enforcing proper metric categorization.
 
         :raises ValueError:
             - If the number of provided labels does not match the expected count.
@@ -260,7 +243,7 @@ class _LabeledCounter(Metric):
 
         for label_values, count in self._count_by_labels.items():
             if count == 0:
-                continue  # entries with a count value of 0 will not be included in the list.
+                continue  # Skip items with a count of 0, as they should not be sent to the analytics backend.
 
             if len(label_values) != num_labels:
                 raise ValueError(
@@ -317,7 +300,11 @@ class _LabeledCounterProxy:
 
 class Counter:
     """
-    A flexible entry point that returns the appropriate counter type.
+    A factory class for creating counter instances.
+
+    This class provides a flexible way to create either a simple counter
+    (`_SimpleCounter`) or a labeled counter (`_LabeledCounter`) based on
+    whether labels are provided.
     """
 
     @overload
@@ -339,7 +326,7 @@ class Counter:
 
 
 @hooks.on_infra_shutdown()
-def publish_metrics():
+def publish_metrics() -> None:
     """
     Collects all the registered metrics and immediately sends them to the analytics service.
     Skips execution if event tracking is disabled (`config.DISABLE_EVENTS`).
@@ -349,7 +336,7 @@ def publish_metrics():
     if config.DISABLE_EVENTS:
         return
 
-    collected_metrics = get_metric_registry().collect()
+    collected_metrics = MetricRegistry().collect()
     if not collected_metrics["metrics"]:  # Skip publishing if no metrics remain after filtering
         return
 
