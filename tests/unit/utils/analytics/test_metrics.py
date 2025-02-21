@@ -5,13 +5,13 @@ import pytest
 
 from localstack.utils.analytics.metrics import (
     Counter,
-    get_metric_registry,
+    MetricRegistry,
 )
 
 
 def test_metric_registry_singleton():
-    registry_1 = get_metric_registry()
-    registry_2 = get_metric_registry()
+    registry_1 = MetricRegistry()
+    registry_2 = MetricRegistry()
     assert registry_1 is registry_2, "Only one instance of MetricRegistry should exist at any time"
 
 
@@ -78,7 +78,7 @@ def test_labeled_counter_when_events_disabled_(disable_analytics, labeled_counte
 
 
 def test_metric_registry_register_and_collect(counter):
-    registry = get_metric_registry()
+    registry = MetricRegistry()
 
     # Ensure the counter is already registered
     assert counter.full_name in registry._registry, "Counter should automatically register itself"
@@ -90,7 +90,7 @@ def test_metric_registry_register_and_collect(counter):
 
 
 def test_metric_registry_register_duplicate_counter(counter):
-    registry = get_metric_registry()
+    registry = MetricRegistry()
 
     # Attempt to manually register the counter again, expecting a ValueError
     with pytest.raises(ValueError, match=f"Metric '{counter.full_name}' already exists."):
