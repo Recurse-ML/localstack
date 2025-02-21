@@ -180,7 +180,7 @@ class _LabeledCounter(Metric):
         if not name:
             raise ValueError("Name is required and cannot be empty.")
 
-        if any(not label.strip() for label in labels):
+        if any(not label for label in labels):
             raise ValueError("Labels must be non-empty strings.")
 
         if len(labels) > 8:
@@ -223,7 +223,7 @@ class _LabeledCounter(Metric):
             - If the number of provided labels does not match the expected count.
             - If any of the provided labels are empty strings.
         """
-        self._label_values = tuple(label_value.strip() for label_value in kwargs.values())
+        self._label_values = tuple(label_value for label_value in kwargs.values())
 
         if len(kwargs) != len(self._label_values):
             raise ValueError(f"Expected labels {self._label_values}, got {list(kwargs.values())}")
