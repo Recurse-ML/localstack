@@ -4,73 +4,78 @@
 #
 #    pip-compile --extra=base-runtime --output-file=requirements-base-runtime.txt --strip-extras --unsafe-package=distribute --unsafe-package=localstack-core --unsafe-package=pip --unsafe-package=setuptools pyproject.toml
 #
-attrs==25.1.0
-    # via
-    #   jsonschema
-    #   localstack-twisted
-    #   referencing
-awscrt==0.23.10
+attrs==23.2.0
+    # via localstack-twisted
+awscrt==0.20.11
     # via localstack-core (pyproject.toml)
-boto3==1.36.21
+blinker==1.8.2
+    # via flask
+boto3==1.34.122
     # via localstack-core (pyproject.toml)
-botocore==1.36.21
+botocore==1.34.122
     # via
     #   boto3
     #   localstack-core (pyproject.toml)
     #   s3transfer
-build==1.2.2.post1
+build==1.2.1
     # via localstack-core (pyproject.toml)
-cachetools==5.5.1
+cachetools==5.3.3
     # via localstack-core (pyproject.toml)
-cbor2==5.6.5
+cbor2==5.6.4
     # via localstack-core (pyproject.toml)
-certifi==2025.1.31
+certifi==2024.6.2
     # via requests
-cffi==1.17.1
+cffi==1.16.0
     # via cryptography
-charset-normalizer==3.4.1
+charset-normalizer==3.3.2
     # via requests
-click==8.1.8
-    # via localstack-core (pyproject.toml)
+click==8.1.7
+    # via
+    #   flask
+    #   localstack-core (pyproject.toml)
 constantly==23.10.4
     # via localstack-twisted
-cryptography==44.0.1
+cryptography==42.0.8
     # via
     #   localstack-core (pyproject.toml)
     #   pyopenssl
 dill==0.3.6
     # via localstack-core (pyproject.toml)
-dnslib==0.9.25
+dnslib==0.9.24
     # via localstack-core (pyproject.toml)
-dnspython==2.7.0
+dnspython==2.6.1
     # via localstack-core (pyproject.toml)
 docker==7.1.0
+    # via localstack-core (pyproject.toml)
+flask==3.0.3
     # via localstack-core (pyproject.toml)
 h11==0.14.0
     # via
     #   hypercorn
     #   wsproto
-h2==4.2.0
+h2==4.1.0
     # via
     #   hypercorn
     #   localstack-twisted
-hpack==4.1.0
+hpack==4.0.0
     # via h2
 hypercorn==0.17.3
     # via localstack-core (pyproject.toml)
-hyperframe==6.1.0
+hyperframe==6.0.1
     # via h2
 hyperlink==21.0.0
     # via localstack-twisted
-idna==3.10
+idna==3.7
     # via
     #   hyperlink
     #   localstack-twisted
     #   requests
-incremental==24.7.2
+incremental==22.10.0
     # via localstack-twisted
-isodate==0.7.2
-    # via openapi-core
+itsdangerous==2.2.0
+    # via flask
+jinja2==3.1.4
+    # via flask
 jmespath==1.0.1
     # via
     #   boto3
@@ -79,129 +84,86 @@ jsonpatch==1.33
     # via localstack-core (pyproject.toml)
 jsonpointer==3.0.0
     # via jsonpatch
-jsonschema==4.23.0
-    # via
-    #   openapi-core
-    #   openapi-schema-validator
-    #   openapi-spec-validator
-jsonschema-path==0.3.4
-    # via
-    #   openapi-core
-    #   openapi-spec-validator
-jsonschema-specifications==2024.10.1
-    # via
-    #   jsonschema
-    #   openapi-schema-validator
-lazy-object-proxy==1.10.0
-    # via openapi-spec-validator
 localstack-twisted==24.3.0
     # via localstack-core (pyproject.toml)
 markdown-it-py==3.0.0
     # via rich
-markupsafe==3.0.2
-    # via werkzeug
+markupsafe==2.1.5
+    # via
+    #   jinja2
+    #   werkzeug
 mdurl==0.1.2
     # via markdown-it-py
-more-itertools==10.6.0
-    # via openapi-core
-openapi-core==0.19.4
-    # via localstack-core (pyproject.toml)
-openapi-schema-validator==0.6.3
-    # via
-    #   openapi-core
-    #   openapi-spec-validator
-openapi-spec-validator==0.7.1
-    # via openapi-core
-packaging==24.2
+packaging==24.1
     # via build
-parse==1.20.2
-    # via openapi-core
-pathable==0.4.4
-    # via jsonschema-path
-plux==1.12.1
+plux==1.10.0
     # via localstack-core (pyproject.toml)
 priority==1.3.0
     # via
     #   hypercorn
     #   localstack-twisted
-psutil==7.0.0
+psutil==5.9.8
     # via localstack-core (pyproject.toml)
 pycparser==2.22
     # via cffi
-pygments==2.19.1
+pygments==2.18.0
     # via rich
-pyopenssl==25.0.0
+pyopenssl==24.1.0
     # via
     #   localstack-core (pyproject.toml)
     #   localstack-twisted
-pyproject-hooks==1.2.0
+pyproject-hooks==1.1.0
     # via build
 python-dateutil==2.9.0.post0
     # via botocore
 python-dotenv==1.0.1
     # via localstack-core (pyproject.toml)
-pyyaml==6.0.2
-    # via
-    #   jsonschema-path
-    #   localstack-core (pyproject.toml)
+pyyaml==6.0.1
+    # via localstack-core (pyproject.toml)
 readerwriterlock==1.0.9
     # via localstack-core (pyproject.toml)
-referencing==0.36.2
-    # via
-    #   jsonschema
-    #   jsonschema-path
-    #   jsonschema-specifications
 requests==2.32.3
     # via
     #   docker
-    #   jsonschema-path
     #   localstack-core (pyproject.toml)
     #   requests-aws4auth
     #   rolo
-requests-aws4auth==1.3.1
+requests-aws4auth==1.2.3
     # via localstack-core (pyproject.toml)
-rfc3339-validator==0.1.4
-    # via openapi-schema-validator
-rich==13.9.4
+rich==13.7.1
     # via localstack-core (pyproject.toml)
-rolo==0.7.5
+rolo==0.5.0
     # via localstack-core (pyproject.toml)
-rpds-py==0.22.3
-    # via
-    #   jsonschema
-    #   referencing
-s3transfer==0.11.2
+s3transfer==0.10.1
     # via boto3
-semver==3.0.4
+semver==3.0.2
     # via localstack-core (pyproject.toml)
-six==1.17.0
+six==1.16.0
     # via
     #   python-dateutil
-    #   rfc3339-validator
+    #   requests-aws4auth
 tailer==0.4.1
     # via localstack-core (pyproject.toml)
 typing-extensions==4.12.2
     # via
     #   localstack-twisted
-    #   pyopenssl
     #   readerwriterlock
-    #   referencing
-urllib3==2.3.0
+urllib3==2.2.1
     # via
     #   botocore
     #   docker
     #   localstack-core (pyproject.toml)
     #   requests
-werkzeug==3.1.3
+werkzeug==3.0.3
     # via
+    #   flask
     #   localstack-core (pyproject.toml)
-    #   openapi-core
     #   rolo
 wsproto==1.2.0
     # via hypercorn
-xmltodict==0.14.2
+xmltodict==0.13.0
     # via localstack-core (pyproject.toml)
-zope-interface==7.2
+zope-interface==6.4.post2
     # via localstack-twisted
 
 # The following packages are considered to be unsafe in a requirements file:

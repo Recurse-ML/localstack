@@ -221,10 +221,9 @@ class LambdaService:
         region: str,
         account_id: str,
         invocation_type: InvocationType | None,
-        client_context: str | None,
+        client_context: Optional[str],
         request_id: str,
         payload: bytes | None,
-        trace_context: dict | None = None,
     ) -> InvocationResult | None:
         """
         Invokes a specific version of a lambda
@@ -236,12 +235,9 @@ class LambdaService:
         :param account_id: Account id of the function
         :param invocation_type: Invocation Type
         :param client_context: Client Context, if applicable
-        :param trace_context: tracing information such as X-Ray header
         :param payload: Invocation payload
         :return: The invocation result
         """
-        # NOTE: consider making the trace_context mandatory once we update all usages (should be easier after v4.0)
-        trace_context = trace_context or {}
         # Invoked arn (for lambda context) does not have qualifier if not supplied
         invoked_arn = lambda_arn(
             function_name=function_name,
@@ -327,7 +323,6 @@ class LambdaService:
                     invocation_type=invocation_type,
                     invoke_time=datetime.now(),
                     request_id=request_id,
-                    trace_context=trace_context,
                 )
             )
 
@@ -339,7 +334,6 @@ class LambdaService:
                 invocation_type=invocation_type,
                 invoke_time=datetime.now(),
                 request_id=request_id,
-                trace_context=trace_context,
             )
         )
 
@@ -459,7 +453,7 @@ class LambdaService:
                 provisioned_concurrency_config.provisioned_concurrent_executions
             )  # async again
 
-    def can_assume_role(self, role_arn: str, region: str) -> bool:
+    def can_assume_role(self, role_arn: str) -> bool:
         """
         Checks whether lambda can assume the given role.
         This _should_ only fail if IAM enforcement is enabled.
@@ -467,7 +461,7 @@ class LambdaService:
         :param role_arn: Role to assume
         :return: True if the role can be assumed by lambda, false otherwise
         """
-        sts_client = connect_to(region_name=region).sts.request_metadata(service_principal="lambda")
+        sts_client = connect_to().sts.request_metadata(service_principal="lambda")
         try:
             sts_client.assume_role(
                 RoleArn=role_arn,

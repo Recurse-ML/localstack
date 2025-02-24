@@ -11,24 +11,11 @@ import tempfile
 from abc import ABCMeta, abstractmethod
 from enum import Enum, unique
 from pathlib import Path
-from typing import (
-    Dict,
-    List,
-    Literal,
-    NamedTuple,
-    Optional,
-    Protocol,
-    Tuple,
-    TypedDict,
-    Union,
-    get_args,
-)
-
-import dotenv
+from typing import Dict, List, Literal, NamedTuple, Optional, Protocol, Tuple, Union, get_args
 
 from localstack import config
 from localstack.utils.collections import HashableList, ensure_list
-from localstack.utils.files import TMP_FILES, chmod_r, rm_rf, save_file
+from localstack.utils.files import TMP_FILES, rm_rf, save_file
 from localstack.utils.no_exit_argument_parser import NoExitArgumentParser
 from localstack.utils.strings import short_uid
 
@@ -44,21 +31,6 @@ class DockerContainerStatus(Enum):
     NON_EXISTENT = 0
     UP = 1
     PAUSED = 2
-
-
-class DockerContainerStats(TypedDict):
-    """Container usage statistics"""
-
-    Container: str
-    ID: str
-    Name: str
-    BlockIO: tuple[int, int]
-    CPUPerc: float
-    MemPerc: float
-    MemUsage: tuple[int, int]
-    NetIO: tuple[int, int]
-    PIDs: int
-    SDKStats: Optional[dict]
 
 
 class ContainerException(Exception):
@@ -464,19 +436,13 @@ class VolumeInfo(NamedTuple):
 
 
 @dataclasses.dataclass
-class LogConfig:
-    type: Literal["json-file", "syslog", "journald", "gelf", "fluentd", "none", "awslogs", "splunk"]
-    config: Dict[str, str] = dataclasses.field(default_factory=dict)
-
-
-@dataclasses.dataclass
 class ContainerConfiguration:
     image_name: str
     name: Optional[str] = None
     volumes: VolumeMappings = dataclasses.field(default_factory=VolumeMappings)
     ports: PortMappings = dataclasses.field(default_factory=PortMappings)
     exposed_ports: List[str] = dataclasses.field(default_factory=list)
-    entrypoint: Optional[Union[List[str], str]] = None
+    entrypoint: Optional[str] = None
     additional_flags: Optional[str] = None
     command: Optional[List[str]] = None
     env_vars: Dict[str, str] = dataclasses.field(default_factory=dict)
@@ -499,7 +465,6 @@ class ContainerConfiguration:
     ulimits: Optional[List[Ulimit]] = None
     labels: Optional[Dict[str, str]] = None
     init: Optional[bool] = None
-    log_config: Optional[LogConfig] = None
 
 
 class ContainerConfigurator(Protocol):
@@ -525,7 +490,7 @@ class DockerRunFlags:
     env_vars: Optional[Dict[str, str]]
     extra_hosts: Optional[Dict[str, str]]
     labels: Optional[Dict[str, str]]
-    volumes: Optional[List[SimpleVolumeBind]]
+    mounts: Optional[List[SimpleVolumeBind]]
     network: Optional[str]
     platform: Optional[DockerPlatform]
     privileged: Optional[bool]
@@ -549,10 +514,6 @@ class ContainerClient(metaclass=ABCMeta):
     @abstractmethod
     def get_container_status(self, container_name: str) -> DockerContainerStatus:
         """Returns the status of the container with the given name"""
-        pass
-
-    def get_container_stats(self, container_name: str) -> DockerContainerStats:
-        """Returns the usage statistics of the container with the given name"""
         pass
 
     def get_networks(self, container_name: str) -> List[str]:
@@ -650,27 +611,6 @@ class ContainerClient(metaclass=ABCMeta):
     def is_container_running(self, container_name: str) -> bool:
         """Checks whether a container with a given name is currently running"""
         return container_name in self.get_running_container_names()
-
-    def create_file_in_container(
-        self,
-        container_name,
-        file_contents: bytes,
-        container_path: str,
-        chmod_mode: Optional[int] = None,
-    ) -> None:
-        """
-        Create a file in container with the provided content. Provide the 'chmod_mode' argument if you want the file to have specific permissions.
-        """
-        with tempfile.NamedTemporaryFile() as tmp:
-            tmp.write(file_contents)
-            tmp.flush()
-            if chmod_mode is not None:
-                chmod_r(tmp.name, chmod_mode)
-            self.copy_into_container(
-                container_name=container_name,
-                local_path=tmp.name,
-                container_path=container_path,
-            )
 
     @abstractmethod
     def copy_into_container(
@@ -886,7 +826,7 @@ class ContainerClient(metaclass=ABCMeta):
             interactive=container_config.interactive,
             tty=container_config.tty,
             command=container_config.command,
-            volumes=container_config.volumes,
+            mount_volumes=container_config.volumes,
             ports=container_config.ports,
             exposed_ports=container_config.exposed_ports,
             env_vars=container_config.env_vars,
@@ -903,7 +843,6 @@ class ContainerClient(metaclass=ABCMeta):
             labels=container_config.labels,
             ulimits=container_config.ulimits,
             init=container_config.init,
-            log_config=container_config.log_config,
         )
 
     @abstractmethod
@@ -912,13 +851,13 @@ class ContainerClient(metaclass=ABCMeta):
         image_name: str,
         *,
         name: Optional[str] = None,
-        entrypoint: Optional[Union[List[str], str]] = None,
+        entrypoint: Optional[str] = None,
         remove: bool = False,
         interactive: bool = False,
         tty: bool = False,
         detach: bool = False,
         command: Optional[Union[List[str], str]] = None,
-        volumes: Optional[Union[VolumeMappings, List[SimpleVolumeBind]]] = None,
+        mount_volumes: Optional[Union[VolumeMappings, List[SimpleVolumeBind]]] = None,
         ports: Optional[PortMappings] = None,
         exposed_ports: Optional[List[str]] = None,
         env_vars: Optional[Dict[str, str]] = None,
@@ -935,7 +874,6 @@ class ContainerClient(metaclass=ABCMeta):
         platform: Optional[DockerPlatform] = None,
         ulimits: Optional[List[Ulimit]] = None,
         init: Optional[bool] = None,
-        log_config: Optional[LogConfig] = None,
     ) -> str:
         """Creates a container with the given image
 
@@ -955,7 +893,7 @@ class ContainerClient(metaclass=ABCMeta):
         tty: bool = False,
         detach: bool = False,
         command: Optional[Union[List[str], str]] = None,
-        volumes: Optional[Union[VolumeMappings, List[SimpleVolumeBind]]] = None,
+        mount_volumes: Optional[Union[VolumeMappings, List[SimpleVolumeBind]]] = None,
         ports: Optional[PortMappings] = None,
         exposed_ports: Optional[List[str]] = None,
         env_vars: Optional[Dict[str, str]] = None,
@@ -972,7 +910,6 @@ class ContainerClient(metaclass=ABCMeta):
         privileged: Optional[bool] = None,
         ulimits: Optional[List[Ulimit]] = None,
         init: Optional[bool] = None,
-        log_config: Optional[LogConfig] = None,
     ) -> Tuple[bytes, bytes]:
         """Creates and runs a given docker container
 
@@ -994,7 +931,7 @@ class ContainerClient(metaclass=ABCMeta):
             tty=container_config.tty,
             detach=container_config.detach,
             command=container_config.command,
-            volumes=container_config.volumes,
+            mount_volumes=container_config.volumes,
             ports=container_config.ports,
             exposed_ports=container_config.exposed_ports,
             env_vars=container_config.env_vars,
@@ -1010,7 +947,6 @@ class ContainerClient(metaclass=ABCMeta):
             privileged=container_config.privileged,
             ulimits=container_config.ulimits,
             init=container_config.init,
-            log_config=container_config.log_config,
         )
 
     @abstractmethod
@@ -1162,51 +1098,11 @@ class Util:
                     LOG.debug("File to copy empty, ignoring...")
 
     @staticmethod
-    def _read_docker_cli_env_file(env_file: str) -> Dict[str, str]:
-        """
-        Read an environment file in docker CLI format, specified here:
-        https://docs.docker.com/reference/cli/docker/container/run/#env
-        :param env_file: Path to the environment file
-        :return: Read environment variables
-        """
-        env_vars = {}
-        try:
-            with open(env_file, mode="rt") as f:
-                env_file_lines = f.readlines()
-        except FileNotFoundError as e:
-            LOG.error(
-                "Specified env file '%s' not found. Please make sure the file is properly mounted into the LocalStack container. Error: %s",
-                env_file,
-                e,
-            )
-            raise
-        except OSError as e:
-            LOG.error(
-                "Could not read env file '%s'. Please make sure the LocalStack container has the permissions to read it. Error: %s",
-                env_file,
-                e,
-            )
-            raise
-        for idx, line in enumerate(env_file_lines):
-            line = line.strip()
-            if not line or line.startswith("#"):
-                # skip comments or empty lines
-                continue
-            lhs, separator, rhs = line.partition("=")
-            if rhs or separator:
-                env_vars[lhs] = rhs
-            else:
-                # No "=" in the line, only the name => lookup in local env
-                if env_value := os.environ.get(lhs):
-                    env_vars[lhs] = env_value
-        return env_vars
-
-    @staticmethod
     def parse_additional_flags(
         additional_flags: str,
         env_vars: Optional[Dict[str, str]] = None,
         labels: Optional[Dict[str, str]] = None,
-        volumes: Optional[List[SimpleVolumeBind]] = None,
+        mounts: Optional[List[SimpleVolumeBind]] = None,
         network: Optional[str] = None,
         platform: Optional[DockerPlatform] = None,
         ports: Optional[PortMappings] = None,
@@ -1220,7 +1116,7 @@ class Util:
                                  https://docs.docker.com/engine/reference/commandline/run/
         :param env_vars: Dict with env vars. Will be modified in place.
         :param labels: Dict with labels. Will be modified in place.
-        :param volumes: List of mount tuples (host_path, container_path). Will be modified in place.
+        :param mounts: List of mount tuples (host_path, container_path). Will be modified in place.
         :param network: Existing network name (optional). Warning will be printed if network is overwritten in flags.
         :param platform: Platform to execute container. Warning will be printed if platform is overwritten in flags.
         :param ports: PortMapping object. Will be modified in place.
@@ -1249,12 +1145,6 @@ class Util:
             "--env-file",
             help="Set environment variables via a file",
             dest="env_files",
-            action="append",
-        )
-        parser.add_argument(
-            "--compose-env-file",
-            help="Set environment variables via a file, with a docker-compose supported feature set.",
-            dest="compose_env_files",
             action="append",
         )
         parser.add_argument(
@@ -1303,12 +1193,35 @@ class Util:
         if args.env_files:
             env_vars = env_vars if env_vars is not None else {}
             for env_file in args.env_files:
-                env_vars.update(Util._read_docker_cli_env_file(env_file))
-
-        if args.compose_env_files:
-            env_vars = env_vars if env_vars is not None else {}
-            for env_file in args.compose_env_files:
-                env_vars.update(dotenv.dotenv_values(env_file))
+                try:
+                    with open(env_file, mode="rt") as f:
+                        env_file_lines = f.readlines()
+                except FileNotFoundError as e:
+                    LOG.error(
+                        "Specified env file '%s' not found. Please make sure the file is properly mounted into the LocalStack container. Error: %s",
+                        env_file,
+                        e,
+                    )
+                    raise
+                except OSError as e:
+                    LOG.error(
+                        "Could not read env file '%s'. Please make sure the LocalStack container has the permissions to read it. Error: %s",
+                        env_file,
+                        e,
+                    )
+                    raise
+                for idx, line in enumerate(env_file_lines):
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        # skip comments or empty lines
+                        continue
+                    lhs, separator, rhs = line.partition("=")
+                    if rhs or separator:
+                        env_vars[lhs] = rhs
+                    else:
+                        # No "=" in the line, only the name => lookup in local env
+                        if env_value := os.environ.get(lhs):
+                            env_vars[lhs] = env_value
 
         if args.envs:
             env_vars = env_vars if env_vars is not None else {}
@@ -1382,7 +1295,7 @@ class Util:
                 hard_limit = int(hard) if hard else int(soft)
                 new_ulimit = Ulimit(name=name, soft_limit=int(soft), hard_limit=hard_limit)
                 if ulimits_dict.get(name):
-                    LOG.warning("Overwriting Docker ulimit %s", new_ulimit)
+                    LOG.warning(f"Overwriting Docker ulimit {new_ulimit}")
                 ulimits_dict[name] = new_ulimit
             ulimits = list(ulimits_dict.values())
 
@@ -1395,7 +1308,7 @@ class Util:
             user = args.user
 
         if args.volumes:
-            volumes = volumes if volumes is not None else []
+            mounts = mounts if mounts is not None else []
             for volume in args.volumes:
                 match = re.match(
                     r"(?P<host>[\w\s\\\/:\-.]+?):(?P<container>[\w\s\/\-.]+)(?::(?P<arg>ro|rw|z|Z))?",
@@ -1409,7 +1322,7 @@ class Util:
                 rw_args = match.group("arg")
                 if rw_args:
                     LOG.info("Volume options like :ro or :rw are currently ignored.")
-                volumes.append((host_path, container_path))
+                mounts.append((host_path, container_path))
 
         dns = ensure_list(dns or [])
         if args.dns:
@@ -1422,7 +1335,7 @@ class Util:
             env_vars=env_vars,
             extra_hosts=extra_hosts,
             labels=labels,
-            volumes=volumes,
+            mounts=mounts,
             ports=ports,
             network=network,
             platform=platform,
@@ -1434,7 +1347,7 @@ class Util:
 
     @staticmethod
     def convert_mount_list_to_dict(
-        volumes: Union[List[SimpleVolumeBind], VolumeMappings],
+        mount_volumes: Union[List[SimpleVolumeBind], VolumeMappings],
     ) -> Dict[str, Dict[str, str]]:
         """Converts a List of (host_path, container_path) tuples to a Dict suitable as volume argument for docker sdk"""
 
@@ -1450,7 +1363,7 @@ class Util:
         return dict(
             map(
                 _map_to_dict,
-                volumes,
+                mount_volumes,
             )
         )
 

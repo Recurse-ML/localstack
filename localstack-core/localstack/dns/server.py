@@ -12,8 +12,12 @@ from pathlib import Path
 from socket import AddressFamily
 from typing import Iterable, Literal, Tuple
 
+import dns.flags
+import dns.message
+import dns.query
 import psutil
 from cachetools import TTLCache, cached
+from dns.exception import Timeout
 from dnslib import (
     AAAA,
     CNAME,
@@ -34,11 +38,6 @@ from dnslib import (
 )
 from dnslib.server import DNSHandler, DNSServer
 from psutil._common import snicaddr
-
-import dns.flags
-import dns.message
-import dns.query
-from dns.exception import Timeout
 
 # Note: avoid adding additional imports here, to avoid import issues when running the CLI
 from localstack import config
@@ -217,9 +216,7 @@ class RecordConverter:
 
         # no best solution found
         LOG.warning(
-            "could not determine subnet-matched IP address for %s, falling back to %s",
-            self.request.q.qname,
-            LOCALHOST_IP,
+            f"could not determine subnet-matched IP address for {self.request.q.qname}, falling back to {LOCALHOST_IP}"
         )
         return LOCALHOST_IP
 
@@ -876,7 +873,7 @@ def start_server(upstream_dns: str, host: str, port: int = config.DNS_PORT):
         LOG.debug("DNS servers are already started. Avoid starting again.")
         return
 
-    LOG.debug("Starting DNS servers (tcp/udp port %s on %s)...", port, host)
+    LOG.debug("Starting DNS servers (tcp/udp port %s on %s)..." % (port, host))
     dns_server = DnsServer(port, protocols=["tcp", "udp"], host=host, upstream_dns=upstream_dns)
 
     for name in NAME_PATTERNS_POINTING_TO_LOCALSTACK:
@@ -895,7 +892,7 @@ def start_server(upstream_dns: str, host: str, port: int = config.DNS_PORT):
     ).strip()
     if skip_local_resolution:
         for skip_pattern in re.split(r"[,;\s]+", skip_local_resolution):
-            dns_server.add_skip(skip_pattern.strip(" \"'"))
+            dns_server.add_skip(skip_pattern)
 
     dns_server.start()
     if not dns_server.wait_is_up(timeout=5):

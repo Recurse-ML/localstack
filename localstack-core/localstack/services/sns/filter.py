@@ -1,4 +1,3 @@
-import ipaddress
 import json
 import typing as t
 
@@ -125,13 +124,6 @@ class SubscriptionFilter:
             return equal_ignore_case.lower() == value.lower()
         elif numeric_condition := condition.get("numeric"):
             return self._evaluate_numeric_condition(numeric_condition, value)
-        elif cidr := condition.get("cidr"):
-            try:
-                ip = ipaddress.ip_address(value)
-                return ip in ipaddress.ip_network(cidr)
-            except ValueError:
-                return False
-
         return False
 
     @staticmethod
@@ -226,8 +218,8 @@ class SubscriptionFilter:
         Input:
         `{"field1": {
             "field2: [
-                {"field3": "val1", "field4": "val2"},
-                {"field3": "val3", "field4": "val4"}
+                {"field3: "val1", "field4": "val2"},
+                {"field3: "val3", "field4": "val4"},
             }
         ]}`
         Output:
@@ -239,7 +231,7 @@ class SubscriptionFilter:
             {
                 "field1.field2.field3": "val3",
                 "field1.field2.field4": "val4"
-            }
+            },
         ]`
         :param nested_dict: a (nested) dictionary
         :return: flatten_dict: a dictionary with no nested dict inside, flattened to a single level
@@ -253,8 +245,6 @@ class SubscriptionFilter:
                     array = _traverse(values, array, _parent_key)
 
             elif isinstance(_object, list):
-                if not _object:
-                    return array
                 array = [i for value in _object for i in _traverse(value, array, parent_key)]
             else:
                 array = [{**item, parent_key: _object} for item in array]
@@ -333,11 +323,6 @@ class FilterPolicyValidator:
                     )
                     _rules.extend(sub_rules)
                 elif isinstance(_value, list):
-                    if not _value:
-                        raise InvalidParameterException(
-                            f"{self.error_prefix}FilterPolicy: Empty arrays are not allowed"
-                        )
-
                     current_combination = 0
                     if key == "$or":
                         for val in _value:
@@ -426,9 +411,6 @@ class FilterPolicyValidator:
                 elif operator == "numeric":
                     self._validate_numeric_condition(value)
 
-                elif operator == "cidr":
-                    self._validate_cidr_condition(value)
-
                 else:
                     raise InvalidParameterException(
                         f"{self.error_prefix}FilterPolicy: Unrecognized match type {operator}"
@@ -438,31 +420,6 @@ class FilterPolicyValidator:
                 raise InvalidParameterException(
                     f"{self.error_prefix}FilterPolicy: Match value must be String, number, true, false, or null"
                 )
-
-    def _validate_cidr_condition(self, value):
-        if not isinstance(value, str):
-            # `cidr` returns the prefix error
-            raise InvalidParameterException(
-                f"{self.error_prefix}FilterPolicy: prefix match pattern must be a string"
-            )
-        splitted = value.split("/")
-        if len(splitted) != 2:
-            raise InvalidParameterException(
-                f"{self.error_prefix}FilterPolicy: Malformed CIDR, one '/' required"
-            )
-        ip_addr, mask = value.split("/")
-        try:
-            int(mask)
-        except ValueError:
-            raise InvalidParameterException(
-                f"{self.error_prefix}FilterPolicy: Malformed CIDR, mask bits must be an integer"
-            )
-        try:
-            ipaddress.ip_network(value)
-        except ValueError:
-            raise InvalidParameterException(
-                f"{self.error_prefix}FilterPolicy: Nonstandard IP address: {ip_addr}"
-            )
 
     def _validate_numeric_condition(self, value):
         if not value:

@@ -12,13 +12,10 @@ from math import ceil
 from typing import TYPE_CHECKING, Any, Callable, Generic, Optional, Type, TypedDict, TypeVar
 
 import botocore
-from botocore.client import BaseClient
-from botocore.exceptions import ClientError
-from botocore.model import OperationModel
 from plux import Plugin, PluginManager
 
 from localstack import config
-from localstack.aws.connect import InternalClientFactory, ServiceLevelClientFactory
+from localstack.aws.connect import ServiceLevelClientFactory, connect_to
 from localstack.services.cloudformation import usage
 from localstack.services.cloudformation.deployment_utils import (
     check_not_found_exception,
@@ -29,12 +26,11 @@ from localstack.services.cloudformation.deployment_utils import (
     remove_none_values,
 )
 from localstack.services.cloudformation.engine.quirks import PHYSICAL_RESOURCE_ID_SPECIAL_CASES
-from localstack.services.cloudformation.provider_utils import convert_request_kwargs
 from localstack.services.cloudformation.service_models import KEY_RESOURCE_STATE
 
 PRO_RESOURCE_PROVIDERS = False
 try:
-    from localstack.pro.core.services.cloudformation.resource_provider import (
+    from localstack_ext.services.cloudformation.resource_provider import (
         CloudFormationResourceProviderPluginExt,
     )
 
@@ -68,8 +64,7 @@ class OperationStatus(Enum):
 @dataclass
 class ProgressEvent(Generic[Properties]):
     status: OperationStatus
-    resource_model: Optional[Properties] = None
-    resource_models: Optional[list[Properties]] = None
+    resource_model: Properties
 
     message: str = ""
     result: Optional[str] = None
@@ -110,33 +105,10 @@ class ResourceProviderPayload(TypedDict):
 ResourceProperties = TypeVar("ResourceProperties")
 
 
-def _handler_provide_client_params(event_name: str, params: dict, model: OperationModel, **kwargs):
-    """
-    A botocore hook handler that will try to convert the passed parameters according to the given operation model
-    """
-    return convert_request_kwargs(params, model.input_shape)
-
-
-class ConvertingInternalClientFactory(InternalClientFactory):
-    def _get_client_post_hook(self, client: BaseClient) -> BaseClient:
-        """
-        Register handlers that modify the passed properties to make them compatible with the API structure
-        """
-
-        client.meta.events.register(
-            "provide-client-params.*.*", handler=_handler_provide_client_params
-        )
-
-        return super()._get_client_post_hook(client)
-
-
-_cfn_resource_client_factory = ConvertingInternalClientFactory(use_ssl=config.DISTRIBUTED_MODE)
-
-
 def convert_payload(
     stack_name: str, stack_id: str, payload: ResourceProviderPayload
 ) -> ResourceRequest[Properties]:
-    client_factory = _cfn_resource_client_factory(
+    client_factory = connect_to(
         aws_access_key_id=payload["requestData"]["callerCredentials"]["accessKeyId"],
         aws_session_token=payload["requestData"]["callerCredentials"]["sessionToken"],
         aws_secret_access_key=payload["requestData"]["callerCredentials"]["secretAccessKey"],
@@ -204,8 +176,6 @@ class ResourceProvider(Generic[Properties]):
     This provides a base class onto which service-specific resource providers are built.
     """
 
-    SCHEMA: dict
-
     def create(self, request: ResourceRequest[Properties]) -> ProgressEvent[Properties]:
         raise NotImplementedError
 
@@ -213,12 +183,6 @@ class ResourceProvider(Generic[Properties]):
         raise NotImplementedError
 
     def delete(self, request: ResourceRequest[Properties]) -> ProgressEvent[Properties]:
-        raise NotImplementedError
-
-    def read(self, request: ResourceRequest[Properties]) -> ProgressEvent[Properties]:
-        raise NotImplementedError
-
-    def list(self, request: ResourceRequest[Properties]) -> ProgressEvent[Properties]:
         raise NotImplementedError
 
 
@@ -433,7 +397,6 @@ class ResourceProviderExecutor:
 
     def deploy_loop(
         self,
-        resource_provider: ResourceProvider,
         resource: dict,
         raw_payload: ResourceProviderPayload,
         max_timeout: int = config.CFN_PER_RESOURCE_TIMEOUT,
@@ -447,56 +410,65 @@ class ResourceProviderExecutor:
             resource_type = get_resource_type(
                 {"Type": raw_payload["resourceType"]}
             )  # TODO: simplify signature of get_resource_type to just take the type
-            resource["SpecifiedProperties"] = raw_payload["requestData"]["resourceProperties"]
-
             try:
+                resource_provider = self.load_resource_provider(resource_type)
+
+                resource["SpecifiedProperties"] = raw_payload["requestData"]["resourceProperties"]
+
                 event = self.execute_action(resource_provider, payload)
-            except ClientError:
-                LOG.error(
-                    "client error invoking '%s' handler for resource '%s' (type '%s')",
-                    raw_payload["action"],
-                    raw_payload["requestData"]["logicalResourceId"],
-                    resource_type,
-                )
-                raise
 
-            match event.status:
-                case OperationStatus.FAILED:
-                    return event
-                case OperationStatus.SUCCESS:
-                    if not hasattr(resource_provider, "SCHEMA"):
-                        raise Exception(
-                            "A ResourceProvider should always have a SCHEMA property defined."
+                match event.status:
+                    case OperationStatus.FAILED:
+                        return event
+                    case OperationStatus.SUCCESS:
+                        if not hasattr(resource_provider, "SCHEMA"):
+                            raise Exception(
+                                "A ResourceProvider should always have a SCHEMA property defined."
+                            )
+                        resource_type_schema = resource_provider.SCHEMA
+                        physical_resource_id = (
+                            self.extract_physical_resource_id_from_model_with_schema(
+                                event.resource_model,
+                                raw_payload["resourceType"],
+                                resource_type_schema,
+                            )
                         )
-                    resource_type_schema = resource_provider.SCHEMA
-                    physical_resource_id = self.extract_physical_resource_id_from_model_with_schema(
-                        event.resource_model,
-                        raw_payload["resourceType"],
-                        resource_type_schema,
-                    )
 
-                    resource["PhysicalResourceId"] = physical_resource_id
-                    resource["Properties"] = event.resource_model
-                    resource["_last_deployed_state"] = copy.deepcopy(event.resource_model)
-                    return event
-                case OperationStatus.IN_PROGRESS:
-                    # update the shared state
-                    context = {**payload["callbackContext"], **event.custom_context}
-                    payload["callbackContext"] = context
-                    payload["requestData"]["resourceProperties"] = event.resource_model
-                    resource["Properties"] = event.resource_model
+                        resource["PhysicalResourceId"] = physical_resource_id
+                        resource["Properties"] = event.resource_model
+                        resource["_last_deployed_state"] = copy.deepcopy(event.resource_model)
+                        return event
+                    case OperationStatus.IN_PROGRESS:
+                        # update the shared state
+                        context = {**payload["callbackContext"], **event.custom_context}
+                        payload["callbackContext"] = context
+                        payload["requestData"]["resourceProperties"] = event.resource_model
 
-                    if current_iteration == 0:
-                        time.sleep(0)
-                    else:
-                        time.sleep(sleep_time)
-                case OperationStatus.PENDING:
-                    # come back to this resource in another iteration
-                    return event
-                case invalid_status:
-                    raise ValueError(
-                        f"Invalid OperationStatus ({invalid_status}) returned for resource {raw_payload['requestData']['logicalResourceId']} (type {raw_payload['resourceType']})"
-                    )
+                        if current_iteration == 0:
+                            time.sleep(0)
+                        else:
+                            time.sleep(sleep_time)
+                    case OperationStatus.PENDING:
+                        # come back to this resource in another iteration
+                        return event
+                    case invalid_status:
+                        raise ValueError(
+                            f"Invalid OperationStatus ({invalid_status}) returned for resource {raw_payload['requestData']['logicalResourceId']} (type {raw_payload['resourceType']})"
+                        )
+
+            except NoResourceProvider:
+                log_not_available_message(
+                    raw_payload["resourceType"],
+                    f"No resource provider found for \"{raw_payload['resourceType']}\"",
+                )
+
+                usage.missing_resource_types.record(raw_payload["resourceType"])
+
+                if config.CFN_IGNORE_UNSUPPORTED_RESOURCE_TYPES:
+                    # TODO: figure out a better way to handle non-implemented here?
+                    return ProgressEvent(OperationStatus.SUCCESS, resource_model={})
+                else:
+                    raise  # re-raise here if explicitly enabled
 
         else:
             raise TimeoutError(
@@ -563,8 +535,7 @@ class ResourceProviderExecutor:
             case _:
                 raise NotImplementedError(change_type)  # TODO: change error type
 
-    @staticmethod
-    def try_load_resource_provider(resource_type: str) -> ResourceProvider | None:
+    def load_resource_provider(self, resource_type: str) -> ResourceProvider:
         # TODO: unify namespace of plugins
 
         # 1. try to load pro resource provider
@@ -598,19 +569,7 @@ class ResourceProviderExecutor:
                     exc_info=LOG.isEnabledFor(logging.DEBUG),
                 )
 
-        # 3. we could not find the resource provider so log the missing resource provider
-        log_not_available_message(
-            resource_type,
-            f'No resource provider found for "{resource_type}"',
-        )
-
-        usage.missing_resource_types.record(resource_type)
-
-        if config.CFN_IGNORE_UNSUPPORTED_RESOURCE_TYPES:
-            # TODO: figure out a better way to handle non-implemented here?
-            return None
-        else:
-            raise NoResourceProvider
+        raise NoResourceProvider
 
     def extract_physical_resource_id_from_model_with_schema(
         self, resource_model: Properties, resource_type: str, resource_type_schema: dict

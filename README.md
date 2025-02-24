@@ -1,5 +1,5 @@
 <p align="center">
-:zap: We are thrilled to announce the release of <a href="https://blog.localstack.cloud/localstack-release-v-4-1-0/">LocalStack 4.1</a> :zap:
+:zap: We are thrilled to announce the release of <a href="https://discuss.localstack.cloud/t/localstack-release-v3-4-0/871">LocalStack 3.4</a> :zap:
 </p>
 
 <p align="center">
@@ -44,13 +44,13 @@
 
 [LocalStack](https://localstack.cloud) is a cloud service emulator that runs in a single container on your laptop or in your CI environment. With LocalStack, you can run your AWS applications or Lambdas entirely on your local machine without connecting to a remote cloud provider! Whether you are testing complex CDK applications or Terraform configurations, or just beginning to learn about AWS services, LocalStack helps speed up and simplify your testing and development workflow.
 
-LocalStack supports a growing number of AWS services, like AWS Lambda, S3, DynamoDB, Kinesis, SQS, SNS, and many more! The [Pro version of LocalStack](https://localstack.cloud/pricing) supports additional APIs and advanced features. You can find a comprehensive list of supported APIs on our [☑️ Feature Coverage](https://docs.localstack.cloud/user-guide/aws/feature-coverage/) page.
+LocalStack supports a growing number of AWS services, like AWS Lambda, S3, Dynamodb, Kinesis, SQS, SNS, and many more! The [Pro version of LocalStack](https://localstack.cloud/pricing) supports additional APIs and advanced features. You can find a comprehensive list of supported APIs on our [☑️ Feature Coverage](https://docs.localstack.cloud/user-guide/aws/feature-coverage/) page.
 
 LocalStack also provides additional features to make your life as a cloud developer easier! Check out LocalStack's [User Guides](https://docs.localstack.cloud/user-guide/) for more information.
 
 ## Install
 
-The quickest way to get started with LocalStack is by using the LocalStack CLI. It enables you to start and manage the LocalStack Docker container directly through your command line. Ensure that your machine has a functional [`docker` environment](https://docs.docker.com/get-docker/) installed before proceeding.
+The quickest way get started with LocalStack is by using the LocalStack CLI. It enables you to start and manage the LocalStack Docker container directly through your command line. Ensure that your machine has a functional [`docker` environment](https://docs.docker.com/get-docker/) installed before proceeding.
 
 ### Brew (macOS or Linux with Homebrew)
 
@@ -60,15 +60,15 @@ Install the LocalStack CLI through our [official LocalStack Brew Tap](https://gi
 brew install localstack/tap/localstack-cli
 ```
 
-### Binary download (macOS, Linux, Windows)
+### Binary download (MacOS, Linux, Windows)
 
 If Brew is not installed on your machine, you can download the pre-built LocalStack CLI binary directly:
 
 - Visit [localstack/localstack-cli](https://github.com/localstack/localstack-cli/releases/latest) and download the latest release for your platform.
 - Extract the downloaded archive to a directory included in your `PATH` variable:
-    -   For macOS/Linux, use the command: `sudo tar xvzf ~/Downloads/localstack-cli-*-darwin-*-onefile.tar.gz -C /usr/local/bin`
+    -   For MacOS/Linux, use the command: `sudo tar xvzf ~/Downloads/localstack-cli-*-darwin-*-onefile.tar.gz -C /usr/local/bin`
 
-### PyPI (macOS, Linux, Windows)
+### PyPI (MacOS, Linux, Windows)
 
 LocalStack is developed using Python. To install the LocalStack CLI using `pip`, run the following command:
 
@@ -93,15 +93,14 @@ Start LocalStack inside a Docker container by running:
   / /___/ /_/ / /__/ /_/ / /___/ / /_/ /_/ / /__/ ,<
  /_____/\____/\___/\__,_/_//____/\__/\__,_/\___/_/|_|
 
-- LocalStack CLI: 4.1.0
-- Profile: default
-- App: https://app.localstack.cloud
+ 💻 LocalStack CLI 3.4.0
+ 👤 Profile: default
 
-[12:00:19] starting LocalStack in Docker mode 🐳               localstack.py:512
-           preparing environment                               bootstrap.py:1321
-           configuring container                               bootstrap.py:1329
-           starting container                                  bootstrap.py:1339
-[12:00:20] detaching                                           bootstrap.py:1343
+[12:47:13] starting LocalStack in Docker mode 🐳                       localstack.py:494
+           preparing environment                                       bootstrap.py:1240
+           configuring container                                       bootstrap.py:1248
+           starting container                                          bootstrap.py:1258
+[12:47:15] detaching                                                   bootstrap.py:1262
 ```
 
 You can query the status of respective services on LocalStack by running:
@@ -159,14 +158,14 @@ To use LocalStack with a graphical user interface, you can use the following UI 
 
 ## Releases
 
-Please refer to [GitHub releases](https://github.com/localstack/localstack/releases) to see the complete list of changes for each release. For extended release notes, please refer to the [changelog](https://docs.localstack.cloud/references/changelog/).
+Please refer to [GitHub releases](https://github.com/localstack/localstack/releases) to see the complete list of changes for each release. For extended release notes, please refer to the [LocalStack Discuss](https://discuss.localstack.cloud/c/announcement/5).
 
 ## Contributing
 
 If you are interested in contributing to LocalStack:
 
 - Start by reading our [contributing guide](docs/CONTRIBUTING.md).
-- Check out our [development environment setup guide](docs/development-environment-setup/README.md).
+- Check out our [development environment setup guide](docs/development-environment-setup.md).
 - Navigate our codebase and [open issues](https://github.com/localstack/localstack/issues).
 
 We are thankful for all the contributions and feedback we receive.
@@ -180,6 +179,7 @@ upvote 👍 [feature requests](https://github.com/localstack/localstack/issues?q
 or 🗣️ discuss local cloud development:
 
 - [LocalStack Slack Community](https://localstack.cloud/contact/)
+- [LocalStack Discussion Page](https://discuss.localstack.cloud/)
 - [LocalStack GitHub Issue tracker](https://github.com/localstack/localstack/issues)
 
 ### Contributors

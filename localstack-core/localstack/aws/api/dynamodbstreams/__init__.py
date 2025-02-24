@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -20,32 +19,32 @@ StringAttributeValue = str
 TableName = str
 
 
-class KeyType(StrEnum):
+class KeyType(str):
     HASH = "HASH"
     RANGE = "RANGE"
 
 
-class OperationType(StrEnum):
+class OperationType(str):
     INSERT = "INSERT"
     MODIFY = "MODIFY"
     REMOVE = "REMOVE"
 
 
-class ShardIteratorType(StrEnum):
+class ShardIteratorType(str):
     TRIM_HORIZON = "TRIM_HORIZON"
     LATEST = "LATEST"
     AT_SEQUENCE_NUMBER = "AT_SEQUENCE_NUMBER"
     AFTER_SEQUENCE_NUMBER = "AFTER_SEQUENCE_NUMBER"
 
 
-class StreamStatus(StrEnum):
+class StreamStatus(str):
     ENABLING = "ENABLING"
     ENABLED = "ENABLED"
     DISABLING = "DISABLING"
     DISABLED = "DISABLED"
 
 
-class StreamViewType(StrEnum):
+class StreamViewType(str):
     NEW_IMAGE = "NEW_IMAGE"
     OLD_IMAGE = "OLD_IMAGE"
     NEW_AND_OLD_IMAGES = "NEW_AND_OLD_IMAGES"

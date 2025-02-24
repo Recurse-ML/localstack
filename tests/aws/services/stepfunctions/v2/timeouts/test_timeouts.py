@@ -3,7 +3,6 @@ import json
 import pytest
 from localstack_snapshot.snapshots.transformer import RegexTransformer
 
-from localstack.aws.api.lambda_ import Runtime
 from localstack.testing.aws.util import is_aws_cloud
 from localstack.testing.pytest import markers
 from localstack.testing.pytest.stepfunctions.utils import (
@@ -19,6 +18,7 @@ from tests.aws.services.stepfunctions.templates.timeouts.timeout_templates impor
 
 @markers.snapshot.skip_snapshot_verify(
     paths=[
+        "$..tracingConfiguration",
         "$..redriveCount",
         "$..redriveStatus",
     ]
@@ -28,21 +28,18 @@ class TestTimeouts:
     def test_global_timeout(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_snapshot,
     ):
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
 
         template = TT.load_sfn_template(BaseTemplate.BASE_WAIT_1_MIN)
         template["TimeoutSeconds"] = 5
         definition = json.dumps(template)
 
         creation_resp = create_state_machine(
-            aws_client,
-            name=f"test_global_timeout-{short_uid()}",
-            definition=definition,
-            roleArn=snf_role_arn,
+            name=f"test_global_timeout-{short_uid()}", definition=definition, roleArn=snf_role_arn
         )
         sfn_snapshot.add_transformer(sfn_snapshot.transform.sfn_sm_create_arn(creation_resp, 0))
         state_machine_arn = creation_resp["stateMachineArn"]
@@ -66,7 +63,7 @@ class TestTimeouts:
     def test_fixed_timeout_service_lambda(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         create_lambda_function,
         sfn_snapshot,
@@ -75,7 +72,7 @@ class TestTimeouts:
         create_lambda_function(
             func_name=function_name,
             handler_file=TT.LAMBDA_WAIT_60_SECONDS,
-            runtime=Runtime.python3_12,
+            runtime="python3.9",
         )
         sfn_snapshot.add_transformer(RegexTransformer(function_name, "<lambda_function_1_name>"))
 
@@ -86,8 +83,8 @@ class TestTimeouts:
             {"FunctionName": function_name, "Payload": None, "TimeoutSecondsValue": 5}
         )
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -98,7 +95,7 @@ class TestTimeouts:
     def test_fixed_timeout_service_lambda_with_path(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         create_lambda_function,
         sfn_snapshot,
@@ -107,7 +104,7 @@ class TestTimeouts:
         create_lambda_function(
             func_name=function_name,
             handler_file=TT.LAMBDA_WAIT_60_SECONDS,
-            runtime=Runtime.python3_12,
+            runtime="python3.9",
         )
         sfn_snapshot.add_transformer(RegexTransformer(function_name, "<lambda_function_1_name>"))
 
@@ -120,8 +117,8 @@ class TestTimeouts:
             {"TimeoutSecondsValue": 5, "FunctionName": function_name, "Payload": None}
         )
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -132,7 +129,7 @@ class TestTimeouts:
     def test_fixed_timeout_lambda(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         create_lambda_function,
         sfn_snapshot,
@@ -141,7 +138,7 @@ class TestTimeouts:
         lambda_creation_response = create_lambda_function(
             func_name=function_name,
             handler_file=TT.LAMBDA_WAIT_60_SECONDS,
-            runtime=Runtime.python3_12,
+            runtime="python3.9",
         )
         sfn_snapshot.add_transformer(RegexTransformer(function_name, "<lambda_function_1_name>"))
         lambda_arn = lambda_creation_response["CreateFunctionResponse"]["FunctionArn"]
@@ -152,8 +149,8 @@ class TestTimeouts:
 
         exec_input = json.dumps({"Payload": None})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -167,7 +164,7 @@ class TestTimeouts:
     def test_service_lambda_map_timeout(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         create_lambda_function,
         sfn_snapshot,
@@ -176,7 +173,7 @@ class TestTimeouts:
         create_lambda_function(
             func_name=function_name,
             handler_file=TT.LAMBDA_WAIT_60_SECONDS,
-            runtime=Runtime.python3_12,
+            runtime="python3.9",
         )
         sfn_snapshot.add_transformer(RegexTransformer(function_name, "<lambda_function_1_name>"))
 
@@ -194,8 +191,8 @@ class TestTimeouts:
             }
         )
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,

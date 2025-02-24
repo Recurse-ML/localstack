@@ -28,9 +28,9 @@ class BranchWorker:
         self._worker_thread = None
 
     def _thread_routine(self) -> None:
-        LOG.info("[BranchWorker] [launched] [id: %s]", self._worker_thread.native_id)
+        LOG.info(f"[BranchWorker] [launched] [id: {self._worker_thread.native_id}]")
         self._program.eval(self.env)
-        LOG.info("[BranchWorker] [terminated] [id: %s]", self._worker_thread.native_id)
+        LOG.info(f"[BranchWorker] [terminated] [id: {self._worker_thread.native_id}]")
         self._branch_worker_comm.on_terminated(env=self.env)
 
     def start(self):
@@ -38,7 +38,7 @@ class BranchWorker:
             raise RuntimeError(f"Attempted to rerun BranchWorker for program ${self._program}.")
 
         self._worker_thread = threading.Thread(
-            target=self._thread_routine, name=f"BranchWorker_${self._program}", daemon=True
+            target=self._thread_routine, name=f"BranchWorker_${self._program}"
         )
         TMP_THREADS.append(self._worker_thread)
         self._worker_thread.start()

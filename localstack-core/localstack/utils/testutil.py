@@ -56,7 +56,7 @@ from localstack.utils.strings import short_uid, to_str
 ARCHIVE_DIR_PREFIX = "lambda.archive."
 DEFAULT_GET_LOG_EVENTS_DELAY = 3
 LAMBDA_DEFAULT_HANDLER = "handler.handler"
-LAMBDA_DEFAULT_RUNTIME = Runtime.python3_12
+LAMBDA_DEFAULT_RUNTIME = Runtime.python3_9
 LAMBDA_DEFAULT_STARTING_POSITION = "LATEST"
 LAMBDA_TIMEOUT_SEC = 30
 LAMBDA_ASSETS_BUCKET_NAME = "ls-test-lambda-assets-bucket"
@@ -435,13 +435,15 @@ def delete_all_s3_objects(s3_client, buckets: str | List[str]):
 
 
 def download_s3_object(s3_client, bucket, path):
-    body = s3_client.get_object(Bucket=bucket, Key=path)["Body"]
-    result = body.read()
-    try:
-        result = to_str(result)
-    except Exception:
-        pass
-    return result
+    with tempfile.SpooledTemporaryFile() as tmpfile:
+        s3_client.download_fileobj(bucket, path, tmpfile)
+        tmpfile.seek(0)
+        result = tmpfile.read()
+        try:
+            result = to_str(result)
+        except Exception:
+            pass
+        return result
 
 
 def all_s3_object_keys(s3_client, bucket: str) -> List[str]:

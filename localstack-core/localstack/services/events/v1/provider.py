@@ -19,12 +19,12 @@ from localstack.aws.api.events import (
     ConnectionAuthorizationType,
     ConnectionDescription,
     ConnectionName,
-    ConnectivityResourceParameters,
     CreateConnectionAuthRequestParameters,
     CreateConnectionResponse,
     EventBusNameOrArn,
     EventPattern,
     EventsApi,
+    InvalidEventPatternException,
     PutRuleResponse,
     PutTargetsResponse,
     RoleArn,
@@ -40,8 +40,13 @@ from localstack.aws.api.events import (
 from localstack.constants import APPLICATION_AMZ_JSON_1_1
 from localstack.http import route
 from localstack.services.edge import ROUTER
+from localstack.services.events.event_ruler import matches_rule
+from localstack.services.events.models import (
+    InvalidEventPatternException as InternalInvalidEventPatternException,
+)
 from localstack.services.events.scheduler import JobScheduler
 from localstack.services.events.v1.models import EventsStore, events_stores
+from localstack.services.events.v1.utils import matches_event
 from localstack.services.moto import call_moto
 from localstack.services.plugins import ServiceLifecycleHook
 from localstack.utils.aws.arns import event_bus_arn, parse_arn
@@ -49,7 +54,6 @@ from localstack.utils.aws.client_types import ServicePrincipal
 from localstack.utils.aws.message_forwarding import send_event_to_target
 from localstack.utils.collections import pick_attributes
 from localstack.utils.common import TMP_FILES, mkdir, save_file, truncate
-from localstack.utils.event_matcher import matches_event
 from localstack.utils.json import extract_jsonpath
 from localstack.utils.strings import long_uid, short_uid
 from localstack.utils.time import TIMESTAMP_FORMAT_TZ, timestamp
@@ -111,7 +115,44 @@ class EventsProvider(EventsApi, ServiceLifecycleHook):
         """Test event pattern uses EventBridge event pattern matching:
         https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-event-patterns.html
         """
-        result = matches_event(event_pattern, event)
+        if config.EVENT_RULE_ENGINE == "java":
+            try:
+                result = matches_rule(event, event_pattern)
+            except InternalInvalidEventPatternException as e:
+                raise InvalidEventPatternException(e.message) from e
+        else:
+            event_pattern_dict = json.loads(event_pattern)
+            event_dict = json.loads(event)
+            result = matches_event(event_pattern_dict, event_dict)
+
+        # TODO: unify the different implementations below:
+        # event_pattern_dict = json.loads(event_pattern)
+        # event_dict = json.loads(event)
+
+        # EventBridge:
+        # result = matches_event(event_pattern_dict, event_dict)
+
+        # Lambda EventSourceMapping:
+        # from localstack.services.lambda_.event_source_listeners.utils import does_match_event
+        #
+        # result = does_match_event(event_pattern_dict, event_dict)
+
+        # moto-ext EventBridge:
+        # from moto.events.models import EventPattern as EventPatternMoto
+        #
+        # event_pattern = EventPatternMoto.load(event_pattern)
+        # result = event_pattern.matches_event(event_dict)
+
+        # SNS: The SNS rule engine seems to differ slightly, for example not allowing the wildcard pattern.
+        # from localstack.services.sns.publisher import SubscriptionFilter
+        # subscription_filter = SubscriptionFilter()
+        # result = subscription_filter._evaluate_nested_filter_policy_on_dict(event_pattern_dict, event_dict)
+
+        # moto-ext SNS:
+        # from moto.sns.utils import FilterPolicyMatcher
+        # filter_policy_matcher = FilterPolicyMatcher(event_pattern_dict, "MessageBody")
+        # result = filter_policy_matcher._body_based_match(event_dict)
+
         return TestEventPatternResponse(Result=result)
 
     @staticmethod
@@ -270,7 +311,7 @@ class EventsProvider(EventsApi, ServiceLifecycleHook):
         rule_scheduled_jobs = self.get_store(context).rule_scheduled_jobs
         job_id = rule_scheduled_jobs.get(name)
         if job_id:
-            LOG.debug("Removing scheduled Events: %s | job_id: %s", name, job_id)
+            LOG.debug("Removing scheduled Events: {} | job_id: {}".format(name, job_id))
             JobScheduler.instance().cancel_job(job_id=job_id)
         call_moto(context)
 
@@ -284,7 +325,7 @@ class EventsProvider(EventsApi, ServiceLifecycleHook):
         rule_scheduled_jobs = self.get_store(context).rule_scheduled_jobs
         job_id = rule_scheduled_jobs.get(name)
         if job_id:
-            LOG.debug("Disabling Rule: %s | job_id: %s", name, job_id)
+            LOG.debug("Disabling Rule: {} | job_id: {}".format(name, job_id))
             JobScheduler.instance().disable_job(job_id=job_id)
         call_moto(context)
 
@@ -295,7 +336,6 @@ class EventsProvider(EventsApi, ServiceLifecycleHook):
         authorization_type: ConnectionAuthorizationType,
         auth_parameters: CreateConnectionAuthRequestParameters,
         description: ConnectionDescription = None,
-        invocation_connectivity_parameters: ConnectivityResourceParameters = None,
         **kwargs,
     ) -> CreateConnectionResponse:
         errors = []
@@ -390,7 +430,13 @@ def filter_event_based_on_event_format(
         return False
     if rule_information.event_pattern._pattern:
         event_pattern = rule_information.event_pattern._pattern
-        if not matches_event(event_pattern, event):
+        if config.EVENT_RULE_ENGINE == "java":
+            event_str = json.dumps(event)
+            event_pattern_str = json.dumps(event_pattern)
+            match_result = matches_rule(event_str, event_pattern_str)
+        else:
+            match_result = matches_event(event_pattern, event)
+        if not match_result:
             return False
     return True
 
@@ -442,12 +488,7 @@ def process_events(event: Dict, targets: list[Dict]):
                 source_arn=target.get("RuleArn"),
             )
         except Exception as e:
-            LOG.info(
-                "Unable to send event notification %s to target %s: %s",
-                truncate(event),
-                target,
-                e,
-            )
+            LOG.info(f"Unable to send event notification {truncate(event)} to target {target}: {e}")
 
 
 def get_event_bus_name(event_bus_name_or_arn: Optional[EventBusNameOrArn] = None) -> str:
@@ -510,9 +551,10 @@ def events_handler_put_events(self):
         targets = []
         for rule in matching_rules:
             if filter_event_based_on_event_format(self, rule.name, event_bus_name, formatted_event):
-                rule_targets, _ = self.events_backend.list_targets_by_rule(
+                rule_targets = self.events_backend.list_targets_by_rule(
                     rule.name, event_bus_arn(event_bus_name, self.current_account, self.region)
-                )
+                ).get("Targets", [])
+
                 targets.extend([{"RuleArn": rule.arn} | target for target in rule_targets])
         # process event
         process_events(formatted_event, targets)

@@ -5,6 +5,8 @@ import time
 from abc import ABC
 from typing import Dict, Optional
 
+from moto.ssm.models import SimpleSystemManagerBackend, ssm_backends
+
 from localstack.aws.api import CommonServiceException, RequestContext
 from localstack.aws.api.ssm import (
     AlarmConfiguration,
@@ -78,10 +80,10 @@ from localstack.aws.api.ssm import (
 )
 from localstack.aws.connect import connect_to
 from localstack.services.moto import call_moto, call_moto_with_request
-from localstack.utils.aws.arns import extract_resource_from_arn, is_arn
 from localstack.utils.bootstrap import is_api_enabled
 from localstack.utils.collections import remove_attributes
 from localstack.utils.objects import keys_to_lower
+from localstack.utils.patch import patch
 
 LOG = logging.getLogger(__name__)
 
@@ -101,6 +103,15 @@ class InvalidParameterNameException(ValidationException):
             "each sub-path can be formed as a mix of letters, numbers and the following 3 symbols .-_"
         )
         super().__init__(msg)
+
+
+class DoesNotExistException(CommonServiceException):
+    def __init__(self, window_id):
+        super().__init__(
+            "DoesNotExistException",
+            message=f"Maintenance window {window_id} does not exist",
+            sender_fault=True,
+        )
 
 
 # TODO: check if _normalize_name(..) calls are still required here
@@ -351,14 +362,6 @@ class SsmProvider(SsmApi, ABC):
 
     @staticmethod
     def _normalize_name(param_name: ParameterName, validate=False) -> ParameterName:
-        if is_arn(param_name):
-            resource_name = extract_resource_from_arn(param_name).replace("parameter/", "")
-            # if the parameter name is only the root path we want to look up without the leading slash.
-            # Otherwise, we add the leading slash
-            if "/" in resource_name:
-                resource_name = f"/{resource_name}"
-            return resource_name
-
         if validate:
             if "//" in param_name or ("/" in param_name and not param_name.startswith("/")):
                 raise InvalidParameterNameException()
@@ -443,3 +446,21 @@ class SsmProvider(SsmApi, ABC):
             "DetailType": "Parameter Store Change",
         }
         events.put_events(Entries=[event])
+
+
+@patch(SimpleSystemManagerBackend.get_maintenance_window)
+def get_maintenance_window(fn, self, window_id, **kwargs):
+    """Get a maintenance window by ID."""
+    store = ssm_backends[self.account_id][self.region_name]
+    if not store.windows.get(window_id):
+        raise DoesNotExistException(window_id)
+    return fn(self, window_id)
+
+
+@patch(SimpleSystemManagerBackend.delete_maintenance_window)
+def delete_maintenance_window(fn, self, window_id, **kwargs):
+    """Delete a maintenance window by ID."""
+    store = ssm_backends[self.account_id][self.region_name]
+    if not store.windows.get(window_id):
+        raise DoesNotExistException(window_id)
+    return fn(self, window_id)

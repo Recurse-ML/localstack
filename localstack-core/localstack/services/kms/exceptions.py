@@ -9,8 +9,3 @@ class ValidationException(CommonServiceException):
 class AccessDeniedException(CommonServiceException):
     def __init__(self, message: str):
         super().__init__("AccessDeniedException", message, 400, True)
-
-
-class TagException(CommonServiceException):
-    def __init__(self, message=None):
-        super().__init__("TagException", status_code=400, message=message)

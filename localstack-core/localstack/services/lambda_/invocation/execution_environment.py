@@ -1,4 +1,6 @@
+import binascii
 import logging
+import os
 import random
 import string
 import time
@@ -8,6 +10,7 @@ from threading import RLock, Timer
 from typing import Callable, Dict, Optional
 
 from localstack import config
+from localstack.aws.api.lambda_ import TracingMode
 from localstack.aws.connect import connect_to
 from localstack.services.lambda_.invocation.lambda_models import (
     Credentials,
@@ -20,12 +23,7 @@ from localstack.services.lambda_.invocation.runtime_executor import (
     RuntimeExecutor,
     get_runtime_executor,
 )
-from localstack.utils.lambda_debug_mode.lambda_debug_mode import (
-    DEFAULT_LAMBDA_DEBUG_MODE_TIMEOUT_SECONDS,
-    is_lambda_debug_timeout_enabled_for,
-)
 from localstack.utils.strings import to_str
-from localstack.utils.xray.trace_header import TraceHeader
 
 STARTUP_TIMEOUT_SEC = config.LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT
 HEX_CHARS = [str(num) for num in range(10)] + ["a", "b", "c", "d", "e", "f"]
@@ -138,7 +136,7 @@ class ExecutionEnvironment:
             # AWS_LAMBDA_DOTNET_PREJIT
             "TZ": ":UTC",
             # 2) Public AWS RIE interface: https://github.com/aws/aws-lambda-runtime-interface-emulator
-            "AWS_LAMBDA_FUNCTION_TIMEOUT": self._get_execution_timeout_seconds(),
+            "AWS_LAMBDA_FUNCTION_TIMEOUT": self.function_version.config.timeout,
             # 3) Public LocalStack endpoint
             "LOCALSTACK_HOSTNAME": self.runtime_executor.get_endpoint_from_executor(),
             "EDGE_PORT": str(config.GATEWAY_LISTEN[0].port),
@@ -170,8 +168,8 @@ class ExecutionEnvironment:
         # Forcefully overwrite the user might break debugging!
         if config.LAMBDA_INIT_USER is not None:
             env_vars["LOCALSTACK_USER"] = config.LAMBDA_INIT_USER
-        if config.LS_LOG in config.TRACE_LOG_LEVELS:
-            env_vars["LOCALSTACK_INIT_LOG_LEVEL"] = "info"
+        if config.DEBUG:
+            env_vars["LOCALSTACK_INIT_LOG_LEVEL"] = "debug"
         if config.LAMBDA_INIT_POST_INVOKE_WAIT_MS:
             env_vars["LOCALSTACK_POST_INVOKE_WAIT_MS"] = int(config.LAMBDA_INIT_POST_INVOKE_WAIT_MS)
         if config.LAMBDA_LIMITS_MAX_FUNCTION_PAYLOAD_SIZE_BYTES:
@@ -192,8 +190,7 @@ class ExecutionEnvironment:
                 )
             self.status = RuntimeStatus.STARTING
 
-        startup_time_seconds: int = self._get_startup_timeout_seconds()
-        self.startup_timer = Timer(startup_time_seconds, self.timed_out)
+        self.startup_timer = Timer(STARTUP_TIMEOUT_SEC, self.timed_out)
         self.startup_timer.start()
 
         try:
@@ -291,9 +288,7 @@ class ExecutionEnvironment:
         )
         if LOG.isEnabledFor(logging.DEBUG):
             LOG.debug(
-                "Logs from the execution environment %s after startup timeout:\n%s",
-                self.id,
-                self.get_prefixed_logs(),
+                f"Logs from the execution environment {self.id} after startup timeout:\n{self.get_prefixed_logs()}"
             )
         with self.status_lock:
             if self.status != RuntimeStatus.STARTING:
@@ -317,9 +312,7 @@ class ExecutionEnvironment:
         )
         if LOG.isEnabledFor(logging.DEBUG):
             LOG.debug(
-                "Logs from the execution environment %s after startup error:\n%s",
-                self.id,
-                self.get_prefixed_logs(),
+                f"Logs from the execution environment {self.id} after startup error:\n{self.get_prefixed_logs()}"
             )
         with self.status_lock:
             if self.status != RuntimeStatus.STARTING:
@@ -341,29 +334,16 @@ class ExecutionEnvironment:
 
     def invoke(self, invocation: Invocation) -> InvocationResult:
         assert self.status == RuntimeStatus.RUNNING
-        # Async/event invokes might miss an aws_trace_header, then we need to create a new root trace id.
-        aws_trace_header = (
-            invocation.trace_context.get("aws_trace_header") or TraceHeader().ensure_root_exists()
-        )
-        # The Lambda RIE requires a full tracing header including Root, Parent, and Samples. Otherwise, tracing fails
-        # with the warning "Subsegment ## handler discarded due to Lambda worker still initializing"
-        aws_trace_header.ensure_sampled_exists()
-        # TODO: replace this random parent id with actual parent segment created within the Lambda provider using X-Ray
-        aws_trace_header.ensure_parent_exists()
-        # TODO: test and implement Active and PassThrough tracing and sampling decisions.
-        # TODO: implement Lambda lineage: https://docs.aws.amazon.com/lambda/latest/dg/invocation-recursion.html
         invoke_payload = {
             "invoke-id": invocation.request_id,  # TODO: rename to request-id (requires change in lambda-init)
             "invoked-function-arn": invocation.invoked_arn,
             "payload": to_str(invocation.payload),
-            "trace-id": aws_trace_header.to_header_str(),
+            "trace-id": self._generate_trace_header(),
         }
         return self.runtime_executor.invoke(payload=invoke_payload)
 
     def get_credentials(self) -> Credentials:
-        sts_client = connect_to(region_name=self.function_version.id.region).sts.request_metadata(
-            service_principal="lambda"
-        )
+        sts_client = connect_to().sts.request_metadata(service_principal="lambda")
         role_session_name = self.function_version.id.function_name
 
         # To handle single character function names #9016
@@ -376,18 +356,35 @@ class ExecutionEnvironment:
             DurationSeconds=43200,
         )["Credentials"]
 
-    def _get_execution_timeout_seconds(self) -> int:
-        # Returns the timeout value in seconds to be enforced during the execution of the
-        # lambda function. This is the configured value or the DEBUG MODE default if this
-        # is enabled.
-        if is_lambda_debug_timeout_enabled_for(self.function_version.qualified_arn):
-            return DEFAULT_LAMBDA_DEBUG_MODE_TIMEOUT_SECONDS
-        return self.function_version.config.timeout
+    def _generate_trace_id(self):
+        """https://docs.aws.amazon.com/xray/latest/devguide/xray-api-sendingdata.html#xray-api-traceids"""
+        # TODO: add test for start time
+        original_request_epoch = int(time.time())
+        timestamp_hex = hex(original_request_epoch)[2:]
+        version_number = "1"
+        unique_id = binascii.hexlify(os.urandom(12)).decode("utf-8")
+        return f"{version_number}-{timestamp_hex}-{unique_id}"
 
-    def _get_startup_timeout_seconds(self) -> int:
-        # Returns the timeout value in seconds to be enforced during lambda container startups.
-        # This is the value defined through LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT or the LAMBDA
-        # DEBUG MODE default if this is enabled.
-        if is_lambda_debug_timeout_enabled_for(self.function_version.qualified_arn):
-            return DEFAULT_LAMBDA_DEBUG_MODE_TIMEOUT_SECONDS
-        return STARTUP_TIMEOUT_SEC
+    def _generate_trace_header(self):
+        """
+        https://docs.aws.amazon.com/lambda/latest/dg/services-xray.html
+
+        "The sampling rate is 1 request per second and 5 percent of additional requests."
+
+        Currently we implement a simpler, more predictable strategy.
+        If TracingMode is "Active", we always sample the request. (Sampled=1)
+
+        TODO: implement passive tracing
+        TODO: use xray sdk here
+        """
+        if self.function_version.config.tracing_config_mode == TracingMode.Active:
+            sampled = "1"
+        else:
+            sampled = "0"
+
+        root_trace_id = self._generate_trace_id()
+
+        parent = binascii.b2a_hex(os.urandom(8)).decode(
+            "utf-8"
+        )  # TODO: segment doesn't actually exist at the moment
+        return f"Root={root_trace_id};Parent={parent};Sampled={sampled}"

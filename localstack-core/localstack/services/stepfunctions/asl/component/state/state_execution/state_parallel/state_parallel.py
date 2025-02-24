@@ -1,5 +1,4 @@
 import copy
-from typing import Optional
 
 from localstack.aws.api.stepfunctions import HistoryEventType
 from localstack.services.stepfunctions.asl.component.common.catch.catch_outcome import CatchOutcome
@@ -7,7 +6,6 @@ from localstack.services.stepfunctions.asl.component.common.error_name.failure_e
     FailureEvent,
     FailureEventException,
 )
-from localstack.services.stepfunctions.asl.component.common.parargs import Parargs
 from localstack.services.stepfunctions.asl.component.common.retry.retry_outcome import RetryOutcome
 from localstack.services.stepfunctions.asl.component.state.state_execution.execute_state import (
     ExecutionState,
@@ -25,7 +23,6 @@ class StateParallel(ExecutionState):
     # machine object must have fields named States and StartAt, whose meanings are exactly
     # like those in the top level of a state machine.
     branches: BranchesDecl
-    parargs: Optional[Parargs]
 
     def __init__(self):
         super().__init__(
@@ -39,7 +36,6 @@ class StateParallel(ExecutionState):
             typ=BranchesDecl,
             raise_on_missing=ValueError(f"Missing Branches definition in props '{state_props}'."),
         )
-        self.parargs = state_props.get(Parargs)
 
     def _eval_execution(self, env: Environment) -> None:
         env.event_manager.add_event(
@@ -55,26 +51,19 @@ class StateParallel(ExecutionState):
 
     def _eval_state(self, env: Environment) -> None:
         # Initialise the retry counter for execution states.
-        env.states.context_object.context_object_data["State"]["RetryCount"] = 0
+        env.context_object_manager.context_object["State"]["RetryCount"] = 0
 
-        # Compute the branches' input: if declared this is the parameters, else the current memory state.
-        if self.parargs is not None:
-            self.parargs.eval(env=env)
-        # In both cases, the inputs are copied by value to the branches, to avoid cross branch state manipulation, and
-        # cached to allow them to be resubmitted in case of failure.
+        # Cache the input, so it can be resubmitted in case of failure.
         input_value = copy.deepcopy(env.stack.pop())
 
         # Attempt to evaluate the state's logic through until it's successful, caught, or retries have run out.
-        while env.is_running():
+        while True:
             try:
                 env.stack.append(input_value)
                 self._evaluate_with_timeout(env)
                 break
             except FailureEventException as failure_event_ex:
-                failure_event: FailureEvent = self._from_error(env=env, ex=failure_event_ex)
-                error_output = self._construct_error_output_value(failure_event=failure_event)
-                env.states.set_error_output(error_output)
-                env.states.set_result(error_output)
+                failure_event: FailureEvent = failure_event_ex.failure_event
 
                 if self.retry is not None:
                     retry_outcome: RetryOutcome = self._handle_retry(
@@ -89,8 +78,9 @@ class StateParallel(ExecutionState):
                 )
 
                 if self.catch is not None:
-                    self._handle_catch(env=env, failure_event=failure_event)
-                    catch_outcome: CatchOutcome = env.stack[-1]
+                    catch_outcome: CatchOutcome = self._handle_catch(
+                        env=env, failure_event=failure_event
+                    )
                     if catch_outcome == CatchOutcome.Caught:
                         break
 

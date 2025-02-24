@@ -102,9 +102,7 @@ class IsTimestamp(Operator):
     def eval(env: Environment, value: Any) -> None:
         variable = env.stack.pop()
         LOG.warning(
-            "State Choice's 'IsTimestamp' operator is not fully supported for input '%s' and target '%s'.",
-            variable,
-            value,
+            f"State Choice's 'IsTimestamp' operator is not fully supported for input '{variable}' and target '{value}'."
         )
         res = IsTimestamp.is_timestamp(variable) is value
         env.stack.append(res)

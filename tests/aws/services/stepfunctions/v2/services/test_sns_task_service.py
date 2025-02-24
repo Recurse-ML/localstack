@@ -17,6 +17,7 @@ from tests.aws.test_notifications import PUBLICATION_RETRIES, PUBLICATION_TIMEOU
 
 @markers.snapshot.skip_snapshot_verify(
     paths=[
+        "$..tracingConfiguration",
         # TODO: add support for Sdk Http metadata.
         "$..SdkHttpMetadata",
         "$..SdkResponseMetadata",
@@ -46,7 +47,7 @@ class TestTaskServiceSns:
     def test_fifo_message_attribute(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         input_params,
         fail_template,
@@ -67,8 +68,8 @@ class TestTaskServiceSns:
 
         exec_input = json.dumps(input_params)
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -82,7 +83,7 @@ class TestTaskServiceSns:
     def test_publish_base(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sns_create_topic,
         sfn_snapshot,
@@ -98,8 +99,8 @@ class TestTaskServiceSns:
 
         exec_input = json.dumps({"TopicArn": topic_arn, "Message": {"Message": "HelloWorld!"}})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -113,7 +114,7 @@ class TestTaskServiceSns:
     def test_publish_message_attributes(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sqs_create_queue,
         sqs_receive_num_messages,
@@ -162,8 +163,8 @@ class TestTaskServiceSns:
             }
         )
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -176,7 +177,7 @@ class TestTaskServiceSns:
     def test_publish_base_error_topic_arn(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sns_create_topic,
         sfn_snapshot,
@@ -192,8 +193,8 @@ class TestTaskServiceSns:
 
         exec_input = json.dumps({"TopicArn": topic_arn, "Message": {"Message": "HelloWorld!"}})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,

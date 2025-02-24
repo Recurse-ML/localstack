@@ -2,11 +2,11 @@ import dataclasses
 import logging
 import os
 import platform
-from typing import Optional
+from typing import Literal, Optional
 
 from localstack import config
 from localstack.constants import VERSION
-from localstack.runtime import get_current_runtime, hooks
+from localstack.runtime import hooks
 from localstack.utils.bootstrap import Container
 from localstack.utils.files import rm_rf
 from localstack.utils.functions import call_safe
@@ -29,8 +29,6 @@ class ClientMetadata:
     is_ci: bool
     is_docker: bool
     is_testing: bool
-    product: str
-    edition: str
 
     def __repr__(self):
         d = dataclasses.asdict(self)
@@ -62,8 +60,6 @@ def read_client_metadata() -> ClientMetadata:
         is_ci=os.getenv("CI") is not None,
         is_docker=config.is_in_docker,
         is_testing=config.is_local_test_mode(),
-        product=get_localstack_product(),
-        edition=os.getenv("LOCALSTACK_TELEMETRY_EDITION") or get_localstack_edition(),
     )
 
 
@@ -110,41 +106,25 @@ def get_machine_id() -> str:
     return doc["machine_id"]
 
 
-def get_localstack_edition() -> str:
-    # Generator expression to find the first hidden file ending with '-version'
-    version_file = next(
-        (
-            f
-            for f in os.listdir(config.dirs.static_libs)
-            if f.startswith(".") and f.endswith("-version")
-        ),
-        None,
-    )
+def get_localstack_edition() -> Optional[Literal["enterprise", "pro", "community"]]:
+    if os.path.exists("/usr/lib/localstack/.enterprise-version"):
+        return "enterprise"
+    elif os.path.exists("/usr/lib/localstack/.pro-version"):
+        return "pro"
+    elif os.path.exists("/usr/lib/localstack/.community-version"):
+        return "community"
 
-    # Return the base name of the version file, or unknown if no file is found
-    return version_file.removesuffix("-version").removeprefix(".") if version_file else "unknown"
-
-
-def get_localstack_product() -> str:
-    """
-    Returns the telemetry product name from the env var, runtime, or "unknown".
-    """
-    try:
-        runtime_product = get_current_runtime().components.name
-    except ValueError:
-        runtime_product = None
-
-    return os.getenv("LOCALSTACK_TELEMETRY_PRODUCT") or runtime_product or "unknown"
+    return None
 
 
 def is_license_activated() -> bool:
     try:
-        from localstack.pro.core import config  # noqa
+        from localstack_ext import config  # noqa
     except ImportError:
         return False
 
     try:
-        from localstack.pro.core.bootstrap import licensingv2
+        from localstack_ext.bootstrap import licensingv2
 
         return licensingv2.get_licensed_environment().activated
     except Exception:

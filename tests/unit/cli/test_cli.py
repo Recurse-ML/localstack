@@ -62,13 +62,13 @@ def test_create_with_plugins(runner):
     localstack_cli = create_with_plugins()
     result = runner.invoke(localstack_cli.group, ["--version"])
     assert result.exit_code == 0
-    assert result.output.strip() == f"LocalStack CLI {VERSION}"
+    assert result.output.strip() == VERSION
 
 
 def test_version(runner):
     result = runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
-    assert result.output.strip() == f"LocalStack CLI {VERSION}"
+    assert result.output.strip() == VERSION
 
 
 def test_status_services_error(runner):
@@ -168,7 +168,7 @@ services:
       - SERVICES=${SERVICES- }
       - DEBUG=${DEBUG- }
       - DATA_DIR=${DATA_DIR- }
-      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN- }
+      - LOCALSTACK_API_KEY=${LOCALSTACK_API_KEY- }
       - KINESIS_ERROR_PROBABILITY=${KINESIS_ERROR_PROBABILITY- }
       - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
@@ -259,9 +259,9 @@ def test_do_not_publish_analytics_event_on_invalid_command_invocation(
     httpserver.expect_request("").respond_with_handler(_handler)
     monkeypatch.setenv("ANALYTICS_API", httpserver.url_for("/"))
     runner.invoke(cli, input)
-    assert len(request_data) == 0, (
-        "analytics API should not be invoked when an invalid command is supplied"
-    )
+    assert (
+        len(request_data) == 0
+    ), "analytics API should not be invoked when an invalid command is supplied"
 
 
 def test_disable_publish_analytics_event_on_command_invocation(
@@ -299,9 +299,9 @@ def test_timeout_publishing_command_invocation(runner, monkeypatch, caplog, http
     httpserver.expect_request("").respond_with_handler(_handler)
     monkeypatch.setenv("ANALYTICS_API", httpserver.url_for("/"))
     runner.invoke(cli, ["config", "show"])
-    assert len(request_data) == 0, (
-        "analytics event publisher process should time out if request is taking too long"
-    )
+    assert (
+        len(request_data) == 0
+    ), "analytics event publisher process should time out if request is taking too long"
 
 
 def test_is_frozen(monkeypatch):

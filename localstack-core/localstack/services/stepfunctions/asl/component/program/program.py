@@ -21,12 +21,11 @@ from localstack.services.stepfunctions.asl.component.common.error_name.states_er
     StatesErrorNameType,
 )
 from localstack.services.stepfunctions.asl.component.common.flow.start_at import StartAt
-from localstack.services.stepfunctions.asl.component.common.query_language import QueryLanguage
 from localstack.services.stepfunctions.asl.component.common.timeouts.timeout import TimeoutSeconds
+from localstack.services.stepfunctions.asl.component.common.version import Version
 from localstack.services.stepfunctions.asl.component.eval_component import EvalComponent
-from localstack.services.stepfunctions.asl.component.program.states import States
-from localstack.services.stepfunctions.asl.component.program.version import Version
 from localstack.services.stepfunctions.asl.component.state.state import CommonStateField
+from localstack.services.stepfunctions.asl.component.states import States
 from localstack.services.stepfunctions.asl.eval.environment import Environment
 from localstack.services.stepfunctions.asl.eval.event.event_detail import EventDetails
 from localstack.services.stepfunctions.asl.eval.program_state import (
@@ -44,7 +43,6 @@ LOG = logging.getLogger(__name__)
 
 
 class Program(EvalComponent):
-    query_language: Final[QueryLanguage]
     start_at: Final[StartAt]
     states: Final[States]
     timeout_seconds: Final[Optional[TimeoutSeconds]]
@@ -53,14 +51,12 @@ class Program(EvalComponent):
 
     def __init__(
         self,
-        query_language: QueryLanguage,
         start_at: StartAt,
         states: States,
         timeout_seconds: Optional[TimeoutSeconds],
         comment: Optional[Comment] = None,
         version: Optional[Version] = None,
     ):
-        self.query_language = query_language
         self.start_at = start_at
         self.states = states
         self.timeout_seconds = timeout_seconds
@@ -76,7 +72,7 @@ class Program(EvalComponent):
     def eval(self, env: Environment) -> None:
         timeout = self.timeout_seconds.timeout_seconds if self.timeout_seconds else None
         env.next_state_name = self.start_at.start_at_name
-        worker_thread = threading.Thread(target=super().eval, args=(env,), daemon=True)
+        worker_thread = threading.Thread(target=super().eval, args=(env,))
         TMP_THREADS.append(worker_thread)
         worker_thread.start()
         worker_thread.join(timeout=timeout)
@@ -87,16 +83,23 @@ class Program(EvalComponent):
     def _eval_body(self, env: Environment) -> None:
         try:
             while env.is_running():
+                # Store the heap values at this depth for garbage collection.
+                heap_values = set(env.heap.keys())
+
                 next_state: CommonStateField = self._get_state(env.next_state_name)
                 next_state.eval(env)
+
                 # Garbage collect hanging values added by this last state.
                 env.stack.clear()
-                env.heap.clear()
+                clear_heap_values = set(env.heap.keys()) - heap_values
+                for heap_value in clear_heap_values:
+                    env.heap.pop(heap_value, None)
+
         except FailureEventException as ex:
             env.set_error(error=ex.get_execution_failed_event_details())
         except Exception as ex:
             cause = f"{type(ex).__name__}({str(ex)})"
-            LOG.error("Stepfunctions computation ended with exception '%s'.", cause)
+            LOG.error(f"Stepfunctions computation ended with exception '{cause}'.")
             env.set_error(
                 ExecutionFailedEventDetails(
                     error=StatesErrorName(typ=StatesErrorNameType.StatesRuntime).error_name,
@@ -143,7 +146,7 @@ class Program(EvalComponent):
                 event_type=HistoryEventType.ExecutionSucceeded,
                 event_details=EventDetails(
                     executionSucceededEventDetails=ExecutionSucceededEventDetails(
-                        output=to_json_str(env.states.get_input(), separators=(",", ":")),
+                        output=to_json_str(env.inp, separators=(",", ":")),
                         outputDetails=HistoryEventExecutionDataDetails(
                             truncated=False  # Always False for api calls.
                         ),

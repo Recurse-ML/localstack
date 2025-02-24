@@ -72,6 +72,7 @@ from email.utils import parsedate_to_datetime
 from typing import IO, Any, Dict, List, Mapping, Optional, Tuple, Union
 from xml.etree import ElementTree as ETree
 
+import cbor2
 import dateutil.parser
 from botocore.model import (
     ListShape,
@@ -82,12 +83,10 @@ from botocore.model import (
     Shape,
     StructureShape,
 )
-
-# cbor2: explicitly load from private _decoder module to avoid using the (non-patched) C-version
-from cbor2._decoder import loads as cbor2_loads
 from werkzeug.exceptions import BadRequest, NotFound
 
 from localstack.aws.protocol.op_router import RestServiceOperationRouter
+from localstack.config import LEGACY_V2_S3_PROVIDER
 from localstack.http import Request
 
 
@@ -338,10 +337,6 @@ class RequestParser(abc.ABC):
     @staticmethod
     def _timestamp_unixtimestamp(timestamp_string: str) -> datetime.datetime:
         return datetime.datetime.utcfromtimestamp(int(timestamp_string))
-
-    @staticmethod
-    def _timestamp_unixtimestampmillis(timestamp_string: str) -> datetime.datetime:
-        return datetime.datetime.utcfromtimestamp(float(timestamp_string) / 1000)
 
     @staticmethod
     def _timestamp_rfc822(datetime_string: str) -> datetime.datetime:
@@ -815,10 +810,7 @@ class BaseJSONRequestParser(RequestParser, ABC):
     This base-class handles parsing the payload / body as JSON.
     """
 
-    # default timestamp format for JSON requests
     TIMESTAMP_FORMAT = "unixtimestamp"
-    # timestamp format for requests with CBOR content type
-    CBOR_TIMESTAMP_FORMAT = "unixtimestampmillis"
 
     def _parse_structure(
         self,
@@ -869,7 +861,7 @@ class BaseJSONRequestParser(RequestParser, ABC):
             return {}
         if request.mimetype.startswith("application/x-amz-cbor"):
             try:
-                return cbor2_loads(body_contents)
+                return cbor2.loads(body_contents)
             except ValueError as e:
                 raise ProtocolParserError("HTTP body could not be parsed as CBOR.") from e
         else:
@@ -882,20 +874,6 @@ class BaseJSONRequestParser(RequestParser, ABC):
         self, request: Request, shape: Shape, node: bool, uri_params: Mapping[str, Any] = None
     ) -> bool:
         return super()._noop_parser(request, shape, node, uri_params)
-
-    def _parse_timestamp(
-        self, request: Request, shape: Shape, node: str, uri_params: Mapping[str, Any] = None
-    ) -> datetime.datetime:
-        if not shape.serialization.get("timestampFormat") and request.mimetype.startswith(
-            "application/x-amz-cbor"
-        ):
-            # cbor2 has native support for timestamp decoding, so this node could already have the right type
-            if isinstance(node, datetime.datetime):
-                return node
-            # otherwise parse the timestamp using the AWS CBOR timestamp format
-            # (non-CBOR-standard conform, uses millis instead of floating-point-millis)
-            return self._convert_str_to_timestamp(node, self.CBOR_TIMESTAMP_FORMAT)
-        return super()._parse_timestamp(request, shape, node, uri_params)
 
     def _parse_blob(
         self, request: Request, shape: Shape, node: bool, uri_params: Mapping[str, Any] = None
@@ -1073,8 +1051,11 @@ class S3RequestParser(RestXMLRequestParser):
 
     @_handle_exceptions
     def parse(self, request: Request) -> Tuple[OperationModel, Any]:
-        """Handle virtual-host-addressing for S3."""
-        with self.VirtualHostRewriter(request):
+        if not LEGACY_V2_S3_PROVIDER:
+            """Handle virtual-host-addressing for S3."""
+            with self.VirtualHostRewriter(request):
+                return super().parse(request)
+        else:
             return super().parse(request)
 
     def _parse_shape(
@@ -1091,7 +1072,7 @@ class S3RequestParser(RestXMLRequestParser):
             and shape.serialization.get("location") == "uri"
             and shape.serialization.get("name") == "Key"
             and (
-                (trailing_slashes := request.path.rpartition(uri_params["Key"])[2])
+                (trailing_slashes := request.path.partition(uri_params["Key"])[2])
                 and all(char == "/" for char in trailing_slashes)
             )
         ):

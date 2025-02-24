@@ -35,10 +35,6 @@ class CallbackOutcomeFailure(CallbackOutcome):
         self.cause = cause
 
 
-class CallbackOutcomeTimedOut(CallbackOutcome):
-    pass
-
-
 class CallbackTimeoutError(TimeoutError):
     pass
 
@@ -77,10 +73,6 @@ class HeartbeatEndpoint:
 
 
 class HeartbeatTimeoutError(TimeoutError):
-    pass
-
-
-class HeartbeatTimedOut(CallbackConsumerError):
     pass
 
 
@@ -124,13 +116,6 @@ class CallbackEndpoint:
     def setup_heartbeat_endpoint(self, heartbeat_seconds: int) -> HeartbeatEndpoint:
         self._heartbeat_endpoint = HeartbeatEndpoint(heartbeat_seconds=heartbeat_seconds)
         return self._heartbeat_endpoint
-
-    def interrupt_all(self) -> None:
-        # Interrupts all waiting processes on this endpoint.
-        self._notify_event.set()
-        heartbeat_endpoint = self._heartbeat_endpoint
-        if heartbeat_endpoint is not None:
-            heartbeat_endpoint.notify()
 
     def notify(self, outcome: CallbackOutcome):
         self._outcome = outcome

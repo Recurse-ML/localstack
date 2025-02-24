@@ -1,4 +1,4 @@
-# Generated from ASLIntrinsicParser.g4 by ANTLR 4.13.2
+# Generated from ASLIntrinsicParser.g4 by ANTLR 4.13.1
 from antlr4 import *
 if "." in __name__:
     from .ASLIntrinsicParser import ASLIntrinsicParser
@@ -95,15 +95,6 @@ class ASLIntrinsicParserListener(ParseTreeListener):
 
     # Exit a parse tree produced by ASLIntrinsicParser#func_arg_json_path.
     def exitFunc_arg_json_path(self, ctx:ASLIntrinsicParser.Func_arg_json_pathContext):
-        pass
-
-
-    # Enter a parse tree produced by ASLIntrinsicParser#func_arg_var.
-    def enterFunc_arg_var(self, ctx:ASLIntrinsicParser.Func_arg_varContext):
-        pass
-
-    # Exit a parse tree produced by ASLIntrinsicParser#func_arg_var.
-    def exitFunc_arg_var(self, ctx:ASLIntrinsicParser.Func_arg_varContext):
         pass
 
 

@@ -18,15 +18,9 @@ from localstack.constants import (
     OPENSEARCH_PLUGIN_LIST,
 )
 from localstack.packages import InstallTarget, Package, PackageInstaller
-from localstack.packages.java import java_package
 from localstack.services.opensearch import versions
 from localstack.utils.archives import download_and_extract_with_retry
 from localstack.utils.files import chmod_r, load_file, mkdir, rm_rf, save_file
-from localstack.utils.java import (
-    java_system_properties_proxy,
-    java_system_properties_ssl,
-    system_properties_to_cli_args,
-)
 from localstack.utils.run import run
 from localstack.utils.ssl import create_ssl_cert, install_predefined_cert_if_available
 from localstack.utils.sync import SynchronizedDefaultDict, retry
@@ -43,8 +37,6 @@ class OpensearchPackage(Package):
 
     def _get_installer(self, version: str) -> PackageInstaller:
         if version in versions._prefixed_elasticsearch_install_versions:
-            if version.startswith("Elasticsearch_5.") or version.startswith("Elasticsearch_6."):
-                return ElasticsearchLegacyPackageInstaller(version)
             return ElasticsearchPackageInstaller(version)
         else:
             return OpensearchPackageInstaller(version)
@@ -73,6 +65,7 @@ class OpensearchPackageInstaller(PackageInstaller):
                 tmp_archive = os.path.join(
                     config.dirs.cache, f"localstack.{os.path.basename(opensearch_url)}"
                 )
+                print(f"DEBUG: installing opensearch to path {install_dir_parent}")
                 download_and_extract_with_retry(opensearch_url, tmp_archive, install_dir_parent)
                 opensearch_dir = glob.glob(os.path.join(install_dir_parent, "opensearch*"))
                 if not opensearch_dir:
@@ -92,16 +85,6 @@ class OpensearchPackageInstaller(PackageInstaller):
                 # install other default plugins for opensearch 1.1+
                 # https://forum.opensearch.org/t/ingest-attachment-cannot-be-installed/6494/12
                 if parsed_version >= "1.1.0":
-                    # Determine network configuration to use for plugin downloads
-                    sys_props = {
-                        **java_system_properties_proxy(),
-                        **java_system_properties_ssl(
-                            os.path.join(install_dir, "jdk", "bin", "keytool"),
-                            {"JAVA_HOME": os.path.join(install_dir, "jdk")},
-                        ),
-                    }
-                    java_opts = system_properties_to_cli_args(sys_props)
-
                     for plugin in OPENSEARCH_PLUGIN_LIST:
                         plugin_binary = os.path.join(install_dir, "bin", "opensearch-plugin")
                         plugin_dir = os.path.join(install_dir, "plugins", plugin)
@@ -109,10 +92,7 @@ class OpensearchPackageInstaller(PackageInstaller):
                             LOG.info("Installing OpenSearch plugin %s", plugin)
 
                             def try_install():
-                                output = run(
-                                    [plugin_binary, "install", "-b", plugin],
-                                    env_vars={"OPENSEARCH_JAVA_OPTS": " ".join(java_opts)},
-                                )
+                                output = run([plugin_binary, "install", "-b", plugin])
                                 LOG.debug("Plugin installation output: %s", output)
 
                             # We're occasionally seeing javax.net.ssl.SSLHandshakeException -> add download retries
@@ -236,12 +216,6 @@ class ElasticsearchPackageInstaller(PackageInstaller):
     def __init__(self, version: str):
         super().__init__("elasticsearch", version)
 
-    def get_java_env_vars(self) -> dict[str, str]:
-        install_dir = self.get_installed_dir()
-        return {
-            "JAVA_HOME": os.path.join(install_dir, "jdk"),
-        }
-
     def _install(self, target: InstallTarget):
         # locally import to avoid having a dependency on ASF when starting the CLI
         from localstack.aws.api.opensearch import EngineType
@@ -267,16 +241,6 @@ class ElasticsearchPackageInstaller(PackageInstaller):
                 mkdir(dir_path)
                 chmod_r(dir_path, 0o777)
 
-            # Determine network configuration to use for plugin downloads
-            sys_props = {
-                **java_system_properties_proxy(),
-                **java_system_properties_ssl(
-                    os.path.join(install_dir, "jdk", "bin", "keytool"),
-                    self.get_java_env_vars(),
-                ),
-            }
-            java_opts = system_properties_to_cli_args(sys_props)
-
             # install default plugins
             for plugin in ELASTICSEARCH_PLUGIN_LIST:
                 plugin_binary = os.path.join(install_dir, "bin", "elasticsearch-plugin")
@@ -285,10 +249,7 @@ class ElasticsearchPackageInstaller(PackageInstaller):
                     LOG.info("Installing Elasticsearch plugin %s", plugin)
 
                     def try_install():
-                        output = run(
-                            [plugin_binary, "install", "-b", plugin],
-                            env_vars={"ES_JAVA_OPTS": " ".join(java_opts)},
-                        )
+                        output = run([plugin_binary, "install", "-b", plugin])
                         LOG.debug("Plugin installation output: %s", output)
 
                     # We're occasionally seeing javax.net.ssl.SSLHandshakeException -> add download retries
@@ -343,28 +304,6 @@ class ElasticsearchPackageInstaller(PackageInstaller):
             return ELASTICSEARCH_DEFAULT_VERSION
 
         return versions.get_install_version(self.version)
-
-
-class ElasticsearchLegacyPackageInstaller(ElasticsearchPackageInstaller):
-    """
-    Specialised package installer for ElasticSearch 5.x and 6.x
-
-    It installs Java during setup because these releases of ES do not have a bundled JDK.
-    This should be removed after these versions are dropped in line with AWS EOL, scheduled for Nov 2026.
-    https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-is.html#choosing-version
-    """
-
-    # ES 5.x and 6.x require Java 8
-    # See: https://www.elastic.co/guide/en/elasticsearch/reference/6.0/zip-targz.html
-    JAVA_VERSION = "8"
-
-    def _prepare_installation(self, target: InstallTarget) -> None:
-        java_package.get_installer(self.JAVA_VERSION).install(target)
-
-    def get_java_env_vars(self) -> dict[str, str]:
-        return {
-            "JAVA_HOME": java_package.get_installer(self.JAVA_VERSION).get_java_home(),
-        }
 
 
 opensearch_package = OpensearchPackage(default_version=OPENSEARCH_DEFAULT_VERSION)

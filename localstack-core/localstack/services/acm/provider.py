@@ -73,6 +73,9 @@ def describe(describe_orig, self):
     if cert.get("KeyAlgorithm") in ["RSA_1024", "RSA_2048"]:
         cert["KeyAlgorithm"] = cert["KeyAlgorithm"].replace("RSA_", "RSA-")
 
+    if "InUse" not in cert:
+        cert["InUse"] = False
+
     # add subject alternative names
     if cert["DomainName"] not in sans:
         sans.append(cert["DomainName"])

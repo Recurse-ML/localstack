@@ -21,7 +21,6 @@ from localstack.utils.sync import retry, wait_until
 from localstack.utils.testutil import create_lambda_archive
 from localstack.utils.urls import localstack_host
 from tests.aws.services.apigateway.apigateway_fixtures import api_invoke_url
-from tests.aws.services.apigateway.conftest import is_next_gen_api
 
 LOG = logging.getLogger(__name__)
 
@@ -32,7 +31,6 @@ OPENAPI_SPEC_TF_JSON = os.path.join(PARENT_DIR, "../../files/openapi.spec.tf.jso
 SWAGGER_MOCK_CORS_JSON = os.path.join(PARENT_DIR, "../../files/swagger-mock-cors.json")
 PETSTORE_SWAGGER_JSON = os.path.join(PARENT_DIR, "../../files/petstore-authorizer.swagger.json")
 TEST_SWAGGER_FILE_JSON = os.path.join(PARENT_DIR, "../../files/swagger.json")
-TEST_OPENAPI_COGNITO_AUTH = os.path.join(PARENT_DIR, "../../files/openapi.cognito-auth.json")
 TEST_OAS30_BASE_PATH_SERVER_VAR_FILE_YAML = os.path.join(
     PARENT_DIR, "../../files/openapi-basepath-server-variable.yaml"
 )
@@ -49,7 +47,6 @@ OAS_30_CIRCULAR_REF_WITH_REQUEST_BODY = os.path.join(
 )
 OAS_30_STAGE_VARIABLES = os.path.join(PARENT_DIR, "../../files/openapi.spec.stage-variables.json")
 OAS30_HTTP_METHOD_INT = os.path.join(PARENT_DIR, "../../files/openapi-http-method-integration.json")
-OAS30_HTTP_STATUS_INT = os.path.join(PARENT_DIR, "../../files/openapi-method-int.spec.yaml")
 TEST_LAMBDA_PYTHON_ECHO = os.path.join(PARENT_DIR, "../lambda_/functions/lambda_echo.py")
 
 
@@ -202,7 +199,7 @@ def apigateway_placeholder_authorizer_lambda_invocation_arn(
             # create_response is the original create call response, even though the fixture waits until it's not pending
             create_response = aws_client.lambda_.create_function(
                 FunctionName=f"test-authorizer-import-{short_uid()}",
-                Runtime=Runtime.python3_12,
+                Runtime=Runtime.python3_10,
                 Handler="handler.handler",
                 Role=lambda_su_role,
                 Code={"ZipFile": zip_file},
@@ -241,7 +238,7 @@ def apigateway_placeholder_authorizer_lambda_invocation_arn(
             try:
                 aws_client.lambda_.delete_function(FunctionName=arn)
             except Exception:
-                LOG.debug("Unable to delete function %s in cleanup", arn)
+                LOG.debug(f"Unable to delete function {arn=} in cleanup")
 
 
 @pytest.fixture
@@ -481,6 +478,7 @@ class TestApiGatewayImportRestApi:
         apigw_create_rest_api,
         aws_client,
         snapshot,
+        apigateway_placeholder_authorizer_lambda_invocation_arn,
         apigw_snapshot_imported_resources,
         apigw_deploy_rest_api,
     ):
@@ -739,76 +737,29 @@ class TestApiGatewayImportRestApi:
         assert request.json().get("message") == "Invalid request body"
 
     @markers.aws.validated
-    @markers.snapshot.skip_snapshot_verify(paths=["$..origin"])
-    @markers.snapshot.skip_snapshot_verify(
-        condition=lambda: not is_next_gen_api(), paths=["$..method"]
-    )
-    def test_import_with_stage_variables(
-        self, import_apigw, aws_client, create_echo_http_server, snapshot
-    ):
-        snapshot.add_transformers_list(
-            [
-                snapshot.transform.key_value("domain"),
-                snapshot.transform.key_value("origin"),
-            ]
-        )
+    def test_import_with_stage_variables(self, import_apigw, aws_client, echo_http_server_post):
         spec_file = load_file(OAS_30_STAGE_VARIABLES)
-        if not is_aws_cloud():
-            # to make sure we return the endpoint without https to avoid cert issues
-            spec_file = spec_file.replace("https://", "http://")
-
         import_resp, root_id = import_apigw(body=spec_file, failOnWarnings=True)
         rest_api_id = import_resp["id"]
-        echo_server_url = create_echo_http_server(trim_x_headers=True)
-        endpoint = re.sub(r"https?://", "", echo_server_url)
 
         response = aws_client.apigateway.create_deployment(restApiId=rest_api_id)
-        deployment_id = response["id"]
         # workaround to remove the fixture scheme prefix. AWS won't allow stage variables
-        # on the OpenAPI uri without the scheme. So we let the scheme on the spec, "https://{stageVariables.url}",
+        # on the OpenAPI uri without the scheme. So we let the scheme on the spec, "http://{stageVariables.url}",
         # and remove it from the fixture
+        endpoint = re.sub(r"https?://", "", echo_http_server_post)
         aws_client.apigateway.create_stage(
             restApiId=rest_api_id,
             stageName="v1",
-            variables={
-                "TestHost": endpoint,
-                "testPath": "test-path",
-                "querystring": "qs_key=qs_value",
-            },
-            deploymentId=deployment_id,
+            variables={"url": endpoint},
+            deploymentId=response["id"],
         )
 
-        url_success = api_invoke_url(api_id=rest_api_id, stage="v1", path="/path1")
-
         def call_api():
-            res = requests.get(url_success)
+            url = api_invoke_url(api_id=rest_api_id, stage="v1", path="/path1")
+            res = requests.get(url)
             assert res.ok
-            return res.json()
 
-        resp = retry(call_api, retries=5, sleep=2)
-        # we remove the headers from the response, not really needed for this test
-        resp.pop("headers", None)
-        snapshot.match("get-resp-from-http", resp)
-
-        if is_next_gen_api() or is_aws_cloud():
-            # assert that we properly raise an integration failure error if the endpoint is bad
-            aws_client.apigateway.create_stage(
-                restApiId=rest_api_id,
-                stageName="v2",
-                deploymentId=deployment_id,
-            )
-
-            url_error = api_invoke_url(api_id=rest_api_id, stage="v2", path="/path1")
-
-            def call_api_error():
-                res = requests.get(url_error)
-                assert res.status_code == 500
-                return res.json()
-
-            resp = retry(call_api_error, retries=5, sleep=2)
-            # we remove the headers from the response, not really needed for this test
-            resp.pop("headers", None)
-            snapshot.match("get-error-resp-from-http", resp)
+        retry(call_api, retries=5, sleep=2)
 
     @markers.aws.validated
     @markers.snapshot.skip_snapshot_verify(
@@ -830,91 +781,6 @@ class TestApiGatewayImportRestApi:
         spec_file = spec_file.replace(
             "${lambda_invocation_arn}", apigateway_placeholder_authorizer_lambda_invocation_arn
         )
-        import_resp, root_id = import_apigw(body=spec_file, failOnWarnings=True)
-        rest_api_id = import_resp["id"]
-
-        response = aws_client.apigateway.get_resources(restApiId=rest_api_id)
-        response["items"] = sorted(response["items"], key=itemgetter("path"))
-        snapshot.match("resources", response)
-
-        # this fixture will iterate over every resource and match its method, methodResponse, integration and
-        # integrationResponse
-        apigw_snapshot_imported_resources(rest_api_id=rest_api_id, resources=response)
-
-    @pytest.mark.no_apigw_snap_transformers
-    @markers.snapshot.skip_snapshot_verify(
-        paths=[
-            "$.resources.items..resourceMethods.GET",  # AWS does not show them after import
-        ]
-    )
-    @markers.aws.validated
-    def test_import_with_cognito_auth_identity_source(
-        self,
-        region_name,
-        account_id,
-        import_apigw,
-        snapshot,
-        aws_client,
-        apigw_snapshot_imported_resources,
-    ):
-        snapshot.add_transformers_list(
-            [
-                snapshot.transform.jsonpath("$.import-swagger.id", value_replacement="rest-id"),
-                snapshot.transform.jsonpath(
-                    "$.resources.items..id", value_replacement="resource-id"
-                ),
-                snapshot.transform.jsonpath(
-                    "$.get-authorizers..id", value_replacement="authorizer-id"
-                ),
-            ]
-        )
-        snapshot.add_transformer(
-            snapshot.transform.regex(
-                regex="petstore.execute-api.us-west-1",
-                replacement="<external-aws-endpoint>",
-            ),
-            priority=-10,
-        )
-        spec_file = load_file(TEST_OPENAPI_COGNITO_AUTH)
-        # the authorizer does not need to exist in AWS
-        spec_file = spec_file.replace(
-            "${cognito_pool_arn}",
-            f"arn:aws:cognito-idp:{region_name}:{account_id}:userpool/{region_name}_ABC123",
-        )
-        response, root_id = import_apigw(body=spec_file, failOnWarnings=True)
-        snapshot.match("import-swagger", response)
-
-        rest_api_id = response["id"]
-
-        authorizers = aws_client.apigateway.get_authorizers(restApiId=rest_api_id)
-        snapshot.match("get-authorizers", sorted(authorizers["items"], key=lambda x: x["name"]))
-
-        response = aws_client.apigateway.get_resources(restApiId=rest_api_id)
-        response["items"] = sorted(response["items"], key=itemgetter("path"))
-        snapshot.match("resources", response)
-
-        # this fixture will iterate over every resource and match its method, methodResponse, integration and
-        # integrationResponse
-        apigw_snapshot_imported_resources(rest_api_id=rest_api_id, resources=response)
-
-    @markers.aws.validated
-    @markers.snapshot.skip_snapshot_verify(
-        paths=[
-            "$.resources.items..resourceMethods.GET",
-        ]
-    )
-    def test_import_with_integer_http_status_code(
-        self,
-        import_apigw,
-        aws_client,
-        apigw_snapshot_imported_resources,
-        snapshot,
-    ):
-        # the following YAML file contains integer status code for the Method and IntegrationResponse
-        # when importing the API, we need to properly cast them into string to avoid any typing issue when serializing
-        # responses. Most typed languages would fail when parsing.
-        snapshot.add_transformer(snapshot.transform.key_value("uri"))
-        spec_file = load_file(OAS30_HTTP_STATUS_INT)
         import_resp, root_id = import_apigw(body=spec_file, failOnWarnings=True)
         rest_api_id = import_resp["id"]
 

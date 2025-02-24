@@ -4,16 +4,12 @@ on:
   pull_request:
     paths:
       - 'bin/docker-helper.sh'
-      - '.github/workflows/tests-bin.yml'
-      - 'tests/bin/*.bats'
     branches:
       - master
       - release/*
   push:
     paths:
       - 'bin/docker-helper.sh'
-      - '.github/workflows/tests-bin.yml'
-      - 'tests/bin/*.bats'
     branches:
       - master
       - release/*
@@ -30,14 +26,6 @@ jobs:
           git clone https://github.com/bats-core/bats-core.git "$HOME"/bats-core
           cd "$HOME"/bats-core
           sudo ./install.sh /usr/local
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install helper script dependencies
-        run: pip install --upgrade setuptools setuptools_scm
 
       - name: Run bats tests
         run: |

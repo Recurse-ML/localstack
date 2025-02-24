@@ -1,10 +1,8 @@
 import datetime
 import json
 import logging
-import re
 import threading
 import uuid
-from datetime import timezone
 from typing import List
 
 from localstack.aws.api import CommonServiceException, RequestContext, handler
@@ -28,7 +26,6 @@ from localstack.aws.api.cloudwatch import (
     DescribeAlarmsOutput,
     DimensionFilters,
     Dimensions,
-    EntityMetricDataList,
     ExtendedStatistic,
     ExtendedStatistics,
     GetDashboardOutput,
@@ -66,7 +63,6 @@ from localstack.aws.api.cloudwatch import (
     StateValue,
     Statistic,
     Statistics,
-    StrictEntityValidation,
     TagKeyList,
     TagList,
     TagResourceOutput,
@@ -80,20 +76,19 @@ from localstack.services.cloudwatch.cloudwatch_database_helper import Cloudwatch
 from localstack.services.cloudwatch.models import (
     CloudWatchStore,
     LocalStackAlarm,
-    LocalStackCompositeAlarm,
     LocalStackDashboard,
     LocalStackMetricAlarm,
     cloudwatch_stores,
 )
 from localstack.services.edge import ROUTER
 from localstack.services.plugins import SERVICE_PLUGINS, ServiceLifecycleHook
-from localstack.state import AssetDirectory, StateVisitor
 from localstack.utils.aws import arns
 from localstack.utils.aws.arns import extract_account_id_from_arn, lambda_function_name
 from localstack.utils.collections import PaginatedList
 from localstack.utils.json import CustomEncoder as JSONEncoder
 from localstack.utils.strings import camel_to_snake_case
 from localstack.utils.sync import poll_condition
+from localstack.utils.tagging import TaggingService
 from localstack.utils.threads import start_worker_thread
 from localstack.utils.time import timestamp_millis
 
@@ -106,18 +101,12 @@ HISTORY_VERSION = "1.0"
 
 LOG = logging.getLogger(__name__)
 _STORE_LOCK = threading.RLock()
-AWS_MAX_DATAPOINTS_ACCEPTED: int = 1440
 
 
 class ValidationError(CommonServiceException):
     # TODO: check this error against AWS (doesn't exist in the API)
     def __init__(self, message: str):
         super().__init__("ValidationError", message, 400, True)
-
-
-class InvalidParameterCombination(CommonServiceException):
-    def __init__(self, message: str):
-        super().__init__("InvalidParameterCombination", message, 400, True)
 
 
 def _validate_parameters_for_put_metric_data(metric_data: MetricData) -> None:
@@ -147,13 +136,11 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
     Cloudwatch provider.
 
     LIMITATIONS:
-        - simplified composite alarm rule evaluation:
-            - only OR operator is supported
-            - only ALARM expression is supported
-            - only metric alarms can be included in the rule and they should be referenced by ARN only
+        - no alarm rule evaluation
     """
 
     def __init__(self):
+        self.tags = TaggingService()
         self.alarm_scheduler: AlarmScheduler = None
         self.store = None
         self.cloudwatch_database = CloudwatchDatabase()
@@ -161,10 +148,6 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
     @staticmethod
     def get_store(account_id: str, region: str) -> CloudWatchStore:
         return cloudwatch_stores[account_id][region]
-
-    def accept_state_visitor(self, visitor: StateVisitor):
-        visitor.visit(cloudwatch_stores)
-        visitor.visit(AssetDirectory(self.service, CloudwatchDatabase.CLOUDWATCH_DATA_ROOT))
 
     def on_after_init(self):
         ROUTER.add(PATH_GET_RAW_METRICS, self.get_raw_metrics)
@@ -216,15 +199,8 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
                 store.alarms.pop(alarm_arn, None)
 
     def put_metric_data(
-        self,
-        context: RequestContext,
-        namespace: Namespace,
-        metric_data: MetricData = None,
-        entity_metric_data: EntityMetricDataList = None,
-        strict_entity_validation: StrictEntityValidation = None,
-        **kwargs,
+        self, context: RequestContext, namespace: Namespace, metric_data: MetricData, **kwargs
     ) -> None:
-        # TODO add support for entity_metric_data and strict_entity_validation
         _validate_parameters_for_put_metric_data(metric_data)
 
         self.cloudwatch_database.add_metric_data(
@@ -268,7 +244,7 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
             if query_result.get("messages"):
                 messages.extend(query_result.get("messages"))
 
-            label = query.get("Label") or f"{query['MetricStat']['Metric']['MetricName']}"
+            label = query.get("Label") or f'{query["MetricStat"]["Metric"]["MetricName"]}'
             # TODO: does this happen even if a label is set in the query?
             for label_addition in label_additions:
                 label = f"{label} {query['MetricStat'][label_addition]}"
@@ -344,7 +320,7 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
             if old_state == state_value:
                 return
 
-            alarm.alarm["StateTransitionedTimestamp"] = datetime.datetime.now(timezone.utc)
+            alarm.alarm["StateTransitionedTimestamp"] = datetime.datetime.now()
             # update startDate (=last ALARM date) - should only update when a new alarm is triggered
             # the date is only updated if we have a reason-data, which is set by an alarm
             if state_reason_data:
@@ -357,8 +333,6 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
                 state_reason,
                 state_reason_data,
             )
-
-            self._evaluate_composite_alarms(context, alarm)
 
             if not alarm.alarm["ActionsEnabled"]:
                 return
@@ -461,18 +435,21 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
 
     @handler("PutCompositeAlarm", expand=False)
     def put_composite_alarm(self, context: RequestContext, request: PutCompositeAlarmInput) -> None:
-        with _STORE_LOCK:
-            store = self.get_store(context.account_id, context.region)
-            composite_alarm = LocalStackCompositeAlarm(
-                context.account_id, context.region, {**request}
-            )
+        composite_to_metric_alarm = {
+            "AlarmName": request.get("AlarmName"),
+            "Description": request.get("AlarmDescription"),
+            "AlarmActions": request.get("AlarmActions", []),
+            "OKActions": request.get("OKActions", []),
+            "InsufficientDataActions": request.get("InsufficientDataActions", []),
+            "ActionsEnabled": request.get("ActionsEnabled"),
+            "AlarmRule": request.get("AlarmRule"),
+            "Tags": request.get("Tags", []),
+        }
+        self.put_metric_alarm(context=context, request=composite_to_metric_alarm)
 
-            alarm_rule = composite_alarm.alarm["AlarmRule"]
-            rule_expression_validation_result = self._validate_alarm_rule_expression(alarm_rule)
-            [LOG.warning(w) for w in rule_expression_validation_result]
-
-            alarm_arn = composite_alarm.alarm["AlarmArn"]
-            store.alarms[alarm_arn] = composite_alarm
+        LOG.warning(
+            "Composite Alarms configuration is not yet supported, alarm state will not be evaluated"
+        )
 
     def describe_alarms(
         self,
@@ -540,8 +517,7 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
     def list_tags_for_resource(
         self, context: RequestContext, resource_arn: AmazonResourceName, **kwargs
     ) -> ListTagsForResourceOutput:
-        store = self.get_store(context.account_id, context.region)
-        tags = store.TAGS.list_tags_for_resource(resource_arn)
+        tags = self.tags.list_tags_for_resource(resource_arn)
         return ListTagsForResourceOutput(Tags=tags.get("Tags", []))
 
     def untag_resource(
@@ -551,15 +527,13 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
         tag_keys: TagKeyList,
         **kwargs,
     ) -> UntagResourceOutput:
-        store = self.get_store(context.account_id, context.region)
-        store.TAGS.untag_resource(resource_arn, tag_keys)
+        self.tags.untag_resource(resource_arn, tag_keys)
         return UntagResourceOutput()
 
     def tag_resource(
         self, context: RequestContext, resource_arn: AmazonResourceName, tags: TagList, **kwargs
     ) -> TagResourceOutput:
-        store = self.get_store(context.account_id, context.region)
-        store.TAGS.tag_resource(resource_arn, tags)
+        self.tags.tag_resource(resource_arn, tags)
         return TagResourceOutput()
 
     def put_dashboard(
@@ -569,13 +543,6 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
         dashboard_body: DashboardBody,
         **kwargs,
     ) -> PutDashboardOutput:
-        pattern = r"^[a-zA-Z0-9_-]+$"
-        if not re.match(pattern, dashboard_name):
-            raise InvalidParameterValueException(
-                "The value for field DashboardName contains invalid characters. "
-                "It can only contain alphanumerics, dash (-) and underscore (_).\n"
-            )
-
         store = self.get_store(context.account_id, context.region)
         store.dashboards[dashboard_name] = LocalStackDashboard(
             context.account_id, context.region, dashboard_name, dashboard_body
@@ -680,22 +647,6 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
         unit: StandardUnit = None,
         **kwargs,
     ) -> GetMetricStatisticsOutput:
-        start_time_unix = int(start_time.timestamp())
-        end_time_unix = int(end_time.timestamp())
-
-        if not start_time_unix < end_time_unix:
-            raise InvalidParameterValueException(
-                "The parameter StartTime must be less than the parameter EndTime."
-            )
-
-        expected_datapoints = (end_time_unix - start_time_unix) / period
-
-        if expected_datapoints > AWS_MAX_DATAPOINTS_ACCEPTED:
-            raise InvalidParameterCombination(
-                f"You have requested up to {int(expected_datapoints)} datapoints, which exceeds the limit of {AWS_MAX_DATAPOINTS_ACCEPTED}. "
-                f"You may reduce the datapoints requested by increasing Period, or decreasing the time range."
-            )
-
         stat_datapoints = {}
 
         units = (
@@ -770,8 +721,7 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
         old_state_reason = alarm.alarm["StateReason"]
         store = self.get_store(context.account_id, context.region)
         current_time = datetime.datetime.now()
-        # version is not present in state reason data for composite alarm, hence the check
-        if state_reason_data and isinstance(alarm, LocalStackMetricAlarm):
+        if state_reason_data:
             state_reason_data["version"] = HISTORY_VERSION
         history_data = {
             "version": HISTORY_VERSION,
@@ -849,117 +799,6 @@ class CloudwatchProvider(CloudwatchApi, ServiceLifecycleHook):
             history = [h for h in history if (date := _get_timestamp(h)) and date <= end_date]
         return DescribeAlarmHistoryOutput(AlarmHistoryItems=history)
 
-    def _evaluate_composite_alarms(self, context: RequestContext, triggering_alarm):
-        # TODO either pass store as a parameter or acquire RLock (with _STORE_LOCK:)
-        # everything works ok now but better ensure protection of critical section in front of future changes
-        store = self.get_store(context.account_id, context.region)
-        alarms = list(store.alarms.values())
-        composite_alarms = [a for a in alarms if isinstance(a, LocalStackCompositeAlarm)]
-        for composite_alarm in composite_alarms:
-            self._evaluate_composite_alarm(context, composite_alarm, triggering_alarm)
-
-    def _evaluate_composite_alarm(self, context, composite_alarm, triggering_alarm):
-        store = self.get_store(context.account_id, context.region)
-        alarm_rule = composite_alarm.alarm["AlarmRule"]
-        rule_expression_validation = self._validate_alarm_rule_expression(alarm_rule)
-        if rule_expression_validation:
-            LOG.warning(
-                "Alarm rule contains unsupported expressions and will not be evaluated: %s",
-                rule_expression_validation,
-            )
-            return
-        new_state_value = StateValue.OK
-        # assuming that a rule consists only of ALARM evaluations of metric alarms, with OR logic applied
-        for metric_alarm_arn in self._get_alarm_arns(alarm_rule):
-            metric_alarm = store.alarms.get(metric_alarm_arn)
-            if not metric_alarm:
-                LOG.warning(
-                    "Alarm rule won't be evaluated as there is no alarm with ARN %s",
-                    metric_alarm_arn,
-                )
-                return
-            if metric_alarm.alarm["StateValue"] == StateValue.ALARM:
-                triggering_alarm = metric_alarm
-                new_state_value = StateValue.ALARM
-                break
-        old_state_value = composite_alarm.alarm["StateValue"]
-        if old_state_value == new_state_value:
-            return
-        triggering_alarm_arn = triggering_alarm.alarm.get("AlarmArn")
-        triggering_alarm_state = triggering_alarm.alarm.get("StateValue")
-        triggering_alarm_state_change_timestamp = triggering_alarm.alarm.get(
-            "StateTransitionedTimestamp"
-        )
-        state_reason_formatted_timestamp = triggering_alarm_state_change_timestamp.strftime(
-            "%A %d %B, %Y %H:%M:%S %Z"
-        )
-        state_reason = (
-            f"{triggering_alarm_arn} "
-            f"transitioned to {triggering_alarm_state} "
-            f"at {state_reason_formatted_timestamp}"
-        )
-        state_reason_data = {
-            "triggeringAlarms": [
-                {
-                    "arn": triggering_alarm_arn,
-                    "state": {
-                        "value": triggering_alarm_state,
-                        "timestamp": timestamp_millis(triggering_alarm_state_change_timestamp),
-                    },
-                }
-            ]
-        }
-        self._update_state(
-            context, composite_alarm, new_state_value, state_reason, state_reason_data
-        )
-        if composite_alarm.alarm["ActionsEnabled"]:
-            self._run_composite_alarm_actions(
-                context, composite_alarm, old_state_value, triggering_alarm
-            )
-
-    def _validate_alarm_rule_expression(self, alarm_rule):
-        validation_result = []
-        alarms_conditions = [alarm.strip() for alarm in alarm_rule.split("OR")]
-        for alarm_condition in alarms_conditions:
-            if not alarm_condition.startswith("ALARM"):
-                validation_result.append(
-                    f"Unsupported expression in alarm rule condition {alarm_condition}: Only ALARM expression is supported by Localstack as of now"
-                )
-        return validation_result
-
-    def _get_alarm_arns(self, composite_alarm_rule):
-        # regexp for everything within (" ")
-        return re.findall(r'\("([^"]*)"\)', composite_alarm_rule)
-
-    def _run_composite_alarm_actions(
-        self, context, composite_alarm, old_state_value, triggering_alarm
-    ):
-        new_state_value = composite_alarm.alarm["StateValue"]
-        if new_state_value == StateValue.OK:
-            actions = composite_alarm.alarm["OKActions"]
-        elif new_state_value == StateValue.ALARM:
-            actions = composite_alarm.alarm["AlarmActions"]
-        else:
-            actions = composite_alarm.alarm["InsufficientDataActions"]
-        for action in actions:
-            data = arns.parse_arn(action)
-            if data["service"] == "sns":
-                service = connect_to(
-                    region_name=data["region"], aws_access_key_id=data["account"]
-                ).sns
-                subject = f"""{new_state_value}: "{composite_alarm.alarm["AlarmName"]}" in {context.region}"""
-                message = create_message_response_update_composite_alarm_state_sns(
-                    composite_alarm, triggering_alarm, old_state_value
-                )
-                service.publish(TopicArn=action, Subject=subject, Message=message)
-            else:
-                # TODO: support other actions
-                LOG.warning(
-                    "Action for service %s not implemented, action '%s' will not be triggered.",
-                    data["service"],
-                    action,
-                )
-
 
 def create_metric_data_query_from_alarm(alarm: LocalStackMetricAlarm):
     # TODO may need to be adapted for other use cases
@@ -1014,7 +853,7 @@ def create_message_response_update_state_lambda(
     return json.dumps(response, cls=JSONEncoder)
 
 
-def create_message_response_update_state_sns(alarm: LocalStackMetricAlarm, old_state: StateValue):
+def create_message_response_update_state_sns(alarm, old_state):
     _alarm = alarm.alarm
     response = {
         "AWSAccountId": alarm.account_id,
@@ -1066,44 +905,5 @@ def create_message_response_update_state_sns(alarm: LocalStackMetricAlarm, old_s
         details["ExtendedStatistic"] = alarm_extended_statistic
 
     response["Trigger"] = details
-
-    return json.dumps(response, cls=JSONEncoder)
-
-
-def create_message_response_update_composite_alarm_state_sns(
-    composite_alarm: LocalStackCompositeAlarm,
-    triggering_alarm: LocalStackMetricAlarm,
-    old_state: StateValue,
-):
-    _alarm = composite_alarm.alarm
-    response = {
-        "AWSAccountId": composite_alarm.account_id,
-        "AlarmName": _alarm["AlarmName"],
-        "AlarmDescription": _alarm.get("AlarmDescription"),
-        "AlarmRule": _alarm.get("AlarmRule"),
-        "OldStateValue": old_state,
-        "NewStateValue": _alarm["StateValue"],
-        "NewStateReason": _alarm["StateReason"],
-        "StateChangeTime": _alarm["StateUpdatedTimestamp"],
-        # the long-name for 'region' should be used - as we don't have it, we use the short name
-        # which needs to be slightly changed to make snapshot tests work
-        "Region": composite_alarm.region.replace("-", " ").capitalize(),
-        "AlarmArn": _alarm["AlarmArn"],
-        "OKActions": _alarm.get("OKActions", []),
-        "AlarmActions": _alarm.get("AlarmActions", []),
-        "InsufficientDataActions": _alarm.get("InsufficientDataActions", []),
-    }
-
-    triggering_children = [
-        {
-            "Arn": triggering_alarm.alarm.get("AlarmArn"),
-            "State": {
-                "Value": triggering_alarm.alarm["StateValue"],
-                "Timestamp": triggering_alarm.alarm["StateUpdatedTimestamp"],
-            },
-        }
-    ]
-
-    response["TriggeringChildren"] = triggering_children
 
     return json.dumps(response, cls=JSONEncoder)

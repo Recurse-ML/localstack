@@ -29,10 +29,7 @@ if TYPE_CHECKING:
     from mypy_boto3_cloudfront import CloudFrontClient
     from mypy_boto3_cloudtrail import CloudTrailClient
     from mypy_boto3_cloudwatch import CloudWatchClient
-    from mypy_boto3_codebuild import CodeBuildClient
     from mypy_boto3_codecommit import CodeCommitClient
-    from mypy_boto3_codedeploy import CodeDeployClient
-    from mypy_boto3_codepipeline import CodePipelineClient
     from mypy_boto3_cognito_identity import CognitoIdentityClient
     from mypy_boto3_cognito_idp import CognitoIdentityProviderClient
     from mypy_boto3_dms import DatabaseMigrationServiceClient
@@ -78,7 +75,6 @@ if TYPE_CHECKING:
     from mypy_boto3_opensearch import OpenSearchServiceClient
     from mypy_boto3_organizations import OrganizationsClient
     from mypy_boto3_pi import PIClient
-    from mypy_boto3_pinpoint import PinpointClient
     from mypy_boto3_pipes import EventBridgePipesClient
     from mypy_boto3_qldb import QLDBClient
     from mypy_boto3_qldb_session import QLDBSessionClient
@@ -136,10 +132,7 @@ class TypedServiceClientFactory(abc.ABC):
     cloudfront: Union["CloudFrontClient", "MetadataRequestInjector[CloudFrontClient]"]
     cloudtrail: Union["CloudTrailClient", "MetadataRequestInjector[CloudTrailClient]"]
     cloudwatch: Union["CloudWatchClient", "MetadataRequestInjector[CloudWatchClient]"]
-    codebuild: Union["CodeBuildClient", "MetadataRequestInjector[CodeBuildClient]"]
     codecommit: Union["CodeCommitClient", "MetadataRequestInjector[CodeCommitClient]"]
-    codedeploy: Union["CodeDeployClient", "MetadataRequestInjector[CodeDeployClient]"]
-    codepipeline: Union["CodePipelineClient", "MetadataRequestInjector[CodePipelineClient]"]
     cognito_identity: Union[
         "CognitoIdentityClient", "MetadataRequestInjector[CognitoIdentityClient]"
     ]
@@ -203,7 +196,6 @@ class TypedServiceClientFactory(abc.ABC):
     opensearch: Union["OpenSearchServiceClient", "MetadataRequestInjector[OpenSearchServiceClient]"]
     organizations: Union["OrganizationsClient", "MetadataRequestInjector[OrganizationsClient]"]
     pi: Union["PIClient", "MetadataRequestInjector[PIClient]"]
-    pinpoint: Union["PinpointClient", "MetadataRequestInjector[PinpointClient]"]
     pipes: Union["EventBridgePipesClient", "MetadataRequestInjector[EventBridgePipesClient]"]
     qldb: Union["QLDBClient", "MetadataRequestInjector[QLDBClient]"]
     qldb_session: Union["QLDBSessionClient", "MetadataRequestInjector[QLDBSessionClient]"]
@@ -270,8 +262,6 @@ class ServicePrincipal(str):
     """
 
     apigateway = "apigateway"
-    cloudformation = "cloudformation"
-    dms = "dms"
     events = "events"
     firehose = "firehose"
     lambda_ = "lambda"
@@ -280,4 +270,3 @@ class ServicePrincipal(str):
     s3 = "s3"
     sns = "sns"
     sqs = "sqs"
-    states = "states"

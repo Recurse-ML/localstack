@@ -1,6 +1,5 @@
 import json
 import time
-from operator import itemgetter
 
 import pytest
 import requests
@@ -9,7 +8,7 @@ from botocore.exceptions import ClientError
 from localstack.aws.api.lambda_ import Runtime
 from localstack.testing.aws.util import is_aws_cloud
 from localstack.testing.pytest import markers
-from localstack.utils.aws.arns import get_partition, parse_arn
+from localstack.utils.aws.arns import parse_arn
 from localstack.utils.strings import short_uid
 from localstack.utils.sync import retry
 from tests.aws.services.apigateway.apigateway_fixtures import (
@@ -19,43 +18,7 @@ from tests.aws.services.apigateway.apigateway_fixtures import (
     create_rest_api_stage,
     create_rest_resource_method,
 )
-from tests.aws.services.apigateway.conftest import APIGATEWAY_ASSUME_ROLE_POLICY, is_next_gen_api
 from tests.aws.services.lambda_.test_lambda import TEST_LAMBDA_AWS_PROXY
-
-
-def _create_mock_integration_with_200_response_template(
-    aws_client, api_id: str, resource_id: str, http_method: str, response_template: dict
-):
-    aws_client.apigateway.put_method(
-        restApiId=api_id,
-        resourceId=resource_id,
-        httpMethod=http_method,
-        authorizationType="NONE",
-    )
-
-    aws_client.apigateway.put_method_response(
-        restApiId=api_id,
-        resourceId=resource_id,
-        httpMethod=http_method,
-        statusCode="200",
-    )
-
-    aws_client.apigateway.put_integration(
-        restApiId=api_id,
-        resourceId=resource_id,
-        httpMethod=http_method,
-        type="MOCK",
-        requestTemplates={"application/json": '{"statusCode": 200}'},
-    )
-
-    aws_client.apigateway.put_integration_response(
-        restApiId=api_id,
-        resourceId=resource_id,
-        httpMethod=http_method,
-        statusCode="200",
-        selectionPattern="",
-        responseTemplates={"application/json": json.dumps(response_template)},
-    )
 
 
 class TestApiGatewayCommon:
@@ -90,7 +53,7 @@ class TestApiGatewayCommon:
         create_lambda_function(
             func_name=fn_name,
             handler_file=TEST_LAMBDA_AWS_PROXY,
-            runtime=Runtime.python3_12,
+            runtime=Runtime.python3_9,
         )
         lambda_arn = aws_client.lambda_.get_function(FunctionName=fn_name)["Configuration"][
             "FunctionArn"
@@ -160,7 +123,7 @@ class TestApiGatewayCommon:
                 httpMethod=http_method,
                 integrationHttpMethod="POST",
                 type="AWS_PROXY",
-                uri=f"arn:{get_partition(region)}:apigateway:{region}:lambda:path/2015-03-31/functions/{lambda_arn}/invocations",
+                uri=f"arn:aws:apigateway:{region}:lambda:path/2015-03-31/functions/{lambda_arn}/invocations",
             )
             aws_client.apigateway.put_method_response(
                 restApiId=api_id,
@@ -179,9 +142,7 @@ class TestApiGatewayCommon:
         deploy_1 = aws_client.apigateway.create_deployment(restApiId=api_id, stageName=stage_name)
         snapshot.match("deploy-1", deploy_1)
 
-        source_arn = (
-            f"arn:{get_partition(region)}:execute-api:{region}:{account_id}:{api_id}/*/*/nested/*"
-        )
+        source_arn = f"arn:aws:execute-api:{region}:{account_id}:{api_id}/*/*/nested/*"
 
         aws_client.lambda_.add_permission(
             FunctionName=lambda_arn,
@@ -335,249 +296,6 @@ class TestApiGatewayCommon:
         assert response_get.ok
 
     @markers.aws.validated
-    def test_api_gateway_request_validator_with_ref_models(
-        self, create_rest_apigw, apigw_redeploy_api, snapshot, aws_client
-    ):
-        api_id, _, root = create_rest_apigw(name="test ref models")
-
-        snapshot.add_transformers_list(
-            [
-                snapshot.transform.key_value("id"),
-                snapshot.transform.regex(api_id, "<api-id>"),
-            ]
-        )
-
-        resource_id = aws_client.apigateway.create_resource(
-            restApiId=api_id, parentId=root, pathPart="path"
-        )["id"]
-
-        validator_id = aws_client.apigateway.create_request_validator(
-            restApiId=api_id,
-            name="test-validator",
-            validateRequestParameters=True,
-            validateRequestBody=True,
-        )["id"]
-
-        # create nested Model schema to validate body
-        aws_client.apigateway.create_model(
-            restApiId=api_id,
-            name="testSchema",
-            contentType="application/json",
-            schema=json.dumps(
-                {
-                    "$schema": "http://json-schema.org/draft-04/schema#",
-                    "title": "testSchema",
-                    "type": "object",
-                    "properties": {
-                        "a": {"type": "number"},
-                        "b": {"type": "number"},
-                    },
-                    "required": ["a", "b"],
-                }
-            ),
-        )
-
-        aws_client.apigateway.create_model(
-            restApiId=api_id,
-            name="testSchemaList",
-            contentType="application/json",
-            schema=json.dumps(
-                {
-                    "type": "array",
-                    "items": {
-                        # hardcoded URL to AWS
-                        "$ref": f"https://apigateway.amazonaws.com/restapis/{api_id}/models/testSchema"
-                    },
-                }
-            ),
-        )
-
-        get_models = aws_client.apigateway.get_models(restApiId=api_id)
-        get_models["items"] = sorted(get_models["items"], key=itemgetter("name"))
-        snapshot.match("get-models-with-ref", get_models)
-
-        aws_client.apigateway.put_method(
-            restApiId=api_id,
-            resourceId=resource_id,
-            httpMethod="POST",
-            authorizationType="NONE",
-            requestValidatorId=validator_id,
-            requestModels={"application/json": "testSchemaList"},
-        )
-
-        aws_client.apigateway.put_method_response(
-            restApiId=api_id,
-            resourceId=resource_id,
-            httpMethod="POST",
-            statusCode="200",
-        )
-
-        aws_client.apigateway.put_integration(
-            restApiId=api_id,
-            resourceId=resource_id,
-            httpMethod="POST",
-            type="MOCK",
-            requestTemplates={"application/json": '{"statusCode": 200}'},
-        )
-
-        aws_client.apigateway.put_integration_response(
-            restApiId=api_id,
-            resourceId=resource_id,
-            httpMethod="POST",
-            statusCode="200",
-            selectionPattern="",
-            responseTemplates={"application/json": json.dumps({"data": "ok"})},
-        )
-
-        stage_name = "local"
-        aws_client.apigateway.create_deployment(restApiId=api_id, stageName=stage_name)
-
-        url = api_invoke_url(api_id, stage=stage_name, path="/path")
-
-        def invoke_api(_data: dict) -> dict:
-            _response = requests.post(url, verify=False, json=_data)
-            assert _response.ok
-            content = _response.json()
-            return content
-
-        # test that with every request parameters and a valid body, it passes
-        response = retry(
-            invoke_api, retries=10 if is_aws_cloud() else 3, sleep=1, _data=[{"a": 1, "b": 2}]
-        )
-        snapshot.match("successful", response)
-
-        response_post_no_body = requests.post(url)
-        assert response_post_no_body.status_code == 400
-        snapshot.match("failed-validation", response_post_no_body.json())
-
-    @markers.aws.validated
-    def test_api_gateway_request_validator_with_ref_one_ofmodels(
-        self, create_rest_apigw, apigw_redeploy_api, snapshot, aws_client
-    ):
-        api_id, _, root = create_rest_apigw(name="test oneOf ref models")
-
-        snapshot.add_transformers_list(
-            [
-                snapshot.transform.key_value("id"),
-                snapshot.transform.regex(api_id, "<api-id>"),
-            ]
-        )
-
-        resource_id = aws_client.apigateway.create_resource(
-            restApiId=api_id, parentId=root, pathPart="path"
-        )["id"]
-
-        validator_id = aws_client.apigateway.create_request_validator(
-            restApiId=api_id,
-            name="test-validator",
-            validateRequestParameters=True,
-            validateRequestBody=True,
-        )["id"]
-
-        aws_client.apigateway.create_model(
-            restApiId=api_id,
-            name="StatusModel",
-            contentType="application/json",
-            schema=json.dumps(
-                {
-                    "type": "object",
-                    "properties": {"Status": {"type": "string"}, "Order": {"type": "integer"}},
-                    "required": [
-                        "Status",
-                        "Order",
-                    ],
-                }
-            ),
-        )
-
-        aws_client.apigateway.create_model(
-            restApiId=api_id,
-            name="TestModel",
-            contentType="application/json",
-            schema=json.dumps(
-                {
-                    "type": "object",
-                    "properties": {
-                        "status": {
-                            "oneOf": [
-                                {"type": "null"},
-                                {
-                                    "$ref": f"https://apigateway.amazonaws.com/restapis/{api_id}/models/StatusModel"
-                                },
-                            ]
-                        },
-                    },
-                    "required": ["status"],
-                }
-            ),
-        )
-
-        get_models = aws_client.apigateway.get_models(restApiId=api_id)
-        get_models["items"] = sorted(get_models["items"], key=itemgetter("name"))
-        snapshot.match("get-models-with-ref", get_models)
-
-        aws_client.apigateway.put_method(
-            restApiId=api_id,
-            resourceId=resource_id,
-            httpMethod="POST",
-            authorizationType="NONE",
-            requestValidatorId=validator_id,
-            requestModels={"application/json": "TestModel"},
-        )
-
-        aws_client.apigateway.put_method_response(
-            restApiId=api_id,
-            resourceId=resource_id,
-            httpMethod="POST",
-            statusCode="200",
-        )
-
-        aws_client.apigateway.put_integration(
-            restApiId=api_id,
-            resourceId=resource_id,
-            httpMethod="POST",
-            type="MOCK",
-            requestTemplates={"application/json": '{"statusCode": 200}'},
-        )
-
-        aws_client.apigateway.put_integration_response(
-            restApiId=api_id,
-            resourceId=resource_id,
-            httpMethod="POST",
-            statusCode="200",
-            selectionPattern="",
-            responseTemplates={"application/json": json.dumps({"data": "ok"})},
-        )
-
-        stage_name = "local"
-        aws_client.apigateway.create_deployment(restApiId=api_id, stageName=stage_name)
-
-        url = api_invoke_url(api_id, stage=stage_name, path="/path")
-
-        def invoke_api(_data: dict) -> dict:
-            _response = requests.post(url, verify=False, json=_data)
-            assert _response.ok
-            content = _response.json()
-            return content
-
-        # test that with every request parameters and a valid body, it passes
-        response = retry(
-            invoke_api, retries=10 if is_aws_cloud() else 3, sleep=1, _data={"status": None}
-        )
-        snapshot.match("successful", response)
-
-        response = invoke_api({"status": {"Status": "works", "Order": 1}})
-        snapshot.match("successful-with-data", response)
-
-        response_post_no_body = requests.post(url)
-        assert response_post_no_body.status_code == 400
-        snapshot.match("failed-validation-no-data", response_post_no_body.json())
-
-        response_post_bad_body = requests.post(url, json={"badFormat": "bla"})
-        assert response_post_bad_body.status_code == 400
-        snapshot.match("failed-validation-bad-data", response_post_bad_body.json())
-
-    @markers.aws.validated
     def test_integration_request_parameters_mapping(
         self, create_rest_apigw, aws_client, echo_http_server_post
     ):
@@ -642,152 +360,6 @@ class TestApiGatewayCommon:
         assert lower_case_headers["contextheader"] == root
         assert lower_case_headers["testheader"] == "test"
 
-    @markers.aws.validated
-    @pytest.mark.skipif(
-        condition=not is_next_gen_api() and not is_aws_cloud(),
-        reason="Wrong behavior in legacy implementation",
-    )
-    @markers.snapshot.skip_snapshot_verify(
-        paths=[
-            "$..server",
-            "$..via",
-            "$..x-amz-cf-id",
-            "$..x-amz-cf-pop",
-            "$..x-cache",
-        ]
-    )
-    def test_invocation_trace_id(
-        self,
-        aws_client,
-        create_rest_apigw,
-        create_lambda_function,
-        create_role_with_policy,
-        region_name,
-        snapshot,
-    ):
-        snapshot.add_transformers_list(
-            [
-                snapshot.transform.key_value("via"),
-                snapshot.transform.key_value("x-amz-cf-id"),
-                snapshot.transform.key_value("x-amz-cf-pop"),
-                snapshot.transform.key_value("x-amz-apigw-id"),
-                snapshot.transform.key_value("x-amzn-trace-id"),
-                snapshot.transform.key_value("FunctionName"),
-                snapshot.transform.key_value("FunctionArn"),
-                snapshot.transform.key_value("date", reference_replacement=False),
-                snapshot.transform.key_value("content-length", reference_replacement=False),
-            ]
-        )
-        api_id, _, root_id = create_rest_apigw(name="test trace id")
-
-        resource = aws_client.apigateway.create_resource(
-            restApiId=api_id, parentId=root_id, pathPart="path"
-        )
-        hardcoded_resource_id = resource["id"]
-
-        response_template_get = {"statusCode": 200}
-        _create_mock_integration_with_200_response_template(
-            aws_client, api_id, hardcoded_resource_id, "GET", response_template_get
-        )
-
-        fn_name = f"test-trace-id-{short_uid()}"
-        # create lambda
-        create_function_response = create_lambda_function(
-            func_name=fn_name,
-            handler_file=TEST_LAMBDA_AWS_PROXY,
-            handler="lambda_aws_proxy.handler",
-            runtime=Runtime.python3_12,
-        )
-        # create invocation role
-        _, role_arn = create_role_with_policy(
-            "Allow", "lambda:InvokeFunction", json.dumps(APIGATEWAY_ASSUME_ROLE_POLICY), "*"
-        )
-        lambda_arn = create_function_response["CreateFunctionResponse"]["FunctionArn"]
-        # matching on lambda id for reference replacement in snapshots
-        snapshot.match("register-lambda", {"FunctionName": fn_name, "FunctionArn": lambda_arn})
-
-        resource = aws_client.apigateway.create_resource(
-            restApiId=api_id, parentId=root_id, pathPart="{proxy+}"
-        )
-        proxy_resource_id = resource["id"]
-
-        aws_client.apigateway.put_method(
-            restApiId=api_id,
-            resourceId=proxy_resource_id,
-            httpMethod="ANY",
-            authorizationType="NONE",
-        )
-
-        # Lambda AWS_PROXY integration
-        aws_client.apigateway.put_integration(
-            restApiId=api_id,
-            resourceId=proxy_resource_id,
-            httpMethod="ANY",
-            type="AWS_PROXY",
-            integrationHttpMethod="POST",
-            uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/{lambda_arn}/invocations",
-            credentials=role_arn,
-        )
-
-        stage_name = "dev"
-        aws_client.apigateway.create_deployment(restApiId=api_id, stageName=stage_name)
-
-        def _invoke_api(path: str, headers: dict[str, str]) -> dict[str, str]:
-            url = api_invoke_url(api_id=api_id, stage=stage_name, path=path)
-            _response = requests.get(url, headers=headers)
-            assert _response.ok
-            lower_case_headers = {k.lower(): v for k, v in _response.headers.items()}
-            return lower_case_headers
-
-        retries = 10 if is_aws_cloud() else 3
-        sleep = 3 if is_aws_cloud() else 1
-        resp_headers = retry(
-            _invoke_api,
-            retries=retries,
-            sleep=sleep,
-            headers={},
-            path="/path",
-        )
-
-        snapshot.match("normal-req-headers-MOCK", resp_headers)
-        assert "x-amzn-trace-id" not in resp_headers
-
-        full_trace = "Root=1-3152b799-8954dae64eda91bc9a23a7e8;Parent=7fa8c0f79203be72;Sampled=1"
-        trace_id = "Root=1-3152b799-8954dae64eda91bc9a23a7e8"
-        hardcoded_parent = "Parent=7fa8c0f79203be72"
-
-        resp_headers_with_trace_id = _invoke_api(
-            path="/path", headers={"x-amzn-trace-id": full_trace}
-        )
-        snapshot.match("trace-id-req-headers-MOCK", resp_headers_with_trace_id)
-
-        resp_proxy_headers = retry(
-            _invoke_api,
-            retries=retries,
-            sleep=sleep,
-            headers={},
-            path="/proxy-value",
-        )
-        snapshot.match("normal-req-headers-AWS_PROXY", resp_proxy_headers)
-
-        resp_headers_with_trace_id = _invoke_api(
-            path="/proxy-value", headers={"x-amzn-trace-id": full_trace}
-        )
-        snapshot.match("trace-id-req-headers-AWS_PROXY", resp_headers_with_trace_id)
-        assert full_trace in resp_headers_with_trace_id["x-amzn-trace-id"]
-        split_trace = resp_headers_with_trace_id["x-amzn-trace-id"].split(";")
-        assert split_trace[1] == hardcoded_parent
-
-        small_trace = trace_id
-        resp_headers_with_trace_id = _invoke_api(
-            path="/proxy-value", headers={"x-amzn-trace-id": small_trace}
-        )
-        snapshot.match("trace-id-small-req-headers-AWS_PROXY", resp_headers_with_trace_id)
-        assert small_trace in resp_headers_with_trace_id["x-amzn-trace-id"]
-        split_trace = resp_headers_with_trace_id["x-amzn-trace-id"].split(";")
-        # assert that AWS populated the parent part of the trace with a generated one
-        assert split_trace[1] != hardcoded_parent
-
 
 class TestUsagePlans:
     @markers.aws.validated
@@ -797,7 +369,6 @@ class TestUsagePlans:
         snapshot,
         create_rest_apigw,
         apigw_redeploy_api,
-        cleanups,
     ):
         snapshot.add_transformer(snapshot.transform.apigateway_api())
         snapshot.add_transformers_list(
@@ -870,7 +441,6 @@ class TestUsagePlans:
         )
         snapshot.match("create-api-key", api_key_response)
         api_key_id = api_key_response["id"]
-        cleanups.append(lambda: aws_client.apigateway.delete_api_key(apiKey=api_key_id))
 
         create_usage_plan_key_resp = aws_client.apigateway.create_usage_plan_key(
             usagePlanId=usage_plan_id,
@@ -1343,8 +913,47 @@ class TestDeployments:
 
 
 class TestApigatewayRouting:
+    def _create_mock_integration_with_200_response_template(
+        self, aws_client, api_id: str, resource_id: str, http_method: str, response_template: dict
+    ):
+        aws_client.apigateway.put_method(
+            restApiId=api_id,
+            resourceId=resource_id,
+            httpMethod=http_method,
+            authorizationType="NONE",
+        )
+
+        aws_client.apigateway.put_method_response(
+            restApiId=api_id,
+            resourceId=resource_id,
+            httpMethod=http_method,
+            statusCode="200",
+        )
+
+        aws_client.apigateway.put_integration(
+            restApiId=api_id,
+            resourceId=resource_id,
+            httpMethod=http_method,
+            type="MOCK",
+            requestTemplates={"application/json": '{"statusCode": 200}'},
+        )
+
+        aws_client.apigateway.put_integration_response(
+            restApiId=api_id,
+            resourceId=resource_id,
+            httpMethod=http_method,
+            statusCode="200",
+            selectionPattern="",
+            responseTemplates={"application/json": json.dumps(response_template)},
+        )
+
     @markers.aws.validated
-    def test_proxy_routing_with_hardcoded_resource_sibling(self, aws_client, create_rest_apigw):
+    def test_proxy_routing_with_hardcoded_resource_sibling(
+        self,
+        aws_client,
+        create_rest_apigw,
+        apigw_redeploy_api,
+    ):
         api_id, _, root_id = create_rest_apigw(name="test proxy routing")
 
         resource = aws_client.apigateway.create_resource(
@@ -1353,7 +962,7 @@ class TestApigatewayRouting:
         hardcoded_resource_id = resource["id"]
 
         response_template_post = {"statusCode": 200, "message": "POST request"}
-        _create_mock_integration_with_200_response_template(
+        self._create_mock_integration_with_200_response_template(
             aws_client, api_id, hardcoded_resource_id, "POST", response_template_post
         )
 
@@ -1363,7 +972,7 @@ class TestApigatewayRouting:
         any_resource_id = resource["id"]
 
         response_template_any = {"statusCode": 200, "message": "ANY request"}
-        _create_mock_integration_with_200_response_template(
+        self._create_mock_integration_with_200_response_template(
             aws_client, api_id, any_resource_id, "ANY", response_template_any
         )
 
@@ -1372,7 +981,7 @@ class TestApigatewayRouting:
         )
         proxy_resource_id = resource["id"]
         response_template_options = {"statusCode": 200, "message": "OPTIONS request"}
-        _create_mock_integration_with_200_response_template(
+        self._create_mock_integration_with_200_response_template(
             aws_client, api_id, proxy_resource_id, "OPTIONS", response_template_options
         )
 
@@ -1423,7 +1032,12 @@ class TestApigatewayRouting:
         )
 
     @markers.aws.validated
-    def test_routing_with_hardcoded_resource_sibling_order(self, aws_client, create_rest_apigw):
+    def test_routing_with_hardcoded_resource_sibling_order(
+        self,
+        aws_client,
+        create_rest_apigw,
+        apigw_redeploy_api,
+    ):
         api_id, _, root_id = create_rest_apigw(name="test parameter routing")
 
         resource = aws_client.apigateway.create_resource(
@@ -1432,7 +1046,7 @@ class TestApigatewayRouting:
         hardcoded_resource_id = resource["id"]
 
         response_template_get = {"statusCode": 200, "message": "part1"}
-        _create_mock_integration_with_200_response_template(
+        self._create_mock_integration_with_200_response_template(
             aws_client, api_id, hardcoded_resource_id, "GET", response_template_get
         )
 
@@ -1442,7 +1056,7 @@ class TestApigatewayRouting:
         )
         proxy_resource_id = resource["id"]
         response_template_get = {"statusCode": 200, "message": "proxy"}
-        _create_mock_integration_with_200_response_template(
+        self._create_mock_integration_with_200_response_template(
             aws_client, api_id, proxy_resource_id, "GET", response_template_get
         )
 
@@ -1452,7 +1066,7 @@ class TestApigatewayRouting:
         any_resource_id = resource["id"]
 
         response_template_get = {"statusCode": 200, "message": "hardcoded-value"}
-        _create_mock_integration_with_200_response_template(
+        self._create_mock_integration_with_200_response_template(
             aws_client, api_id, any_resource_id, "GET", response_template_get
         )
 
@@ -1489,71 +1103,3 @@ class TestApigatewayRouting:
             path="/part1/random-value",
             expected_response="proxy",
         )
-
-    @markers.aws.validated
-    @pytest.mark.skipif(
-        condition=not is_next_gen_api() and not is_aws_cloud(),
-        reason="Wrong behavior in legacy implementation",
-    )
-    def test_routing_not_found(self, aws_client, create_rest_apigw, snapshot):
-        api_id, _, root_id = create_rest_apigw(name=f"test-notfound-{short_uid()}")
-
-        resource = aws_client.apigateway.create_resource(
-            restApiId=api_id, parentId=root_id, pathPart="existing"
-        )
-        hardcoded_resource_id = resource["id"]
-
-        response_template_get = {"statusCode": 200, "message": "exists"}
-        _create_mock_integration_with_200_response_template(
-            aws_client, api_id, hardcoded_resource_id, "GET", response_template_get
-        )
-
-        stage_name = "dev"
-        aws_client.apigateway.create_deployment(restApiId=api_id, stageName=stage_name)
-
-        def _invoke_api(path: str, method: str, works: bool):
-            url = api_invoke_url(api_id=api_id, stage=stage_name, path=path)
-            _response = requests.request(method, url)
-            assert _response.ok == works
-            return _response
-
-        retry_args = {"retries": 10 if is_aws_cloud() else 3, "sleep": 3 if is_aws_cloud() else 1}
-        response = retry(_invoke_api, method="GET", path="/existing", works=True, **retry_args)
-        snapshot.match("working-route", response.json())
-
-        response = retry(
-            _invoke_api, method="GET", path="/random-non-existing", works=False, **retry_args
-        )
-        resp = {
-            "content": response.json(),
-            "errorType": response.headers.get("x-amzn-ErrorType"),
-        }
-        snapshot.match("not-found", resp)
-
-        response = retry(_invoke_api, method="POST", path="/existing", works=False, **retry_args)
-        resp = {
-            "content": response.json(),
-            "errorType": response.headers.get("x-amzn-ErrorType"),
-        }
-        snapshot.match("wrong-method", resp)
-
-    @markers.aws.only_localstack
-    def test_api_not_existing(self, aws_client, create_rest_apigw, snapshot):
-        """
-        This cannot be tested against AWS, as this is the format: `https://<api-id>.execute-api.<region>.amazonaws.com`
-        So if the API does not exist, the DNS subdomain is not created and is not reachable.
-        This test document the expected behavior for LocalStack.
-        """
-        aws_client.apigateway.get_rest_apis()
-        endpoint_url = api_invoke_url(api_id="404api", stage="dev", path="/test-path")
-
-        _response = requests.get(endpoint_url)
-
-        assert _response.status_code == 404
-        if not is_next_gen_api():
-            assert not _response.content
-
-        else:
-            assert _response.json() == {
-                "message": "The API id '404api' does not correspond to a deployed API Gateway API"
-            }

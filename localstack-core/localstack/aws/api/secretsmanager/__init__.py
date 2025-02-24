@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -29,7 +28,6 @@ RegionType = str
 RequireEachIncludedTypeType = bool
 RotationEnabledType = bool
 RotationLambdaARNType = str
-RotationTokenType = str
 ScheduleExpressionType = str
 SecretARNType = str
 SecretIdType = str
@@ -42,7 +40,7 @@ TagKeyType = str
 TagValueType = str
 
 
-class FilterNameStringType(StrEnum):
+class FilterNameStringType(str):
     description = "description"
     name = "name"
     tag_key = "tag-key"
@@ -52,12 +50,12 @@ class FilterNameStringType(StrEnum):
     all = "all"
 
 
-class SortOrderType(StrEnum):
+class SortOrderType(str):
     asc = "asc"
     desc = "desc"
 
 
-class StatusType(StrEnum):
+class StatusType(str):
     InSync = "InSync"
     Failed = "Failed"
     InProgress = "InProgress"
@@ -438,7 +436,6 @@ class PutSecretValueRequest(ServiceRequest):
     SecretBinary: Optional[SecretBinaryType]
     SecretString: Optional[SecretStringType]
     VersionStages: Optional[SecretVersionStagesType]
-    RotationToken: Optional[RotationTokenType]
 
 
 class PutSecretValueResponse(TypedDict, total=False):
@@ -701,7 +698,6 @@ class SecretsmanagerApi:
         secret_binary: SecretBinaryType = None,
         secret_string: SecretStringType = None,
         version_stages: SecretVersionStagesType = None,
-        rotation_token: RotationTokenType = None,
         **kwargs,
     ) -> PutSecretValueResponse:
         raise NotImplementedError

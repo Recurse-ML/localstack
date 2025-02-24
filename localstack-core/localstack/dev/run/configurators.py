@@ -20,17 +20,11 @@ from localstack.utils.files import get_user_cache_dir
 from localstack.utils.run import run
 from localstack.utils.strings import md5
 
-from .paths import (
-    HOST_PATH_MAPPINGS,
-    CommunityContainerPaths,
-    ContainerPaths,
-    HostPaths,
-    ProContainerPaths,
-)
+from .paths import CommunityContainerPaths, ContainerPaths, HostPaths, ProContainerPaths
 
 
 class ConfigEnvironmentConfigurator:
-    """Configures the environment variables from the localstack and localstack-pro config."""
+    """Configures the environment variables from the localstack and localstack_ext config."""
 
     def __init__(self, pro: bool):
         self.pro = pro
@@ -40,8 +34,8 @@ class ConfigEnvironmentConfigurator:
             cfg.env_vars = {}
 
         if self.pro:
-            # import localstack.pro.core.config extends the list of config vars
-            from localstack.pro.core import config as config_pro  # noqa
+            # import localstack_ext config extends the list of config vars
+            from localstack_ext import config as config_ext  # noqa
 
         ContainerConfigurators.config_env_vars(cfg)
 
@@ -113,7 +107,7 @@ class CustomEntryPointConfigurator:
 
 class SourceVolumeMountConfigurator:
     """
-    Mounts source code of localstack, localstack_ext, and moto into the container. It does this by assuming
+    Mounts source code of localstack, localsack_ext, and moto into the container. It does this by assuming
     that there is a "workspace" directory in which the source repositories are checked out into.
     Depending on whether we want to start the pro container, the source paths for localstack are different.
     """
@@ -123,42 +117,44 @@ class SourceVolumeMountConfigurator:
         *,
         host_paths: HostPaths = None,
         pro: bool = False,
-        chosen_packages: list[str] | None = None,
     ):
         self.host_paths = host_paths or HostPaths()
         self.container_paths = ProContainerPaths() if pro else CommunityContainerPaths()
         self.pro = pro
-        self.chosen_packages = chosen_packages or []
 
     def __call__(self, cfg: ContainerConfiguration):
         # localstack source code if available
-        source = self.host_paths.aws_community_package_dir
+        source = self.host_paths.localstack_project_dir / "localstack-core" / "localstack"
         if source.exists():
             cfg.volumes.add(
-                # read_only=False is a temporary workaround to make the mounting of the pro source work
-                # this can be reverted once we don't need the nested mounting anymore
-                VolumeBind(str(source), self.container_paths.localstack_source_dir, read_only=False)
+                VolumeBind(str(source), self.container_paths.localstack_source_dir, read_only=True)
             )
 
         # ext source code if available
         if self.pro:
-            source = self.host_paths.aws_pro_package_dir
+            source = self.host_paths.localstack_ext_project_dir / "localstack_ext"
             if source.exists():
                 cfg.volumes.add(
                     VolumeBind(
-                        str(source), self.container_paths.localstack_pro_source_dir, read_only=True
+                        str(source), self.container_paths.localstack_ext_source_dir, read_only=True
                     )
                 )
 
-        # mount local code checkouts if possible
-        for package_name in self.chosen_packages:
-            # Unconditional lookup because the CLI rejects incorect items
-            extractor = HOST_PATH_MAPPINGS[package_name]
-            self.try_mount_to_site_packages(cfg, extractor(self.host_paths))
+        # moto code if available
+        self.try_mount_to_site_packages(cfg, self.host_paths.moto_project_dir / "moto")
+
+        # postgresql-proxy code if available
+        self.try_mount_to_site_packages(cfg, self.host_paths.postgresql_proxy / "postgresql_proxy")
+
+        # rolo code if available
+        self.try_mount_to_site_packages(cfg, self.host_paths.rolo_dir / "rolo")
+
+        # plux
+        self.try_mount_to_site_packages(cfg, self.host_paths.workspace_dir / "plux" / "plugin")
 
         # docker entrypoint
         if self.pro:
-            source = self.host_paths.localstack_pro_project_dir / "bin" / "docker-entrypoint.sh"
+            source = self.host_paths.localstack_ext_project_dir / "bin" / "docker-entrypoint.sh"
         else:
             source = self.host_paths.localstack_project_dir / "bin" / "docker-entrypoint.sh"
         if source.exists():
@@ -185,12 +181,35 @@ class SourceVolumeMountConfigurator:
             )
 
 
+class CoverageRunScriptConfigurator:
+    """
+    Adds the coverage-run.py script as read-only volume mount into /opt/code/localstack/bin/coverage-run.py
+    """
+
+    def __init__(self, *, host_paths: HostPaths = None):
+        self.host_paths = host_paths or HostPaths()
+        self.container_paths = ProContainerPaths()
+
+    def __call__(self, cfg: ContainerConfiguration):
+        # coverage script
+        source = self.host_paths.localstack_ext_project_dir / "bin" / "coverage-run.py"
+        target = f"{self.container_paths.project_dir}/bin/coverage-run.py"
+        if source.exists():
+            cfg.volumes.add(VolumeBind(str(source), target, read_only=True))
+
+        # and add the pyproject toml since it contains the coverage config
+        source = self.host_paths.localstack_ext_project_dir / "pyproject.toml"
+        target = f"{self.container_paths.project_dir}/pyproject.toml"
+        if source.exists():
+            cfg.volumes.add(VolumeBind(str(source), target, read_only=True))
+
+
 class EntryPointMountConfigurator:
     """
     Mounts ``entry_points.txt`` files of localstack and dependencies into the venv in the container.
 
     For example, when starting the pro container, the entrypoints of localstack-ext on the host would be in
-    ``~/workspace/localstack-ext/localstack-pro-core/localstack_ext.egg-info/entry_points.txt``
+    ``~/workspace/localstack-ext/localstack_ext.egg-info/entry_points.txt``
     which needs to be mounted into the distribution info of the installed dependency within the container:
     ``/opt/code/localstack/.venv/.../site-packages/localstack_ext-2.1.0.dev0.dist-info/entry_points.txt``.
     """
@@ -216,7 +235,11 @@ class EntryPointMountConfigurator:
     def __call__(self, cfg: ContainerConfiguration):
         # special case for community code
         if not self.pro:
-            host_path = self.host_paths.aws_community_package_dir
+            host_path = (
+                self.host_paths.localstack_project_dir
+                / "localstack_core.egg-info"
+                / "entry_points.txt"
+            )
             if host_path.exists():
                 cfg.volumes.append(
                     VolumeBind(
@@ -235,38 +258,6 @@ class EntryPointMountConfigurator:
             dep_path = container_path.parent.name.removesuffix(".dist-info")
             dep, ver = dep_path.split("-")
 
-            if dep == "localstack_core":
-                host_path = (
-                    self.host_paths.localstack_project_dir
-                    / "localstack-core"
-                    / "localstack_core.egg-info"
-                    / "entry_points.txt"
-                )
-                if host_path.is_file():
-                    cfg.volumes.add(
-                        VolumeBind(
-                            str(host_path),
-                            str(container_path),
-                            read_only=True,
-                        )
-                    )
-                    continue
-            elif dep == "localstack_ext":
-                host_path = (
-                    self.host_paths.localstack_pro_project_dir
-                    / "localstack-pro-core"
-                    / "localstack_ext.egg-info"
-                    / "entry_points.txt"
-                )
-                if host_path.is_file():
-                    cfg.volumes.add(
-                        VolumeBind(
-                            str(host_path),
-                            str(container_path),
-                            read_only=True,
-                        )
-                    )
-                    continue
             for host_path in self.host_paths.workspace_dir.glob(
                 f"*/{dep}.egg-info/entry_points.txt"
             ):
@@ -281,7 +272,7 @@ class DependencyMountConfigurator:
 
     dependency_glob = "/opt/code/localstack/.venv/lib/python3.*/site-packages/*"
 
-    # skip mounting dependencies with incompatible binaries (e.g., on macOS)
+    # skip mounting dependencies with incompatible binaries (e.g., on MacOS)
     skipped_dependencies = ["cryptography", "psutil", "rpds"]
 
     def __init__(

@@ -62,7 +62,7 @@ def test_invoke_warm_start(create_lambda_function, aws_client):
     create_lambda_function(
         handler_file=TEST_LAMBDA_PYTHON_ECHO,
         func_name=function_name,
-        runtime=Runtime.python3_12,
+        runtime=Runtime.python3_9,
     )
 
     def invoke():
@@ -86,7 +86,7 @@ def test_invoke_cold_start(create_lambda_function, aws_client, monkeypatch):
     create_lambda_function(
         handler_file=TEST_LAMBDA_PYTHON_ECHO,
         func_name=function_name,
-        runtime=Runtime.python3_12,
+        runtime=Runtime.python3_9,
     )
 
     def invoke():
@@ -320,7 +320,7 @@ def test_lambda_event_invoke(create_lambda_function, s3_bucket, aws_client, aws_
             with lock:
                 request_ids.append(request_id)
         except Exception as e:
-            LOG.error("runner-%s failed: %s", runner, e)
+            LOG.error(f"runner-{runner} failed: {e}")
             error_counter.increment()
 
     start_time = datetime.utcnow()
@@ -335,12 +335,12 @@ def test_lambda_event_invoke(create_lambda_function, s3_bucket, aws_client, aws_
         thread.join()
     end_time = datetime.utcnow()
     diff = end_time - start_time
-    LOG.info("N=%s took %s seconds", num_invocations, diff.total_seconds())
+    LOG.info(f"N={num_invocations} took {diff.total_seconds()} seconds")
     assert error_counter.counter == 0
 
     # Sleeping here is a bit hacky, but we want to avoid polling for now because polling affects the results.
     sleep_seconds = 2000
-    LOG.info("Sleeping for %s ...", sleep_seconds)
+    LOG.info(f"Sleeping for {sleep_seconds} ...")
     time.sleep(sleep_seconds)
 
     # Validate CloudWatch invocation metric
@@ -458,7 +458,7 @@ def test_lambda_event_source_mapping_sqs(
             with lock:
                 request_ids.append(request_id)
         except Exception as e:
-            LOG.error("runner-%s failed: %s", runner, e)
+            LOG.error(f"runner-{runner} failed: {e}")
             error_counter.increment()
 
     start_time = datetime.utcnow()
@@ -473,12 +473,12 @@ def test_lambda_event_source_mapping_sqs(
         thread.join()
     end_time = datetime.utcnow()
     diff = end_time - start_time
-    LOG.info("N=%s took %s seconds", num_invocations, diff.total_seconds())
+    LOG.info(f"N={num_invocations} took {diff.total_seconds()} seconds")
     assert error_counter.counter == 0
 
     # Sleeping here is a bit hacky, but we want to avoid polling for now because polling affects the results.
     sleep_seconds = 400
-    LOG.info("Sleeping for %s ...", sleep_seconds)
+    LOG.info(f"Sleeping for {sleep_seconds} ...")
     time.sleep(sleep_seconds)
 
     # Validate CloudWatch invocation metric
@@ -609,7 +609,7 @@ def test_sns_subscription_lambda(
             with lock:
                 request_ids.append(request_id)
         except Exception as e:
-            LOG.error("runner-%s failed: %s", runner, e)
+            LOG.error(f"runner-{runner} failed: {e}")
             error_counter.increment()
 
     start_time = datetime.utcnow()
@@ -624,11 +624,11 @@ def test_sns_subscription_lambda(
         thread.join()
     end_time = datetime.utcnow()
     diff = end_time - start_time
-    LOG.info("N=%s took %s seconds", num_invocations, diff.total_seconds())
+    LOG.info(f"N={num_invocations} took {diff.total_seconds()} seconds")
     assert error_counter.counter == 0
 
     sleep_seconds = 600
-    LOG.info("Sleeping for %s ...", sleep_seconds)
+    LOG.info(f"Sleeping for {sleep_seconds} ...")
     time.sleep(sleep_seconds)
 
     # Validate CloudWatch invocation metric

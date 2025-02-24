@@ -1,10 +1,8 @@
 from typing import Final
 
-from localstack.services.stepfunctions.asl.component.common.string.string_expression import (
-    StringSampler,
-)
 from localstack.services.stepfunctions.asl.component.eval_component import EvalComponent
 from localstack.services.stepfunctions.asl.eval.environment import Environment
+from localstack.services.stepfunctions.asl.utils.json_path import JSONPathUtils
 
 
 class NoSuchVariable:
@@ -13,15 +11,13 @@ class NoSuchVariable:
 
 
 class Variable(EvalComponent):
-    string_sampler: Final[StringSampler]
-
-    def __init__(self, string_sampler: StringSampler):
-        self.string_sampler = string_sampler
+    def __init__(self, value: str):
+        self.value: Final[str] = value
 
     def _eval_body(self, env: Environment) -> None:
         try:
-            self.string_sampler.eval(env=env)
-            value = env.stack.pop()
+            inp = env.stack[-1]
+            value = JSONPathUtils.extract_json(self.value, inp)
         except Exception as ex:
-            value = NoSuchVariable(f"{self.string_sampler.literal_value}, {ex}")
+            value = NoSuchVariable(f"{self.value}, {ex}")
         env.stack.append(value)

@@ -19,19 +19,19 @@ from localstack.aws.api.stepfunctions import (
     SensitiveCause,
     SensitiveError,
     StartExecutionOutput,
-    StartSyncExecutionOutput,
-    StateMachineType,
-    SyncExecutionStatus,
     Timestamp,
     TraceHeader,
-    VariableReferences,
 )
 from localstack.aws.connect import connect_to
-from localstack.services.stepfunctions.asl.eval.evaluation_details import (
-    AWSExecutionDetails,
-    EvaluationDetails,
-    ExecutionDetails,
-    StateMachineDetails,
+from localstack.services.stepfunctions.asl.eval.aws_execution_details import AWSExecutionDetails
+from localstack.services.stepfunctions.asl.eval.contextobject.contex_object import (
+    ContextObjectInitData,
+)
+from localstack.services.stepfunctions.asl.eval.contextobject.contex_object import (
+    Execution as ContextObjectExecution,
+)
+from localstack.services.stepfunctions.asl.eval.contextobject.contex_object import (
+    StateMachine as ContextObjectStateMachine,
 )
 from localstack.services.stepfunctions.asl.eval.event.logging import (
     CloudWatchLoggingSession,
@@ -43,15 +43,9 @@ from localstack.services.stepfunctions.asl.eval.program_state import (
     ProgramStopped,
     ProgramTimedOut,
 )
-from localstack.services.stepfunctions.asl.static_analyser.variable_references_static_analyser import (
-    VariableReferencesStaticAnalyser,
-)
 from localstack.services.stepfunctions.asl.utils.encoding import to_json_str
 from localstack.services.stepfunctions.backend.activity import Activity
-from localstack.services.stepfunctions.backend.execution_worker import (
-    ExecutionWorker,
-    SyncExecutionWorker,
-)
+from localstack.services.stepfunctions.backend.execution_worker import ExecutionWorker
 from localstack.services.stepfunctions.backend.execution_worker_comm import (
     ExecutionWorkerCommunication,
 )
@@ -64,17 +58,15 @@ LOG = logging.getLogger(__name__)
 
 
 class BaseExecutionWorkerCommunication(ExecutionWorkerCommunication):
-    execution: Final[Execution]
-
     def __init__(self, execution: Execution):
-        self.execution = execution
+        self.execution: Execution = execution
 
     def _reflect_execution_status(self):
         exit_program_state: ProgramState = self.execution.exec_worker.env.program_state()
         self.execution.stop_date = datetime.datetime.now(tz=datetime.timezone.utc)
         if isinstance(exit_program_state, ProgramEnded):
             self.execution.exec_status = ExecutionStatus.SUCCEEDED
-            self.execution.output = self.execution.exec_worker.env.states.get_input()
+            self.execution.output = self.execution.exec_worker.env.inp
         elif isinstance(exit_program_state, ProgramStopped):
             self.execution.exec_status = ExecutionStatus.ABORTED
         elif isinstance(exit_program_state, ProgramError):
@@ -95,7 +87,6 @@ class BaseExecutionWorkerCommunication(ExecutionWorkerCommunication):
 
 class Execution:
     name: Final[str]
-    sm_type: Final[StateMachineType]
     role_arn: Final[Arn]
     exec_arn: Final[Arn]
 
@@ -125,7 +116,6 @@ class Execution:
     def __init__(
         self,
         name: str,
-        sm_type: StateMachineType,
         role_arn: Arn,
         exec_arn: Arn,
         account_id: str,
@@ -138,7 +128,6 @@ class Execution:
         trace_header: Optional[TraceHeader] = None,
     ):
         self.name = name
-        self.sm_type = sm_type
         self.role_arn = role_arn
         self.exec_arn = exec_arn
         self.account_id = account_id
@@ -206,11 +195,6 @@ class Execution:
         revision_id = self.state_machine.revision_id
         if self.state_machine.revision_id:
             out["revisionId"] = revision_id
-        variable_references: VariableReferences = VariableReferencesStaticAnalyser.process_and_get(
-            definition=self.state_machine.definition
-        )
-        if variable_references:
-            out["variableReferences"] = variable_references
         return out
 
     def to_execution_list_item(self) -> ExecutionListItem:
@@ -245,42 +229,39 @@ class Execution:
     def _to_serialized_date(timestamp: datetime.datetime) -> str:
         """See test in tests.aws.services.stepfunctions.v2.base.test_base.TestSnfBase.test_execution_dateformat"""
         return (
-            f"{timestamp.astimezone(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3]}Z"
+            f'{timestamp.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]}Z'
         )
 
     def _get_start_execution_worker_comm(self) -> BaseExecutionWorkerCommunication:
         return BaseExecutionWorkerCommunication(self)
+
+    def _get_start_context_object_init_data(self) -> ContextObjectInitData:
+        return ContextObjectInitData(
+            Execution=ContextObjectExecution(
+                Id=self.exec_arn,
+                Input=self.input_data,
+                Name=self.name,
+                RoleArn=self.role_arn,
+                StartTime=self._to_serialized_date(self.start_date),
+            ),
+            StateMachine=ContextObjectStateMachine(
+                Id=self.state_machine.arn,
+                Name=self.state_machine.name,
+            ),
+        )
 
     def _get_start_aws_execution_details(self) -> AWSExecutionDetails:
         return AWSExecutionDetails(
             account=self.account_id, region=self.region_name, role_arn=self.role_arn
         )
 
-    def get_start_execution_details(self) -> ExecutionDetails:
-        return ExecutionDetails(
-            arn=self.exec_arn,
-            name=self.name,
-            role_arn=self.role_arn,
-            inpt=self.input_data,
-            start_time=self._to_serialized_date(self.start_date),
-        )
-
-    def get_start_state_machine_details(self) -> StateMachineDetails:
-        return StateMachineDetails(
-            arn=self.state_machine.arn,
-            name=self.state_machine.name,
-            typ=self.state_machine.sm_type,
-            definition=self.state_machine.definition,
-        )
-
     def _get_start_execution_worker(self) -> ExecutionWorker:
         return ExecutionWorker(
-            evaluation_details=EvaluationDetails(
-                aws_execution_details=self._get_start_aws_execution_details(),
-                execution_details=self.get_start_execution_details(),
-                state_machine_details=self.get_start_state_machine_details(),
-            ),
+            definition=self.state_machine.definition,
+            input_data=self.input_data,
             exec_comm=self._get_start_execution_worker_comm(),
+            context_object_init=self._get_start_context_object_init_data(),
+            aws_execution_details=self._get_start_aws_execution_details(),
             cloud_watch_logging_session=self._cloud_watch_logging_session,
             activity_store=self._activity_store,
         )
@@ -335,62 +316,5 @@ class Execution:
             self._get_events_client().put_events(Entries=[entry])
         except Exception:
             LOG.exception(
-                "Unable to send notification of Entry='%s' for Step Function execution with Arn='%s' to EventBridge.",
-                entry,
-                self.exec_arn,
+                f"Unable to send notification of Entry='{entry}' for Step Function execution with Arn='{self.exec_arn}' to EventBridge."
             )
-
-
-class SyncExecutionWorkerCommunication(BaseExecutionWorkerCommunication):
-    execution: Final[SyncExecution]
-
-    def _reflect_execution_status(self) -> None:
-        super()._reflect_execution_status()
-        exit_status: ExecutionStatus = self.execution.exec_status
-        if exit_status == ExecutionStatus.SUCCEEDED:
-            self.execution.sync_execution_status = SyncExecutionStatus.SUCCEEDED
-        elif exit_status == ExecutionStatus.TIMED_OUT:
-            self.execution.sync_execution_status = SyncExecutionStatus.TIMED_OUT
-        else:
-            self.execution.sync_execution_status = SyncExecutionStatus.FAILED
-
-
-class SyncExecution(Execution):
-    sync_execution_status: Optional[SyncExecutionStatus] = None
-
-    def _get_start_execution_worker(self) -> SyncExecutionWorker:
-        return SyncExecutionWorker(
-            evaluation_details=EvaluationDetails(
-                aws_execution_details=self._get_start_aws_execution_details(),
-                execution_details=self.get_start_execution_details(),
-                state_machine_details=self.get_start_state_machine_details(),
-            ),
-            exec_comm=self._get_start_execution_worker_comm(),
-            cloud_watch_logging_session=self._cloud_watch_logging_session,
-            activity_store=self._activity_store,
-        )
-
-    def _get_start_execution_worker_comm(self) -> BaseExecutionWorkerCommunication:
-        return SyncExecutionWorkerCommunication(self)
-
-    def to_start_sync_execution_output(self) -> StartSyncExecutionOutput:
-        start_output = StartSyncExecutionOutput(
-            executionArn=self.exec_arn,
-            stateMachineArn=self.state_machine.arn,
-            name=self.name,
-            status=self.sync_execution_status,
-            startDate=self.start_date,
-            stopDate=self.stop_date,
-            input=to_json_str(self.input_data, separators=(",", ":")),
-            inputDetails=self.input_details,
-            traceHeader=self.trace_header,
-        )
-        if self.sync_execution_status == SyncExecutionStatus.SUCCEEDED:
-            start_output["output"] = to_json_str(self.output, separators=(",", ":"))
-        if self.output_details:
-            start_output["outputDetails"] = self.output_details
-        if self.error is not None:
-            start_output["error"] = self.error
-        if self.cause is not None:
-            start_output["cause"] = self.cause
-        return start_output

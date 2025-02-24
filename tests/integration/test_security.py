@@ -178,7 +178,10 @@ class TestCSRF:
                 "Origin": "https://app.localstack.cloud",
             },
         )
-        assert response.status_code == 404
+        if config.APIGW_NEXT_GEN_PROVIDER:
+            assert response.status_code == 403
+        else:
+            assert response.status_code == 404
 
         assert not any(response.headers.get(cors_header) for cors_header in cors_headers)
 
@@ -193,7 +196,10 @@ class TestCSRF:
             },
         )
 
-        assert response.status_code == 404
+        if config.APIGW_NEXT_GEN_PROVIDER:
+            assert response.status_code == 403
+        else:
+            assert response.status_code == 404
         assert not any(response.headers.get(cors_header) for cors_header in cors_headers)
 
         # now we give it a try with a route from the provider defined in the specs: GetRestApi, and an authorized origin

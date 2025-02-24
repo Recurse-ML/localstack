@@ -19,6 +19,7 @@ class SSMParameterProperties(TypedDict):
     AllowedPattern: Optional[str]
     DataType: Optional[str]
     Description: Optional[str]
+    Id: Optional[str]
     Name: Optional[str]
     Policies: Optional[str]
     Tags: Optional[dict]
@@ -40,21 +41,19 @@ class SSMParameterProvider(ResourceProvider[SSMParameterProperties]):
         Create a new resource.
 
         Primary identifier fields:
-          - /properties/Name
+          - /properties/Id
 
         Required properties:
-          - Value
           - Type
+          - Value
 
         Create-only properties:
           - /properties/Name
 
+        Read-only properties:
+          - /properties/Id
 
 
-        IAM permissions required:
-          - ssm:PutParameter
-          - ssm:AddTagsToResource
-          - ssm:GetParameters
 
         """
         model = request.desired_state
@@ -88,7 +87,11 @@ class SSMParameterProvider(ResourceProvider[SSMParameterProperties]):
 
         ssm.put_parameter(**params)
 
-        return self.read(request)
+        return ProgressEvent(
+            status=OperationStatus.SUCCESS,
+            resource_model=model,
+            custom_context=request.custom_context,
+        )
 
     def read(
         self,
@@ -97,27 +100,9 @@ class SSMParameterProvider(ResourceProvider[SSMParameterProperties]):
         """
         Fetch resource information
 
-        IAM permissions required:
-          - ssm:GetParameters
+
         """
-        ssm = request.aws_client_factory.ssm
-        parameter_name = request.desired_state.get("Name")
-        try:
-            resource = ssm.get_parameter(Name=parameter_name, WithDecryption=False)
-        except ssm.exceptions.ParameterNotFound:
-            return ProgressEvent(
-                status=OperationStatus.FAILED,
-                message=f"Resource of type '{self.TYPE}' with identifier '{parameter_name}' was not found.",
-                error_code="NotFound",
-            )
-
-        parameter = util.select_attributes(resource["Parameter"], params=self.SCHEMA["properties"])
-
-        return ProgressEvent(
-            status=OperationStatus.SUCCESS,
-            resource_model=parameter,
-            custom_context=request.custom_context,
-        )
+        raise NotImplementedError
 
     def delete(
         self,
@@ -126,8 +111,7 @@ class SSMParameterProvider(ResourceProvider[SSMParameterProperties]):
         """
         Delete a resource
 
-        IAM permissions required:
-          - ssm:DeleteParameter
+
         """
         model = request.desired_state
         ssm = request.aws_client_factory.ssm
@@ -147,11 +131,7 @@ class SSMParameterProvider(ResourceProvider[SSMParameterProperties]):
         """
         Update a resource
 
-        IAM permissions required:
-          - ssm:PutParameter
-          - ssm:AddTagsToResource
-          - ssm:RemoveTagsFromResource
-          - ssm:GetParameters
+
         """
         model = request.desired_state
         ssm = request.aws_client_factory.ssm
@@ -214,16 +194,3 @@ class SSMParameterProvider(ResourceProvider[SSMParameterProperties]):
             ssm.remove_tags_from_resource(
                 ResourceType="Parameter", ResourceId=model["Name"], TagKeys=tag_keys_to_remove
             )
-
-    def list(
-        self,
-        request: ResourceRequest[SSMParameterProperties],
-    ) -> ProgressEvent[SSMParameterProperties]:
-        resources = request.aws_client_factory.ssm.describe_parameters()
-        return ProgressEvent(
-            status=OperationStatus.SUCCESS,
-            resource_models=[
-                SSMParameterProperties(Name=resource["Name"])
-                for resource in resources["Parameters"]
-            ],
-        )

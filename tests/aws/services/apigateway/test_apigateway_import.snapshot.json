@@ -845,7 +845,7 @@
           "passthroughBehavior": "WHEN_NO_MATCH",
           "timeoutInMillis": 29000,
           "type": "AWS_PROXY",
-          "uri": "arn:<partition>:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:<partition>:lambda:us-west-2:000000000000:function:s3OnObjectCreatedLambda-60c92b6/invocations"
+          "uri": "arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:000000000000:function:s3OnObjectCreatedLambda-60c92b6/invocations"
         },
         "methodResponses": {
           "200": {
@@ -892,7 +892,7 @@
         "passthroughBehavior": "WHEN_NO_MATCH",
         "timeoutInMillis": 29000,
         "type": "AWS_PROXY",
-        "uri": "arn:<partition>:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:<partition>:lambda:us-west-2:000000000000:function:s3OnObjectCreatedLambda-60c92b6/invocations",
+        "uri": "arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:000000000000:function:s3OnObjectCreatedLambda-60c92b6/invocations",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -1078,7 +1078,7 @@
           "passthroughBehavior": "WHEN_NO_MATCH",
           "timeoutInMillis": 29000,
           "type": "AWS_PROXY",
-          "uri": "arn:<partition>:apigateway:<region>:lambda:path/2015-03-31/functions/arn:<partition>:lambda:<region>:000000000000:function:aws-serverless-shopping-cart-produ-GetProductsFunction-c1359550:live/invocations"
+          "uri": "arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/arn:aws:lambda:<region>:000000000000:function:aws-serverless-shopping-cart-produ-GetProductsFunction-c1359550:live/invocations"
         },
         "ResponseMetadata": {
           "HTTPHeaders": {},
@@ -1103,7 +1103,7 @@
         "passthroughBehavior": "WHEN_NO_MATCH",
         "timeoutInMillis": 29000,
         "type": "AWS_PROXY",
-        "uri": "arn:<partition>:apigateway:<region>:lambda:path/2015-03-31/functions/arn:<partition>:lambda:<region>:000000000000:function:aws-serverless-shopping-cart-produ-GetProductsFunction-c1359550:live/invocations",
+        "uri": "arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/arn:aws:lambda:<region>:000000000000:function:aws-serverless-shopping-cart-produ-GetProductsFunction-c1359550:live/invocations",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -1231,7 +1231,7 @@
           "passthroughBehavior": "WHEN_NO_MATCH",
           "timeoutInMillis": 29000,
           "type": "AWS_PROXY",
-          "uri": "arn:<partition>:apigateway:<region>:lambda:path/2015-03-31/functions/arn:<partition>:lambda:<region>:000000000000:function:aws-serverless-shopping-cart-produc-GetProductFunction-28378339:live/invocations"
+          "uri": "arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/arn:aws:lambda:<region>:000000000000:function:aws-serverless-shopping-cart-produc-GetProductFunction-28378339:live/invocations"
         },
         "requestParameters": {
           "method.request.path.product_id": true
@@ -1259,7 +1259,7 @@
         "passthroughBehavior": "WHEN_NO_MATCH",
         "timeoutInMillis": 29000,
         "type": "AWS_PROXY",
-        "uri": "arn:<partition>:apigateway:<region>:lambda:path/2015-03-31/functions/arn:<partition>:lambda:<region>:000000000000:function:aws-serverless-shopping-cart-produc-GetProductFunction-28378339:live/invocations",
+        "uri": "arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/arn:aws:lambda:<region>:000000000000:function:aws-serverless-shopping-cart-produc-GetProductFunction-28378339:live/invocations",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -2537,7 +2537,7 @@
     }
   },
   "tests/aws/services/apigateway/test_apigateway_import.py::TestApiGatewayImportRestApi::test_import_rest_api_with_base_path_oas30[prepend]": {
-    "recorded-date": "12-12-2024, 22:45:00",
+    "recorded-date": "15-04-2024, 21:36:04",
     "recorded-content": {
       "put-rest-api-oas30-srv-var": {
         "apiKeySource": "HEADER",
@@ -2790,9 +2790,6 @@
         "rootResourceId": "<id:2>",
         "tags": {},
         "version": "2.0",
-        "warnings": [
-          "Invalid format for 'requestParameters'. Expected type string for property 'integration.request.header.nothing' of resource '/base-url/part/test' and method 'GET' but got 'true'"
-        ],
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -2849,8 +2846,7 @@
           },
           "passthroughBehavior": "WHEN_NO_MATCH",
           "requestParameters": {
-            "integration.request.header.X-Amz-Invocation-Type": "'Event'",
-            "integration.request.header.double-single": "'True'"
+            "integration.request.header.X-Amz-Invocation-Type": "'Event'"
           },
           "requestTemplates": {
             "application/json": {
@@ -2902,8 +2898,7 @@
         },
         "passthroughBehavior": "WHEN_NO_MATCH",
         "requestParameters": {
-          "integration.request.header.X-Amz-Invocation-Type": "'Event'",
-          "integration.request.header.double-single": "'True'"
+          "integration.request.header.X-Amz-Invocation-Type": "'Event'"
         },
         "requestTemplates": {
           "application/json": {
@@ -3027,7 +3022,7 @@
     }
   },
   "tests/aws/services/apigateway/test_apigateway_import.py::TestApiGatewayImportRestApi::test_import_rest_api_with_base_path_oas30[split]": {
-    "recorded-date": "12-12-2024, 22:45:36",
+    "recorded-date": "15-04-2024, 21:36:26",
     "recorded-content": {
       "put-rest-api-oas30-srv-var": {
         "apiKeySource": "HEADER",
@@ -3274,9 +3269,6 @@
         "rootResourceId": "<id:2>",
         "tags": {},
         "version": "2.0",
-        "warnings": [
-          "Invalid format for 'requestParameters'. Expected type string for property 'integration.request.header.nothing' of resource '/part/test' and method 'GET' but got 'true'"
-        ],
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -3327,8 +3319,7 @@
           },
           "passthroughBehavior": "WHEN_NO_MATCH",
           "requestParameters": {
-            "integration.request.header.X-Amz-Invocation-Type": "'Event'",
-            "integration.request.header.double-single": "'True'"
+            "integration.request.header.X-Amz-Invocation-Type": "'Event'"
           },
           "requestTemplates": {
             "application/json": {
@@ -3380,8 +3371,7 @@
         },
         "passthroughBehavior": "WHEN_NO_MATCH",
         "requestParameters": {
-          "integration.request.header.X-Amz-Invocation-Type": "'Event'",
-          "integration.request.header.double-single": "'True'"
+          "integration.request.header.X-Amz-Invocation-Type": "'Event'"
         },
         "requestTemplates": {
           "application/json": {
@@ -3505,7 +3495,7 @@
     }
   },
   "tests/aws/services/apigateway/test_apigateway_import.py::TestApiGatewayImportRestApi::test_import_rest_api_with_base_path_oas30[ignore]": {
-    "recorded-date": "12-12-2024, 22:44:26",
+    "recorded-date": "15-04-2024, 21:35:47",
     "recorded-content": {
       "put-rest-api-oas30-srv-var": {
         "apiKeySource": "HEADER",
@@ -3752,9 +3742,6 @@
         "rootResourceId": "<id:2>",
         "tags": {},
         "version": "2.0",
-        "warnings": [
-          "Invalid format for 'requestParameters'. Expected type string for property 'integration.request.header.nothing' of resource '/test' and method 'GET' but got 'true'"
-        ],
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -3799,8 +3786,7 @@
           },
           "passthroughBehavior": "WHEN_NO_MATCH",
           "requestParameters": {
-            "integration.request.header.X-Amz-Invocation-Type": "'Event'",
-            "integration.request.header.double-single": "'True'"
+            "integration.request.header.X-Amz-Invocation-Type": "'Event'"
           },
           "requestTemplates": {
             "application/json": {
@@ -3852,8 +3838,7 @@
         },
         "passthroughBehavior": "WHEN_NO_MATCH",
         "requestParameters": {
-          "integration.request.header.X-Amz-Invocation-Type": "'Event'",
-          "integration.request.header.double-single": "'True'"
+          "integration.request.header.X-Amz-Invocation-Type": "'Event'"
         },
         "requestTemplates": {
           "application/json": {
@@ -4807,507 +4792,7 @@
     }
   },
   "tests/aws/services/apigateway/test_apigateway_import.py::TestApiGatewayImportRestApi::test_import_with_stage_variables": {
-    "recorded-date": "12-08-2024, 13:42:20",
-    "recorded-content": {
-      "get-resp-from-http": {
-        "args": {
-          "qs_key": "qs_value"
-        },
-        "data": "",
-        "domain": "<domain:1>",
-        "method": "POST",
-        "origin": "<origin:1>",
-        "path": "/test-path"
-      },
-      "get-error-resp-from-http": {
-        "message": "Internal server error"
-      }
-    }
-  },
-  "tests/aws/services/apigateway/test_apigateway_import.py::TestApiGatewayImportRestApi::test_import_with_cognito_auth_identity_source": {
-    "recorded-date": "11-12-2024, 13:10:45",
-    "recorded-content": {
-      "import-swagger": {
-        "apiKeySource": "HEADER",
-        "createdDate": "datetime",
-        "description": "A Pet Store API.",
-        "disableExecuteApiEndpoint": false,
-        "endpointConfiguration": {
-          "types": [
-            "EDGE"
-          ]
-        },
-        "id": "<rest-id:1>",
-        "name": "Example Pet Store",
-        "rootResourceId": "<resource-id:1>",
-        "version": "1.0",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 201
-        }
-      },
-      "get-authorizers": [
-        {
-          "id": "<authorizer-id:1>",
-          "name": "cognito-test-identity-source",
-          "type": "COGNITO_USER_POOLS",
-          "providerARNs": [
-            "arn:<partition>:cognito-idp:<region>:111111111111:userpool/<region>_ABC123"
-          ],
-          "authType": "cognito_user_pools",
-          "identitySource": "method.request.header.TestHeaderAuth"
-        },
-        {
-          "id": "<authorizer-id:2>",
-          "name": "extra-test-identity-source",
-          "type": "COGNITO_USER_POOLS",
-          "providerARNs": [
-            "arn:<partition>:cognito-idp:<region>:111111111111:userpool/<region>_ABC123"
-          ],
-          "authType": "cognito_user_pools",
-          "identitySource": "method.request.header.TestHeaderAuth"
-        }
-      ],
-      "resources": {
-        "items": [
-          {
-            "id": "<resource-id:1>",
-            "path": "/"
-          },
-          {
-            "id": "<resource-id:2>",
-            "parentId": "<resource-id:1>",
-            "path": "/default-no-scope",
-            "pathPart": "default-no-scope",
-            "resourceMethods": {
-              "GET": {}
-            }
-          },
-          {
-            "id": "<resource-id:3>",
-            "parentId": "<resource-id:1>",
-            "path": "/default-scope-override",
-            "pathPart": "default-scope-override",
-            "resourceMethods": {
-              "GET": {}
-            }
-          },
-          {
-            "id": "<resource-id:4>",
-            "parentId": "<resource-id:1>",
-            "path": "/non-default-authorizer",
-            "pathPart": "non-default-authorizer",
-            "resourceMethods": {
-              "GET": {}
-            }
-          },
-          {
-            "id": "<resource-id:5>",
-            "parentId": "<resource-id:1>",
-            "path": "/pets",
-            "pathPart": "pets",
-            "resourceMethods": {
-              "GET": {}
-            }
-          }
-        ],
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-default-no-scope-get": {
-        "apiKeyRequired": false,
-        "authorizationType": "COGNITO_USER_POOLS",
-        "authorizerId": "<authorizer-id:1>",
-        "httpMethod": "GET",
-        "methodIntegration": {
-          "cacheKeyParameters": [],
-          "cacheNamespace": "<resource-id:2>",
-          "connectionType": "INTERNET",
-          "httpMethod": "GET",
-          "integrationResponses": {
-            "200": {
-              "statusCode": "200"
-            }
-          },
-          "passthroughBehavior": "WHEN_NO_MATCH",
-          "timeoutInMillis": 29000,
-          "type": "HTTP",
-          "uri": "http://petstore-demo-endpoint.execute-api.com/petstore/pets"
-        },
-        "methodResponses": {
-          "200": {
-            "statusCode": "200"
-          }
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-response-default-no-scope-get": {
-        "statusCode": "200",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-default-no-scope-get": {
-        "cacheKeyParameters": [],
-        "cacheNamespace": "<resource-id:2>",
-        "connectionType": "INTERNET",
-        "httpMethod": "GET",
-        "integrationResponses": {
-          "200": {
-            "statusCode": "200"
-          }
-        },
-        "passthroughBehavior": "WHEN_NO_MATCH",
-        "timeoutInMillis": 29000,
-        "type": "HTTP",
-        "uri": "http://petstore-demo-endpoint.execute-api.com/petstore/pets",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-response-default-no-scope-get": {
-        "statusCode": "200",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-default-scope-override-get": {
-        "apiKeyRequired": false,
-        "authorizationScopes": [
-          "openid"
-        ],
-        "authorizationType": "COGNITO_USER_POOLS",
-        "authorizerId": "<authorizer-id:1>",
-        "httpMethod": "GET",
-        "methodIntegration": {
-          "cacheKeyParameters": [],
-          "cacheNamespace": "<resource-id:3>",
-          "connectionType": "INTERNET",
-          "httpMethod": "GET",
-          "integrationResponses": {
-            "200": {
-              "statusCode": "200"
-            }
-          },
-          "passthroughBehavior": "WHEN_NO_MATCH",
-          "timeoutInMillis": 29000,
-          "type": "HTTP",
-          "uri": "http://petstore-demo-endpoint.execute-api.com/petstore/pets"
-        },
-        "methodResponses": {
-          "200": {
-            "statusCode": "200"
-          }
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-response-default-scope-override-get": {
-        "statusCode": "200",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-default-scope-override-get": {
-        "cacheKeyParameters": [],
-        "cacheNamespace": "<resource-id:3>",
-        "connectionType": "INTERNET",
-        "httpMethod": "GET",
-        "integrationResponses": {
-          "200": {
-            "statusCode": "200"
-          }
-        },
-        "passthroughBehavior": "WHEN_NO_MATCH",
-        "timeoutInMillis": 29000,
-        "type": "HTTP",
-        "uri": "http://petstore-demo-endpoint.execute-api.com/petstore/pets",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-response-default-scope-override-get": {
-        "statusCode": "200",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-non-default-authorizer-get": {
-        "apiKeyRequired": false,
-        "authorizationScopes": [
-          "email",
-          "openid"
-        ],
-        "authorizationType": "COGNITO_USER_POOLS",
-        "authorizerId": "<authorizer-id:2>",
-        "httpMethod": "GET",
-        "methodIntegration": {
-          "cacheKeyParameters": [],
-          "cacheNamespace": "<resource-id:4>",
-          "connectionType": "INTERNET",
-          "httpMethod": "GET",
-          "integrationResponses": {
-            "200": {
-              "statusCode": "200"
-            }
-          },
-          "passthroughBehavior": "WHEN_NO_MATCH",
-          "timeoutInMillis": 29000,
-          "type": "HTTP",
-          "uri": "http://petstore-demo-endpoint.execute-api.com/petstore/pets"
-        },
-        "methodResponses": {
-          "200": {
-            "statusCode": "200"
-          }
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-response-non-default-authorizer-get": {
-        "statusCode": "200",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-non-default-authorizer-get": {
-        "cacheKeyParameters": [],
-        "cacheNamespace": "<resource-id:4>",
-        "connectionType": "INTERNET",
-        "httpMethod": "GET",
-        "integrationResponses": {
-          "200": {
-            "statusCode": "200"
-          }
-        },
-        "passthroughBehavior": "WHEN_NO_MATCH",
-        "timeoutInMillis": 29000,
-        "type": "HTTP",
-        "uri": "http://petstore-demo-endpoint.execute-api.com/petstore/pets",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-response-non-default-authorizer-get": {
-        "statusCode": "200",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-pets-get": {
-        "apiKeyRequired": false,
-        "authorizationScopes": [
-          "email"
-        ],
-        "authorizationType": "COGNITO_USER_POOLS",
-        "authorizerId": "<authorizer-id:1>",
-        "httpMethod": "GET",
-        "methodIntegration": {
-          "cacheKeyParameters": [],
-          "cacheNamespace": "<resource-id:5>",
-          "connectionType": "INTERNET",
-          "httpMethod": "GET",
-          "passthroughBehavior": "WHEN_NO_MATCH",
-          "timeoutInMillis": 29000,
-          "type": "HTTP_PROXY",
-          "uri": "http://<external-aws-endpoint>.amazonaws.com/petstore/pets"
-        },
-        "methodResponses": {
-          "200": {
-            "responseModels": {
-              "application/json": "Pets"
-            },
-            "responseParameters": {
-              "method.response.header.Access-Control-Allow-Origin": false
-            },
-            "statusCode": "200"
-          }
-        },
-        "operationName": "GET HTTP",
-        "requestParameters": {
-          "method.request.querystring.page": false,
-          "method.request.querystring.type": false
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-response-pets-get": {
-        "responseModels": {
-          "application/json": "Pets"
-        },
-        "responseParameters": {
-          "method.response.header.Access-Control-Allow-Origin": false
-        },
-        "statusCode": "200",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-pets-get": {
-        "cacheKeyParameters": [],
-        "cacheNamespace": "<resource-id:5>",
-        "connectionType": "INTERNET",
-        "httpMethod": "GET",
-        "passthroughBehavior": "WHEN_NO_MATCH",
-        "timeoutInMillis": 29000,
-        "type": "HTTP_PROXY",
-        "uri": "http://<external-aws-endpoint>.amazonaws.com/petstore/pets",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-response-pets-get": {
-        "Error": {
-          "Code": "NotFoundException",
-          "Message": "Invalid Response status code specified"
-        },
-        "message": "Invalid Response status code specified",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 404
-        }
-      }
-    }
-  },
-  "tests/aws/services/apigateway/test_apigateway_import.py::TestApiGatewayImportRestApi::test_import_with_integer_http_status_code": {
-    "recorded-date": "14-01-2025, 14:09:57",
-    "recorded-content": {
-      "resources": {
-        "items": [
-          {
-            "id": "<id:1>",
-            "path": "/"
-          },
-          {
-            "id": "<id:2>",
-            "parentId": "<id:1>",
-            "path": "/test",
-            "pathPart": "test",
-            "resourceMethods": {
-              "GET": {}
-            }
-          }
-        ],
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-test-get": {
-        "apiKeyRequired": false,
-        "authorizationType": "NONE",
-        "httpMethod": "GET",
-        "methodIntegration": {
-          "cacheKeyParameters": [],
-          "cacheNamespace": "<id:2>",
-          "integrationResponses": {
-            "200": {
-              "responseParameters": {
-                "method.response.header.Access-Control-Allow-Origin": "'*'"
-              },
-              "statusCode": "200"
-            }
-          },
-          "passthroughBehavior": "WHEN_NO_MATCH",
-          "requestParameters": {
-            "integration.request.header.X-Amz-Invocation-Type": "'Event'"
-          },
-          "requestTemplates": {
-            "application/json": {
-              "statusCode": 200
-            }
-          },
-          "timeoutInMillis": 29000,
-          "type": "MOCK"
-        },
-        "methodResponses": {
-          "200": {
-            "responseModels": {
-              "application/json": "Empty"
-            },
-            "responseParameters": {
-              "method.response.header.Access-Control-Allow-Origin": false
-            },
-            "statusCode": "200"
-          }
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "method-response-test-get": {
-        "responseModels": {
-          "application/json": "Empty"
-        },
-        "responseParameters": {
-          "method.response.header.Access-Control-Allow-Origin": false
-        },
-        "statusCode": "200",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-test-get": {
-        "cacheKeyParameters": [],
-        "cacheNamespace": "<id:2>",
-        "integrationResponses": {
-          "200": {
-            "responseParameters": {
-              "method.response.header.Access-Control-Allow-Origin": "'*'"
-            },
-            "statusCode": "200"
-          }
-        },
-        "passthroughBehavior": "WHEN_NO_MATCH",
-        "requestParameters": {
-          "integration.request.header.X-Amz-Invocation-Type": "'Event'"
-        },
-        "requestTemplates": {
-          "application/json": {
-            "statusCode": 200
-          }
-        },
-        "timeoutInMillis": 29000,
-        "type": "MOCK",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "integration-response-test-get": {
-        "responseParameters": {
-          "method.response.header.Access-Control-Allow-Origin": "'*'"
-        },
-        "statusCode": "200",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      }
-    }
+    "recorded-date": "15-04-2024, 21:38:55",
+    "recorded-content": {}
   }
 }

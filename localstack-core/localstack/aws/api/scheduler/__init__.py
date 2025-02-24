@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -50,48 +49,48 @@ TaskCount = int
 TaskDefinitionArn = str
 
 
-class ActionAfterCompletion(StrEnum):
+class ActionAfterCompletion(str):
     NONE = "NONE"
     DELETE = "DELETE"
 
 
-class AssignPublicIp(StrEnum):
+class AssignPublicIp(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
 
 
-class FlexibleTimeWindowMode(StrEnum):
+class FlexibleTimeWindowMode(str):
     OFF = "OFF"
     FLEXIBLE = "FLEXIBLE"
 
 
-class LaunchType(StrEnum):
+class LaunchType(str):
     EC2 = "EC2"
     FARGATE = "FARGATE"
     EXTERNAL = "EXTERNAL"
 
 
-class PlacementConstraintType(StrEnum):
+class PlacementConstraintType(str):
     distinctInstance = "distinctInstance"
     memberOf = "memberOf"
 
 
-class PlacementStrategyType(StrEnum):
+class PlacementStrategyType(str):
     random = "random"
     spread = "spread"
     binpack = "binpack"
 
 
-class PropagateTags(StrEnum):
+class PropagateTags(str):
     TASK_DEFINITION = "TASK_DEFINITION"
 
 
-class ScheduleGroupState(StrEnum):
+class ScheduleGroupState(str):
     ACTIVE = "ACTIVE"
     DELETING = "DELETING"
 
 
-class ScheduleState(StrEnum):
+class ScheduleState(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
 

@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import IO, Dict, Iterable, Iterator, List, Optional, TypedDict, Union
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -18,12 +17,10 @@ AnalyticsId = str
 BucketKeyEnabled = bool
 BucketLocationName = str
 BucketName = str
-BucketRegion = str
 BypassGovernanceRetention = bool
 CacheControl = str
 ChecksumCRC32 = str
 ChecksumCRC32C = str
-ChecksumCRC64NVME = str
 ChecksumSHA1 = str
 ChecksumSHA256 = str
 CloudFunction = str
@@ -96,14 +93,12 @@ LocationPrefix = str
 MFA = str
 Marker = str
 MaxAgeSeconds = int
-MaxBuckets = int
 MaxDirectoryBuckets = int
 MaxKeys = int
 MaxParts = int
 MaxUploads = int
 Message = str
 MetadataKey = str
-MetadataTableStatus = str
 MetadataValue = str
 MetricsId = str
 Minutes = int
@@ -146,10 +141,6 @@ ResponseContentType = str
 Restore = str
 RestoreOutputPath = str
 Role = str
-S3TablesArn = str
-S3TablesBucketArn = str
-S3TablesName = str
-S3TablesNamespace = str
 SSECustomerAlgorithm = str
 SSECustomerKey = str
 SSECustomerKeyMD5 = str
@@ -173,6 +164,7 @@ VersionCount = int
 VersionIdMarker = str
 WebsiteRedirectLocation = str
 Years = int
+BucketRegion = str
 BucketContentType = str
 IfCondition = str
 RestoreObjectOutputStatusCode = int
@@ -191,25 +183,23 @@ HttpMethod = str
 ResourceType = str
 MissingHeaderName = str
 KeyLength = str
-Header = str
-additionalMessage = str
 
 
-class AnalyticsS3ExportFileFormat(StrEnum):
+class AnalyticsS3ExportFileFormat(str):
     CSV = "CSV"
 
 
-class ArchiveStatus(StrEnum):
+class ArchiveStatus(str):
     ARCHIVE_ACCESS = "ARCHIVE_ACCESS"
     DEEP_ARCHIVE_ACCESS = "DEEP_ARCHIVE_ACCESS"
 
 
-class BucketAccelerateStatus(StrEnum):
+class BucketAccelerateStatus(str):
     Enabled = "Enabled"
     Suspended = "Suspended"
 
 
-class BucketCannedACL(StrEnum):
+class BucketCannedACL(str):
     private = "private"
     public_read = "public-read"
     public_read_write = "public-read-write"
@@ -217,7 +207,7 @@ class BucketCannedACL(StrEnum):
     log_delivery_write = "log-delivery-write"
 
 
-class BucketLocationConstraint(StrEnum):
+class BucketLocationConstraint(str):
     af_south_1 = "af-south-1"
     ap_east_1 = "ap-east-1"
     ap_northeast_1 = "ap-northeast-1"
@@ -228,22 +218,17 @@ class BucketLocationConstraint(StrEnum):
     ap_southeast_1 = "ap-southeast-1"
     ap_southeast_2 = "ap-southeast-2"
     ap_southeast_3 = "ap-southeast-3"
-    ap_southeast_4 = "ap-southeast-4"
-    ap_southeast_5 = "ap-southeast-5"
     ca_central_1 = "ca-central-1"
     cn_north_1 = "cn-north-1"
     cn_northwest_1 = "cn-northwest-1"
     EU = "EU"
     eu_central_1 = "eu-central-1"
-    eu_central_2 = "eu-central-2"
     eu_north_1 = "eu-north-1"
     eu_south_1 = "eu-south-1"
     eu_south_2 = "eu-south-2"
     eu_west_1 = "eu-west-1"
     eu_west_2 = "eu-west-2"
     eu_west_3 = "eu-west-3"
-    il_central_1 = "il-central-1"
-    me_central_1 = "me-central-1"
     me_south_1 = "me-south-1"
     sa_east_1 = "sa-east-1"
     us_east_2 = "us-east-2"
@@ -253,59 +238,52 @@ class BucketLocationConstraint(StrEnum):
     us_west_2 = "us-west-2"
 
 
-class BucketLogsPermission(StrEnum):
+class BucketLogsPermission(str):
     FULL_CONTROL = "FULL_CONTROL"
     READ = "READ"
     WRITE = "WRITE"
 
 
-class BucketType(StrEnum):
+class BucketType(str):
     Directory = "Directory"
 
 
-class BucketVersioningStatus(StrEnum):
+class BucketVersioningStatus(str):
     Enabled = "Enabled"
     Suspended = "Suspended"
 
 
-class ChecksumAlgorithm(StrEnum):
+class ChecksumAlgorithm(str):
     CRC32 = "CRC32"
     CRC32C = "CRC32C"
     SHA1 = "SHA1"
     SHA256 = "SHA256"
-    CRC64NVME = "CRC64NVME"
 
 
-class ChecksumMode(StrEnum):
+class ChecksumMode(str):
     ENABLED = "ENABLED"
 
 
-class ChecksumType(StrEnum):
-    COMPOSITE = "COMPOSITE"
-    FULL_OBJECT = "FULL_OBJECT"
-
-
-class CompressionType(StrEnum):
+class CompressionType(str):
     NONE = "NONE"
     GZIP = "GZIP"
     BZIP2 = "BZIP2"
 
 
-class DataRedundancy(StrEnum):
+class DataRedundancy(str):
     SingleAvailabilityZone = "SingleAvailabilityZone"
-    SingleLocalZone = "SingleLocalZone"
 
 
-class DeleteMarkerReplicationStatus(StrEnum):
+class DeleteMarkerReplicationStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class EncodingType(StrEnum):
+class EncodingType(str):
     url = "url"
 
 
-class Event(StrEnum):
+class Event(str):
     s3_ReducedRedundancyLostObject = "s3:ReducedRedundancyLostObject"
     s3_ObjectCreated_ = "s3:ObjectCreated:*"
     s3_ObjectCreated_Put = "s3:ObjectCreated:Put"
@@ -337,58 +315,58 @@ class Event(StrEnum):
     s3_ObjectTagging_Delete = "s3:ObjectTagging:Delete"
 
 
-class ExistingObjectReplicationStatus(StrEnum):
+class ExistingObjectReplicationStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class ExpirationStatus(StrEnum):
+class ExpirationStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class ExpressionType(StrEnum):
+class ExpressionType(str):
     SQL = "SQL"
 
 
-class FileHeaderInfo(StrEnum):
+class FileHeaderInfo(str):
     USE = "USE"
     IGNORE = "IGNORE"
     NONE = "NONE"
 
 
-class FilterRuleName(StrEnum):
+class FilterRuleName(str):
     prefix = "prefix"
     suffix = "suffix"
 
 
-class IntelligentTieringAccessTier(StrEnum):
+class IntelligentTieringAccessTier(str):
     ARCHIVE_ACCESS = "ARCHIVE_ACCESS"
     DEEP_ARCHIVE_ACCESS = "DEEP_ARCHIVE_ACCESS"
 
 
-class IntelligentTieringStatus(StrEnum):
+class IntelligentTieringStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class InventoryFormat(StrEnum):
+class InventoryFormat(str):
     CSV = "CSV"
     ORC = "ORC"
     Parquet = "Parquet"
 
 
-class InventoryFrequency(StrEnum):
+class InventoryFrequency(str):
     Daily = "Daily"
     Weekly = "Weekly"
 
 
-class InventoryIncludedObjectVersions(StrEnum):
+class InventoryIncludedObjectVersions(str):
     All = "All"
     Current = "Current"
 
 
-class InventoryOptionalField(StrEnum):
+class InventoryOptionalField(str):
     Size = "Size"
     LastModifiedDate = "LastModifiedDate"
     StorageClass = "StorageClass"
@@ -406,37 +384,36 @@ class InventoryOptionalField(StrEnum):
     ObjectOwner = "ObjectOwner"
 
 
-class JSONType(StrEnum):
+class JSONType(str):
     DOCUMENT = "DOCUMENT"
     LINES = "LINES"
 
 
-class LocationType(StrEnum):
+class LocationType(str):
     AvailabilityZone = "AvailabilityZone"
-    LocalZone = "LocalZone"
 
 
-class MFADelete(StrEnum):
+class MFADelete(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class MFADeleteStatus(StrEnum):
+class MFADeleteStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class MetadataDirective(StrEnum):
+class MetadataDirective(str):
     COPY = "COPY"
     REPLACE = "REPLACE"
 
 
-class MetricsStatus(StrEnum):
+class MetricsStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class ObjectAttributes(StrEnum):
+class ObjectAttributes(str):
     ETag = "ETag"
     Checksum = "Checksum"
     ObjectParts = "ObjectParts"
@@ -444,7 +421,7 @@ class ObjectAttributes(StrEnum):
     ObjectSize = "ObjectSize"
 
 
-class ObjectCannedACL(StrEnum):
+class ObjectCannedACL(str):
     private = "private"
     public_read = "public-read"
     public_read_write = "public-read-write"
@@ -454,32 +431,32 @@ class ObjectCannedACL(StrEnum):
     bucket_owner_full_control = "bucket-owner-full-control"
 
 
-class ObjectLockEnabled(StrEnum):
+class ObjectLockEnabled(str):
     Enabled = "Enabled"
 
 
-class ObjectLockLegalHoldStatus(StrEnum):
+class ObjectLockLegalHoldStatus(str):
     ON = "ON"
     OFF = "OFF"
 
 
-class ObjectLockMode(StrEnum):
+class ObjectLockMode(str):
     GOVERNANCE = "GOVERNANCE"
     COMPLIANCE = "COMPLIANCE"
 
 
-class ObjectLockRetentionMode(StrEnum):
+class ObjectLockRetentionMode(str):
     GOVERNANCE = "GOVERNANCE"
     COMPLIANCE = "COMPLIANCE"
 
 
-class ObjectOwnership(StrEnum):
+class ObjectOwnership(str):
     BucketOwnerPreferred = "BucketOwnerPreferred"
     ObjectWriter = "ObjectWriter"
     BucketOwnerEnforced = "BucketOwnerEnforced"
 
 
-class ObjectStorageClass(StrEnum):
+class ObjectStorageClass(str):
     STANDARD = "STANDARD"
     REDUCED_REDUNDANCY = "REDUCED_REDUNDANCY"
     GLACIER = "GLACIER"
@@ -493,29 +470,29 @@ class ObjectStorageClass(StrEnum):
     EXPRESS_ONEZONE = "EXPRESS_ONEZONE"
 
 
-class ObjectVersionStorageClass(StrEnum):
+class ObjectVersionStorageClass(str):
     STANDARD = "STANDARD"
 
 
-class OptionalObjectAttributes(StrEnum):
+class OptionalObjectAttributes(str):
     RestoreStatus = "RestoreStatus"
 
 
-class OwnerOverride(StrEnum):
+class OwnerOverride(str):
     Destination = "Destination"
 
 
-class PartitionDateSource(StrEnum):
+class PartitionDateSource(str):
     EventTime = "EventTime"
     DeliveryTime = "DeliveryTime"
 
 
-class Payer(StrEnum):
+class Payer(str):
     Requester = "Requester"
     BucketOwner = "BucketOwner"
 
 
-class Permission(StrEnum):
+class Permission(str):
     FULL_CONTROL = "FULL_CONTROL"
     WRITE = "WRITE"
     WRITE_ACP = "WRITE_ACP"
@@ -523,27 +500,27 @@ class Permission(StrEnum):
     READ_ACP = "READ_ACP"
 
 
-class Protocol(StrEnum):
+class Protocol(str):
     http = "http"
     https = "https"
 
 
-class QuoteFields(StrEnum):
+class QuoteFields(str):
     ALWAYS = "ALWAYS"
     ASNEEDED = "ASNEEDED"
 
 
-class ReplicaModificationsStatus(StrEnum):
+class ReplicaModificationsStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class ReplicationRuleStatus(StrEnum):
+class ReplicationRuleStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class ReplicationStatus(StrEnum):
+class ReplicationStatus(str):
     COMPLETE = "COMPLETE"
     PENDING = "PENDING"
     FAILED = "FAILED"
@@ -551,40 +528,40 @@ class ReplicationStatus(StrEnum):
     COMPLETED = "COMPLETED"
 
 
-class ReplicationTimeStatus(StrEnum):
+class ReplicationTimeStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class RequestCharged(StrEnum):
+class RequestCharged(str):
     requester = "requester"
 
 
-class RequestPayer(StrEnum):
+class RequestPayer(str):
     requester = "requester"
 
 
-class RestoreRequestType(StrEnum):
+class RestoreRequestType(str):
     SELECT = "SELECT"
 
 
-class ServerSideEncryption(StrEnum):
+class ServerSideEncryption(str):
     AES256 = "AES256"
     aws_kms = "aws:kms"
     aws_kms_dsse = "aws:kms:dsse"
 
 
-class SessionMode(StrEnum):
+class SessionMode(str):
     ReadOnly = "ReadOnly"
     ReadWrite = "ReadWrite"
 
 
-class SseKmsEncryptedObjectsStatus(StrEnum):
+class SseKmsEncryptedObjectsStatus(str):
     Enabled = "Enabled"
     Disabled = "Disabled"
 
 
-class StorageClass(StrEnum):
+class StorageClass(str):
     STANDARD = "STANDARD"
     REDUCED_REDUNDANCY = "REDUCED_REDUNDANCY"
     STANDARD_IA = "STANDARD_IA"
@@ -598,27 +575,22 @@ class StorageClass(StrEnum):
     EXPRESS_ONEZONE = "EXPRESS_ONEZONE"
 
 
-class StorageClassAnalysisSchemaVersion(StrEnum):
+class StorageClassAnalysisSchemaVersion(str):
     V_1 = "V_1"
 
 
-class TaggingDirective(StrEnum):
+class TaggingDirective(str):
     COPY = "COPY"
     REPLACE = "REPLACE"
 
 
-class Tier(StrEnum):
+class Tier(str):
     Standard = "Standard"
     Bulk = "Bulk"
     Expedited = "Expedited"
 
 
-class TransitionDefaultMinimumObjectSize(StrEnum):
-    varies_by_storage_class = "varies_by_storage_class"
-    all_storage_classes_128K = "all_storage_classes_128K"
-
-
-class TransitionStorageClass(StrEnum):
+class TransitionStorageClass(str):
     GLACIER = "GLACIER"
     STANDARD_IA = "STANDARD_IA"
     ONEZONE_IA = "ONEZONE_IA"
@@ -627,7 +599,7 @@ class TransitionStorageClass(StrEnum):
     GLACIER_IR = "GLACIER_IR"
 
 
-class Type(StrEnum):
+class Type(str):
     CanonicalUser = "CanonicalUser"
     AmazonCustomerByEmail = "AmazonCustomerByEmail"
     Group = "Group"
@@ -646,30 +618,12 @@ class BucketAlreadyOwnedByYou(ServiceException):
     BucketName: Optional[BucketName]
 
 
-class EncryptionTypeMismatch(ServiceException):
-    code: str = "EncryptionTypeMismatch"
-    sender_fault: bool = False
-    status_code: int = 400
-
-
 class InvalidObjectState(ServiceException):
     code: str = "InvalidObjectState"
     sender_fault: bool = False
     status_code: int = 403
     StorageClass: Optional[StorageClass]
     AccessTier: Optional[IntelligentTieringAccessTier]
-
-
-class InvalidRequest(ServiceException):
-    code: str = "InvalidRequest"
-    sender_fault: bool = False
-    status_code: int = 400
-
-
-class InvalidWriteOffset(ServiceException):
-    code: str = "InvalidWriteOffset"
-    sender_fault: bool = False
-    status_code: int = 400
 
 
 class NoSuchBucket(ServiceException):
@@ -705,12 +659,6 @@ class ObjectNotInActiveTierError(ServiceException):
     code: str = "ObjectNotInActiveTierError"
     sender_fault: bool = False
     status_code: int = 403
-
-
-class TooManyParts(ServiceException):
-    code: str = "TooManyParts"
-    sender_fault: bool = False
-    status_code: int = 400
 
 
 class NoSuchLifecycleConfiguration(ServiceException):
@@ -993,38 +941,6 @@ class EntityTooLarge(ServiceException):
     ProposedSize: Optional[ProposedSize]
 
 
-class InvalidEncryptionAlgorithmError(ServiceException):
-    code: str = "InvalidEncryptionAlgorithmError"
-    sender_fault: bool = False
-    status_code: int = 400
-    ArgumentName: Optional[ArgumentName]
-    ArgumentValue: Optional[ArgumentValue]
-
-
-class NotImplemented(ServiceException):
-    code: str = "NotImplemented"
-    sender_fault: bool = False
-    status_code: int = 501
-    Header: Optional[Header]
-    additionalMessage: Optional[additionalMessage]
-
-
-class ConditionalRequestConflict(ServiceException):
-    code: str = "ConditionalRequestConflict"
-    sender_fault: bool = False
-    status_code: int = 409
-    Condition: Optional[IfCondition]
-    Key: Optional[ObjectKey]
-
-
-class BadDigest(ServiceException):
-    code: str = "BadDigest"
-    sender_fault: bool = False
-    status_code: int = 400
-    ExpectedDigest: Optional[ContentMD5]
-    CalculatedDigest: Optional[ContentMD5]
-
-
 AbortDate = datetime
 
 
@@ -1036,16 +952,12 @@ class AbortMultipartUploadOutput(TypedDict, total=False):
     RequestCharged: Optional[RequestCharged]
 
 
-IfMatchInitiatedTime = datetime
-
-
 class AbortMultipartUploadRequest(ServiceRequest):
     Bucket: BucketName
     Key: ObjectKey
     UploadId: MultipartUploadId
     RequestPayer: Optional[RequestPayer]
     ExpectedBucketOwner: Optional[AccountId]
-    IfMatchInitiatedTime: Optional[IfMatchInitiatedTime]
 
 
 class AccelerateConfiguration(TypedDict, total=False):
@@ -1140,7 +1052,6 @@ CreationDate = datetime
 class Bucket(TypedDict, total=False):
     Name: Optional[BucketName]
     CreationDate: Optional[CreationDate]
-    BucketRegion: Optional[BucketRegion]
 
 
 class BucketInfo(TypedDict, total=False):
@@ -1290,10 +1201,8 @@ class CSVOutput(TypedDict, total=False):
 class Checksum(TypedDict, total=False):
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
-    ChecksumType: Optional[ChecksumType]
 
 
 ChecksumAlgorithmList = List[ChecksumAlgorithm]
@@ -1323,10 +1232,8 @@ class CompleteMultipartUploadOutput(TypedDict, total=False):
     ETag: Optional[ETag]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
-    ChecksumType: Optional[ChecksumType]
     ServerSideEncryption: Optional[ServerSideEncryption]
     VersionId: Optional[ObjectVersionId]
     SSEKMSKeyId: Optional[SSEKMSKeyId]
@@ -1334,14 +1241,10 @@ class CompleteMultipartUploadOutput(TypedDict, total=False):
     RequestCharged: Optional[RequestCharged]
 
 
-MpuObjectSize = int
-
-
 class CompletedPart(TypedDict, total=False):
     ETag: Optional[ETag]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
     PartNumber: Optional[PartNumber]
@@ -1361,15 +1264,10 @@ class CompleteMultipartUploadRequest(ServiceRequest):
     UploadId: MultipartUploadId
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
-    ChecksumType: Optional[ChecksumType]
-    MpuObjectSize: Optional[MpuObjectSize]
     RequestPayer: Optional[RequestPayer]
     ExpectedBucketOwner: Optional[AccountId]
-    IfMatch: Optional[IfMatch]
-    IfNoneMatch: Optional[IfNoneMatch]
     SSECustomerAlgorithm: Optional[SSECustomerAlgorithm]
     SSECustomerKey: Optional[SSECustomerKey]
     SSECustomerKeyMD5: Optional[SSECustomerKeyMD5]
@@ -1393,10 +1291,8 @@ LastModified = datetime
 class CopyObjectResult(TypedDict, total=False):
     ETag: Optional[ETag]
     LastModified: Optional[LastModified]
-    ChecksumType: Optional[ChecksumType]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
 
@@ -1470,7 +1366,6 @@ class CopyPartResult(TypedDict, total=False):
     LastModified: Optional[LastModified]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
 
@@ -1484,23 +1379,6 @@ class CreateBucketConfiguration(TypedDict, total=False):
     LocationConstraint: Optional[BucketLocationConstraint]
     Location: Optional[LocationInfo]
     Bucket: Optional[BucketInfo]
-
-
-class S3TablesDestination(TypedDict, total=False):
-    TableBucketArn: S3TablesBucketArn
-    TableName: S3TablesName
-
-
-class MetadataTableConfiguration(TypedDict, total=False):
-    S3TablesDestination: S3TablesDestination
-
-
-class CreateBucketMetadataTableConfigurationRequest(ServiceRequest):
-    Bucket: BucketName
-    ContentMD5: Optional[ContentMD5]
-    ChecksumAlgorithm: Optional[ChecksumAlgorithm]
-    MetadataTableConfiguration: MetadataTableConfiguration
-    ExpectedBucketOwner: Optional[AccountId]
 
 
 class CreateBucketOutput(TypedDict, total=False):
@@ -1534,7 +1412,6 @@ class CreateMultipartUploadOutput(TypedDict, total=False):
     BucketKeyEnabled: Optional[BucketKeyEnabled]
     RequestCharged: Optional[RequestCharged]
     ChecksumAlgorithm: Optional[ChecksumAlgorithm]
-    ChecksumType: Optional[ChecksumType]
 
 
 class CreateMultipartUploadRequest(ServiceRequest):
@@ -1568,7 +1445,6 @@ class CreateMultipartUploadRequest(ServiceRequest):
     ObjectLockLegalHoldStatus: Optional[ObjectLockLegalHoldStatus]
     ExpectedBucketOwner: Optional[AccountId]
     ChecksumAlgorithm: Optional[ChecksumAlgorithm]
-    ChecksumType: Optional[ChecksumType]
 
 
 SessionExpiration = datetime
@@ -1582,20 +1458,12 @@ class SessionCredentials(TypedDict, total=False):
 
 
 class CreateSessionOutput(TypedDict, total=False):
-    ServerSideEncryption: Optional[ServerSideEncryption]
-    SSEKMSKeyId: Optional[SSEKMSKeyId]
-    SSEKMSEncryptionContext: Optional[SSEKMSEncryptionContext]
-    BucketKeyEnabled: Optional[BucketKeyEnabled]
     Credentials: SessionCredentials
 
 
 class CreateSessionRequest(ServiceRequest):
     SessionMode: Optional[SessionMode]
     Bucket: BucketName
-    ServerSideEncryption: Optional[ServerSideEncryption]
-    SSEKMSKeyId: Optional[SSEKMSKeyId]
-    SSEKMSEncryptionContext: Optional[SSEKMSEncryptionContext]
-    BucketKeyEnabled: Optional[BucketKeyEnabled]
 
 
 class DefaultRetention(TypedDict, total=False):
@@ -1604,16 +1472,9 @@ class DefaultRetention(TypedDict, total=False):
     Years: Optional[Years]
 
 
-Size = int
-LastModifiedTime = datetime
-
-
 class ObjectIdentifier(TypedDict, total=False):
     Key: ObjectKey
     VersionId: Optional[ObjectVersionId]
-    ETag: Optional[ETag]
-    LastModifiedTime: Optional[LastModifiedTime]
-    Size: Optional[Size]
 
 
 ObjectIdentifierList = List[ObjectIdentifier]
@@ -1652,11 +1513,6 @@ class DeleteBucketInventoryConfigurationRequest(ServiceRequest):
 
 
 class DeleteBucketLifecycleRequest(ServiceRequest):
-    Bucket: BucketName
-    ExpectedBucketOwner: Optional[AccountId]
-
-
-class DeleteBucketMetadataTableConfigurationRequest(ServiceRequest):
     Bucket: BucketName
     ExpectedBucketOwner: Optional[AccountId]
 
@@ -1718,10 +1574,6 @@ class DeleteObjectOutput(TypedDict, total=False):
     RequestCharged: Optional[RequestCharged]
 
 
-IfMatchSize = int
-IfMatchLastModifiedTime = datetime
-
-
 class DeleteObjectRequest(ServiceRequest):
     Bucket: BucketName
     Key: ObjectKey
@@ -1730,9 +1582,6 @@ class DeleteObjectRequest(ServiceRequest):
     RequestPayer: Optional[RequestPayer]
     BypassGovernanceRetention: Optional[BypassGovernanceRetention]
     ExpectedBucketOwner: Optional[AccountId]
-    IfMatch: Optional[IfMatch]
-    IfMatchLastModifiedTime: Optional[IfMatchLastModifiedTime]
-    IfMatchSize: Optional[IfMatchSize]
 
 
 class DeleteObjectTaggingOutput(TypedDict, total=False):
@@ -1826,11 +1675,6 @@ End = int
 
 class EndEvent(TypedDict, total=False):
     pass
-
-
-class ErrorDetails(TypedDict, total=False):
-    ErrorCode: Optional[ErrorCode]
-    ErrorMessage: Optional[ErrorMessage]
 
 
 class ErrorDocument(TypedDict, total=False):
@@ -2012,7 +1856,6 @@ class GetBucketInventoryConfigurationRequest(ServiceRequest):
 
 class GetBucketLifecycleConfigurationOutput(TypedDict, total=False):
     Rules: Optional[LifecycleRules]
-    TransitionDefaultMinimumObjectSize: Optional[TransitionDefaultMinimumObjectSize]
 
 
 class GetBucketLifecycleConfigurationRequest(ServiceRequest):
@@ -2057,32 +1900,6 @@ class GetBucketLoggingOutput(TypedDict, total=False):
 
 
 class GetBucketLoggingRequest(ServiceRequest):
-    Bucket: BucketName
-    ExpectedBucketOwner: Optional[AccountId]
-
-
-class S3TablesDestinationResult(TypedDict, total=False):
-    TableBucketArn: S3TablesBucketArn
-    TableName: S3TablesName
-    TableArn: S3TablesArn
-    TableNamespace: S3TablesNamespace
-
-
-class MetadataTableConfigurationResult(TypedDict, total=False):
-    S3TablesDestinationResult: S3TablesDestinationResult
-
-
-class GetBucketMetadataTableConfigurationResult(TypedDict, total=False):
-    MetadataTableConfigurationResult: MetadataTableConfigurationResult
-    Status: MetadataTableStatus
-    Error: Optional[ErrorDetails]
-
-
-class GetBucketMetadataTableConfigurationOutput(TypedDict, total=False):
-    GetBucketMetadataTableConfigurationResult: Optional[GetBucketMetadataTableConfigurationResult]
-
-
-class GetBucketMetadataTableConfigurationRequest(ServiceRequest):
     Bucket: BucketName
     ExpectedBucketOwner: Optional[AccountId]
 
@@ -2294,12 +2111,14 @@ class GetObjectAclRequest(ServiceRequest):
     ExpectedBucketOwner: Optional[AccountId]
 
 
+Size = int
+
+
 class ObjectPart(TypedDict, total=False):
     PartNumber: Optional[PartNumber]
     Size: Optional[Size]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
 
@@ -2390,10 +2209,8 @@ class GetObjectOutput(TypedDict, total=False):
     ETag: Optional[ETag]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
-    ChecksumType: Optional[ChecksumType]
     MissingMeta: Optional[MissingMeta]
     VersionId: Optional[ObjectVersionId]
     CacheControl: Optional[CacheControl]
@@ -2532,10 +2349,8 @@ class HeadObjectOutput(TypedDict, total=False):
     ContentLength: Optional[ContentLength]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
-    ChecksumType: Optional[ChecksumType]
     ETag: Optional[ETag]
     MissingMeta: Optional[MissingMeta]
     VersionId: Optional[ObjectVersionId]
@@ -2544,7 +2359,6 @@ class HeadObjectOutput(TypedDict, total=False):
     ContentEncoding: Optional[ContentEncoding]
     ContentLanguage: Optional[ContentLanguage]
     ContentType: Optional[ContentType]
-    ContentRange: Optional[ContentRange]
     Expires: Optional[Expires]
     WebsiteRedirectLocation: Optional[WebsiteRedirectLocation]
     ServerSideEncryption: Optional[ServerSideEncryption]
@@ -2571,12 +2385,6 @@ class HeadObjectRequest(ServiceRequest):
     IfUnmodifiedSince: Optional[IfUnmodifiedSince]
     Key: ObjectKey
     Range: Optional[Range]
-    ResponseCacheControl: Optional[ResponseCacheControl]
-    ResponseContentDisposition: Optional[ResponseContentDisposition]
-    ResponseContentEncoding: Optional[ResponseContentEncoding]
-    ResponseContentLanguage: Optional[ResponseContentLanguage]
-    ResponseContentType: Optional[ResponseContentType]
-    ResponseExpires: Optional[ResponseExpires]
     VersionId: Optional[ObjectVersionId]
     SSECustomerAlgorithm: Optional[SSECustomerAlgorithm]
     SSECustomerKey: Optional[SSECustomerKey]
@@ -2696,16 +2504,7 @@ class ListBucketMetricsConfigurationsRequest(ServiceRequest):
 
 class ListBucketsOutput(TypedDict, total=False):
     Owner: Optional[Owner]
-    ContinuationToken: Optional[NextToken]
-    Prefix: Optional[Prefix]
     Buckets: Optional[Buckets]
-
-
-class ListBucketsRequest(ServiceRequest):
-    MaxBuckets: Optional[MaxBuckets]
-    ContinuationToken: Optional[Token]
-    Prefix: Optional[Prefix]
-    BucketRegion: Optional[BucketRegion]
 
 
 class ListDirectoryBucketsOutput(TypedDict, total=False):
@@ -2726,7 +2525,6 @@ class MultipartUpload(TypedDict, total=False):
     Owner: Optional[Owner]
     Initiator: Optional[Initiator]
     ChecksumAlgorithm: Optional[ChecksumAlgorithm]
-    ChecksumType: Optional[ChecksumType]
 
 
 MultipartUploadList = List[MultipartUpload]
@@ -2771,7 +2569,6 @@ class RestoreStatus(TypedDict, total=False):
 class ObjectVersion(TypedDict, total=False):
     ETag: Optional[ETag]
     ChecksumAlgorithm: Optional[ChecksumAlgorithmList]
-    ChecksumType: Optional[ChecksumType]
     Size: Optional[Size]
     StorageClass: Optional[ObjectVersionStorageClass]
     Key: Optional[ObjectKey]
@@ -2823,7 +2620,6 @@ class Object(TypedDict, total=False):
     LastModified: Optional[LastModified]
     ETag: Optional[ETag]
     ChecksumAlgorithm: Optional[ChecksumAlgorithmList]
-    ChecksumType: Optional[ChecksumType]
     Size: Optional[Size]
     StorageClass: Optional[ObjectStorageClass]
     Owner: Optional[Owner]
@@ -2898,7 +2694,6 @@ class Part(TypedDict, total=False):
     Size: Optional[Size]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
 
@@ -2922,7 +2717,6 @@ class ListPartsOutput(TypedDict, total=False):
     StorageClass: Optional[StorageClass]
     RequestCharged: Optional[RequestCharged]
     ChecksumAlgorithm: Optional[ChecksumAlgorithm]
-    ChecksumType: Optional[ChecksumType]
 
 
 class ListPartsRequest(ServiceRequest):
@@ -3084,16 +2878,11 @@ class PutBucketInventoryConfigurationRequest(ServiceRequest):
     ExpectedBucketOwner: Optional[AccountId]
 
 
-class PutBucketLifecycleConfigurationOutput(TypedDict, total=False):
-    TransitionDefaultMinimumObjectSize: Optional[TransitionDefaultMinimumObjectSize]
-
-
 class PutBucketLifecycleConfigurationRequest(ServiceRequest):
     Bucket: BucketName
     ChecksumAlgorithm: Optional[ChecksumAlgorithm]
     LifecycleConfiguration: Optional[BucketLifecycleConfiguration]
     ExpectedBucketOwner: Optional[AccountId]
-    TransitionDefaultMinimumObjectSize: Optional[TransitionDefaultMinimumObjectSize]
 
 
 class PutBucketLifecycleRequest(ServiceRequest):
@@ -3263,10 +3052,8 @@ class PutObjectOutput(TypedDict, total=False):
     ETag: Optional[ETag]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
-    ChecksumType: Optional[ChecksumType]
     ServerSideEncryption: Optional[ServerSideEncryption]
     VersionId: Optional[ObjectVersionId]
     SSECustomerAlgorithm: Optional[SSECustomerAlgorithm]
@@ -3274,11 +3061,7 @@ class PutObjectOutput(TypedDict, total=False):
     SSEKMSKeyId: Optional[SSEKMSKeyId]
     SSEKMSEncryptionContext: Optional[SSEKMSEncryptionContext]
     BucketKeyEnabled: Optional[BucketKeyEnabled]
-    Size: Optional[Size]
     RequestCharged: Optional[RequestCharged]
-
-
-WriteOffsetBytes = int
 
 
 class PutObjectRequest(ServiceRequest):
@@ -3295,18 +3078,14 @@ class PutObjectRequest(ServiceRequest):
     ChecksumAlgorithm: Optional[ChecksumAlgorithm]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
     Expires: Optional[Expires]
-    IfMatch: Optional[IfMatch]
-    IfNoneMatch: Optional[IfNoneMatch]
     GrantFullControl: Optional[GrantFullControl]
     GrantRead: Optional[GrantRead]
     GrantReadACP: Optional[GrantReadACP]
     GrantWriteACP: Optional[GrantWriteACP]
     Key: ObjectKey
-    WriteOffsetBytes: Optional[WriteOffsetBytes]
     Metadata: Optional[Metadata]
     ServerSideEncryption: Optional[ServerSideEncryption]
     StorageClass: Optional[StorageClass]
@@ -3488,7 +3267,6 @@ class UploadPartOutput(TypedDict, total=False):
     ETag: Optional[ETag]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
     SSECustomerAlgorithm: Optional[SSECustomerAlgorithm]
@@ -3506,7 +3284,6 @@ class UploadPartRequest(ServiceRequest):
     ChecksumAlgorithm: Optional[ChecksumAlgorithm]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
     Key: ObjectKey
@@ -3536,7 +3313,6 @@ class WriteGetObjectResponseRequest(ServiceRequest):
     ContentType: Optional[ContentType]
     ChecksumCRC32: Optional[ChecksumCRC32]
     ChecksumCRC32C: Optional[ChecksumCRC32C]
-    ChecksumCRC64NVME: Optional[ChecksumCRC64NVME]
     ChecksumSHA1: Optional[ChecksumSHA1]
     ChecksumSHA256: Optional[ChecksumSHA256]
     DeleteMarker: Optional[DeleteMarker]
@@ -3604,7 +3380,6 @@ class S3Api:
         upload_id: MultipartUploadId,
         request_payer: RequestPayer = None,
         expected_bucket_owner: AccountId = None,
-        if_match_initiated_time: IfMatchInitiatedTime = None,
         **kwargs,
     ) -> AbortMultipartUploadOutput:
         raise NotImplementedError
@@ -3619,15 +3394,10 @@ class S3Api:
         multipart_upload: CompletedMultipartUpload = None,
         checksum_crc32: ChecksumCRC32 = None,
         checksum_crc32_c: ChecksumCRC32C = None,
-        checksum_crc64_nvme: ChecksumCRC64NVME = None,
         checksum_sha1: ChecksumSHA1 = None,
         checksum_sha256: ChecksumSHA256 = None,
-        checksum_type: ChecksumType = None,
-        mpu_object_size: MpuObjectSize = None,
         request_payer: RequestPayer = None,
         expected_bucket_owner: AccountId = None,
-        if_match: IfMatch = None,
-        if_none_match: IfNoneMatch = None,
         sse_customer_algorithm: SSECustomerAlgorithm = None,
         sse_customer_key: SSECustomerKey = None,
         sse_customer_key_md5: SSECustomerKeyMD5 = None,
@@ -3702,19 +3472,6 @@ class S3Api:
     ) -> CreateBucketOutput:
         raise NotImplementedError
 
-    @handler("CreateBucketMetadataTableConfiguration")
-    def create_bucket_metadata_table_configuration(
-        self,
-        context: RequestContext,
-        bucket: BucketName,
-        metadata_table_configuration: MetadataTableConfiguration,
-        content_md5: ContentMD5 = None,
-        checksum_algorithm: ChecksumAlgorithm = None,
-        expected_bucket_owner: AccountId = None,
-        **kwargs,
-    ) -> None:
-        raise NotImplementedError
-
     @handler("CreateMultipartUpload")
     def create_multipart_upload(
         self,
@@ -3749,7 +3506,6 @@ class S3Api:
         object_lock_legal_hold_status: ObjectLockLegalHoldStatus = None,
         expected_bucket_owner: AccountId = None,
         checksum_algorithm: ChecksumAlgorithm = None,
-        checksum_type: ChecksumType = None,
         **kwargs,
     ) -> CreateMultipartUploadOutput:
         raise NotImplementedError
@@ -3760,10 +3516,6 @@ class S3Api:
         context: RequestContext,
         bucket: BucketName,
         session_mode: SessionMode = None,
-        server_side_encryption: ServerSideEncryption = None,
-        ssekms_key_id: SSEKMSKeyId = None,
-        ssekms_encryption_context: SSEKMSEncryptionContext = None,
-        bucket_key_enabled: BucketKeyEnabled = None,
         **kwargs,
     ) -> CreateSessionOutput:
         raise NotImplementedError
@@ -3828,16 +3580,6 @@ class S3Api:
 
     @handler("DeleteBucketLifecycle")
     def delete_bucket_lifecycle(
-        self,
-        context: RequestContext,
-        bucket: BucketName,
-        expected_bucket_owner: AccountId = None,
-        **kwargs,
-    ) -> None:
-        raise NotImplementedError
-
-    @handler("DeleteBucketMetadataTableConfiguration")
-    def delete_bucket_metadata_table_configuration(
         self,
         context: RequestContext,
         bucket: BucketName,
@@ -3918,9 +3660,6 @@ class S3Api:
         request_payer: RequestPayer = None,
         bypass_governance_retention: BypassGovernanceRetention = None,
         expected_bucket_owner: AccountId = None,
-        if_match: IfMatch = None,
-        if_match_last_modified_time: IfMatchLastModifiedTime = None,
-        if_match_size: IfMatchSize = None,
         **kwargs,
     ) -> DeleteObjectOutput:
         raise NotImplementedError
@@ -4069,16 +3808,6 @@ class S3Api:
         expected_bucket_owner: AccountId = None,
         **kwargs,
     ) -> GetBucketLoggingOutput:
-        raise NotImplementedError
-
-    @handler("GetBucketMetadataTableConfiguration")
-    def get_bucket_metadata_table_configuration(
-        self,
-        context: RequestContext,
-        bucket: BucketName,
-        expected_bucket_owner: AccountId = None,
-        **kwargs,
-    ) -> GetBucketMetadataTableConfigurationOutput:
         raise NotImplementedError
 
     @handler("GetBucketMetricsConfiguration")
@@ -4345,12 +4074,6 @@ class S3Api:
         if_none_match: IfNoneMatch = None,
         if_unmodified_since: IfUnmodifiedSince = None,
         range: Range = None,
-        response_cache_control: ResponseCacheControl = None,
-        response_content_disposition: ResponseContentDisposition = None,
-        response_content_encoding: ResponseContentEncoding = None,
-        response_content_language: ResponseContentLanguage = None,
-        response_content_type: ResponseContentType = None,
-        response_expires: ResponseExpires = None,
         version_id: ObjectVersionId = None,
         sse_customer_algorithm: SSECustomerAlgorithm = None,
         sse_customer_key: SSECustomerKey = None,
@@ -4407,15 +4130,7 @@ class S3Api:
         raise NotImplementedError
 
     @handler("ListBuckets")
-    def list_buckets(
-        self,
-        context: RequestContext,
-        max_buckets: MaxBuckets = None,
-        continuation_token: Token = None,
-        prefix: Prefix = None,
-        bucket_region: BucketRegion = None,
-        **kwargs,
-    ) -> ListBucketsOutput:
+    def list_buckets(self, context: RequestContext, **kwargs) -> ListBucketsOutput:
         raise NotImplementedError
 
     @handler("ListDirectoryBuckets")
@@ -4630,9 +4345,8 @@ class S3Api:
         checksum_algorithm: ChecksumAlgorithm = None,
         lifecycle_configuration: BucketLifecycleConfiguration = None,
         expected_bucket_owner: AccountId = None,
-        transition_default_minimum_object_size: TransitionDefaultMinimumObjectSize = None,
         **kwargs,
-    ) -> PutBucketLifecycleConfigurationOutput:
+    ) -> None:
         raise NotImplementedError
 
     @handler("PutBucketLogging")
@@ -4796,17 +4510,13 @@ class S3Api:
         checksum_algorithm: ChecksumAlgorithm = None,
         checksum_crc32: ChecksumCRC32 = None,
         checksum_crc32_c: ChecksumCRC32C = None,
-        checksum_crc64_nvme: ChecksumCRC64NVME = None,
         checksum_sha1: ChecksumSHA1 = None,
         checksum_sha256: ChecksumSHA256 = None,
         expires: Expires = None,
-        if_match: IfMatch = None,
-        if_none_match: IfNoneMatch = None,
         grant_full_control: GrantFullControl = None,
         grant_read: GrantRead = None,
         grant_read_acp: GrantReadACP = None,
         grant_write_acp: GrantWriteACP = None,
-        write_offset_bytes: WriteOffsetBytes = None,
         metadata: Metadata = None,
         server_side_encryption: ServerSideEncryption = None,
         storage_class: StorageClass = None,
@@ -4975,7 +4685,6 @@ class S3Api:
         checksum_algorithm: ChecksumAlgorithm = None,
         checksum_crc32: ChecksumCRC32 = None,
         checksum_crc32_c: ChecksumCRC32C = None,
-        checksum_crc64_nvme: ChecksumCRC64NVME = None,
         checksum_sha1: ChecksumSHA1 = None,
         checksum_sha256: ChecksumSHA256 = None,
         sse_customer_algorithm: SSECustomerAlgorithm = None,
@@ -5034,7 +4743,6 @@ class S3Api:
         content_type: ContentType = None,
         checksum_crc32: ChecksumCRC32 = None,
         checksum_crc32_c: ChecksumCRC32C = None,
-        checksum_crc64_nvme: ChecksumCRC64NVME = None,
         checksum_sha1: ChecksumSHA1 = None,
         checksum_sha256: ChecksumSHA256 = None,
         delete_marker: DeleteMarker = None,

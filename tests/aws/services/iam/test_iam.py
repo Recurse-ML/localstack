@@ -1,14 +1,12 @@
 import json
-from urllib.parse import quote_plus
 
 import pytest
 from botocore.exceptions import ClientError
 
 from localstack.aws.api.iam import Tag
-from localstack.services.iam.iam_patches import ADDITIONAL_MANAGED_POLICIES
+from localstack.services.iam.provider import ADDITIONAL_MANAGED_POLICIES
 from localstack.testing.aws.util import create_client_with_keys, wait_for_user
 from localstack.testing.pytest import markers
-from localstack.utils.aws.arns import get_partition
 from localstack.utils.common import short_uid
 from localstack.utils.strings import long_uid
 
@@ -41,7 +39,7 @@ class TestIAMExtensions:
         user_response = iam_client_as_user.get_user()
         user = user_response["User"]
         assert user["UserName"] == user_name
-        assert user["Arn"] == f"arn:{get_partition(region_name)}:iam::{account_id}:user/{user_name}"
+        assert user["Arn"] == f"arn:aws:iam::{account_id}:user/{user_name}"
 
     @markers.aws.only_localstack
     def test_get_user_without_username_as_root(self, aws_client):
@@ -152,36 +150,6 @@ class TestIAMExtensions:
                 RoleName=role_name, AssumeRolePolicyDocument=assume_role_policy_document
             )
         snapshot.match("invalid-json", e.value.response)
-
-    @markers.aws.validated
-    def test_role_with_path_lifecycle(self, aws_client, snapshot):
-        snapshot.add_transformer(snapshot.transform.iam_api())
-        role_name = f"role-{short_uid()}"
-        path = f"/path{short_uid()}/"
-        snapshot.add_transformer(snapshot.transform.regex(path, "<path>"))
-        assume_policy_document = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Action": "sts:AssumeRole",
-                    "Principal": {"Service": "lambda.amazonaws.com"},
-                    "Effect": "Allow",
-                }
-            ],
-        }
-
-        create_role_response = aws_client.iam.create_role(
-            RoleName=role_name,
-            AssumeRolePolicyDocument=json.dumps(assume_policy_document),
-            Path=path,
-        )
-        snapshot.match("create-role-response", create_role_response)
-
-        get_role_response = aws_client.iam.get_role(RoleName=role_name)
-        snapshot.match("get-role-response", get_role_response)
-
-        delete_role_response = aws_client.iam.delete_role(RoleName=role_name)
-        snapshot.match("delete-role-response", delete_role_response)
 
 
 class TestIAMIntegrations:
@@ -362,14 +330,11 @@ class TestIAMIntegrations:
         aws_client.iam.delete_user(UserName=user_name)
 
     @markers.aws.validated
-    def test_attach_detach_role_policy(self, aws_client, region_name):
+    def test_attach_detach_role_policy(self, aws_client):
         role_name = f"s3-role-{short_uid()}"
         policy_name = f"s3-role-policy-{short_uid()}"
 
         policy_arns = [p["Arn"] for p in ADDITIONAL_MANAGED_POLICIES.values()]
-        policy_arns = [
-            arn.replace("arn:aws:", f"arn:{get_partition(region_name)}:") for arn in policy_arns
-        ]
 
         assume_policy_document = {
             "Version": "2012-10-17",
@@ -392,7 +357,7 @@ class TestIAMIntegrations:
                         "s3:ListBucket",
                     ],
                     "Effect": "Allow",
-                    "Resource": [f"arn:{get_partition(region_name)}:s3:::bucket_name"],
+                    "Resource": ["arn:aws:s3:::bucket_name"],
                 }
             ],
         }
@@ -743,119 +708,3 @@ class TestIAMIntegrations:
             UserName=user_name, PolicyArn=policy_arn
         )
         snapshot.match("valid_policy_arn", attach_policy_response)
-
-
-class TestIAMPolicyEncoding:
-    @markers.aws.validated
-    def test_put_user_policy_encoding(self, snapshot, aws_client, create_user, region_name):
-        snapshot.add_transformer(snapshot.transform.iam_api())
-
-        target_arn = quote_plus(f"arn:aws:apigateway:{region_name}::/restapis/aaeeieije")
-        policy_document = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": ["apigatway:PUT"],
-                    "Resource": [f"arn:aws:apigateway:{region_name}::/tags/{target_arn}"],
-                }
-            ],
-        }
-
-        user_name = f"test-user-{short_uid()}"
-        policy_name = f"test-policy-{short_uid()}"
-        create_user(UserName=user_name)
-
-        aws_client.iam.put_user_policy(
-            UserName=user_name, PolicyName=policy_name, PolicyDocument=json.dumps(policy_document)
-        )
-        get_policy_response = aws_client.iam.get_user_policy(
-            UserName=user_name, PolicyName=policy_name
-        )
-        snapshot.match("get-policy-response", get_policy_response)
-
-    @markers.aws.validated
-    def test_put_role_policy_encoding(self, snapshot, aws_client, create_role, region_name):
-        snapshot.add_transformer(snapshot.transform.iam_api())
-
-        target_arn = quote_plus(f"arn:aws:apigateway:{region_name}::/restapis/aaeeieije")
-        policy_document = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": ["apigatway:PUT"],
-                    "Resource": [f"arn:aws:apigateway:{region_name}::/tags/{target_arn}"],
-                }
-            ],
-        }
-        assume_policy_document = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Action": "sts:AssumeRole",
-                    "Principal": {"Service": "lambda.amazonaws.com"},
-                    "Effect": "Allow",
-                    "Condition": {"StringEquals": {"aws:SourceArn": target_arn}},
-                }
-            ],
-        }
-
-        role_name = f"test-role-{short_uid()}"
-        policy_name = f"test-policy-{short_uid()}"
-        path = f"/{short_uid()}/"
-        snapshot.add_transformer(snapshot.transform.key_value("Path"))
-        create_role_response = create_role(
-            RoleName=role_name,
-            AssumeRolePolicyDocument=json.dumps(assume_policy_document),
-            Path=path,
-        )
-        snapshot.match("create-role-response", create_role_response)
-
-        aws_client.iam.put_role_policy(
-            RoleName=role_name, PolicyName=policy_name, PolicyDocument=json.dumps(policy_document)
-        )
-        get_policy_response = aws_client.iam.get_role_policy(
-            RoleName=role_name, PolicyName=policy_name
-        )
-        snapshot.match("get-policy-response", get_policy_response)
-
-        get_role_response = aws_client.iam.get_role(RoleName=role_name)
-        snapshot.match("get-role-response", get_role_response)
-
-        list_roles_response = aws_client.iam.list_roles(PathPrefix=path)
-        snapshot.match("list-roles-response", list_roles_response)
-
-    @markers.aws.validated
-    def test_put_group_policy_encoding(self, snapshot, aws_client, region_name, cleanups):
-        snapshot.add_transformer(snapshot.transform.iam_api())
-
-        # create quoted target arn
-        target_arn = quote_plus(f"arn:aws:apigateway:{region_name}::/restapis/aaeeieije")
-        policy_document = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": ["apigatway:PUT"],
-                    "Resource": [f"arn:aws:apigateway:{region_name}::/tags/{target_arn}"],
-                }
-            ],
-        }
-
-        group_name = f"test-group-{short_uid()}"
-        policy_name = f"test-policy-{short_uid()}"
-        aws_client.iam.create_group(GroupName=group_name)
-        cleanups.append(lambda: aws_client.iam.delete_group(GroupName=group_name))
-
-        aws_client.iam.put_group_policy(
-            GroupName=group_name, PolicyName=policy_name, PolicyDocument=json.dumps(policy_document)
-        )
-        cleanups.append(
-            lambda: aws_client.iam.delete_group_policy(GroupName=group_name, PolicyName=policy_name)
-        )
-
-        get_policy_response = aws_client.iam.get_group_policy(
-            GroupName=group_name, PolicyName=policy_name
-        )
-        snapshot.match("get-policy-response", get_policy_response)

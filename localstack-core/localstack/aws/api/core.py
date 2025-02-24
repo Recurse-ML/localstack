@@ -80,8 +80,6 @@ class RequestContext(RoloRequestContext):
     """The botocore OperationModel of the AWS operation being invoked."""
     region: Optional[str]
     """The region the request is made to."""
-    partition: str
-    """The partition the request is made to."""
     account_id: Optional[str]
     """The account the request is made from."""
     request_id: Optional[str]
@@ -94,21 +92,17 @@ class RequestContext(RoloRequestContext):
     """The exception the AWS emulator backend may have raised."""
     internal_request_params: Optional[InternalRequestParameters]
     """Data sent by client-side LocalStack during internal calls."""
-    trace_context: dict
-    """Tracing metadata such as X-Ray trace headers"""
 
     def __init__(self, request=None) -> None:
         super().__init__(request)
         self.service = None
         self.operation = None
         self.region = None
-        self.partition = "aws"  # Sensible default - will be overwritten by region-handler
         self.account_id = None
         self.request_id = long_uid()
         self.service_request = None
         self.service_response = None
         self.service_exception = None
-        self.trace_context = {}
         self.internal_request_params = None
 
     @property

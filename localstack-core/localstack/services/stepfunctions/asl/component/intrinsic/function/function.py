@@ -2,7 +2,9 @@ import abc
 from typing import Final
 
 from localstack.services.stepfunctions.asl.component.eval_component import EvalComponent
-from localstack.services.stepfunctions.asl.component.intrinsic.argument.argument import ArgumentList
+from localstack.services.stepfunctions.asl.component.intrinsic.argument.function_argument_list import (
+    FunctionArgumentList,
+)
 from localstack.services.stepfunctions.asl.component.intrinsic.functionname.function_name import (
     FunctionName,
 )
@@ -10,8 +12,7 @@ from localstack.services.stepfunctions.asl.component.intrinsic.functionname.func
 
 class Function(EvalComponent, abc.ABC):
     name: FunctionName
-    argument_list: Final[ArgumentList]
 
-    def __init__(self, name: FunctionName, argument_list: ArgumentList):
+    def __init__(self, name: FunctionName, arg_list: FunctionArgumentList):
         self.name = name
-        self.argument_list = argument_list
+        self.arg_list: Final[FunctionArgumentList] = arg_list

@@ -1,4 +1,4 @@
-# A simple module to track deprecations over time / versions, and some simple functions guiding the affected users.
+# A simple module to track deprecations over time / versions, and some simple functions guiding affected users.
 import logging
 import os
 from dataclasses import dataclass
@@ -270,46 +270,10 @@ DEPRECATIONS = [
         "This option has no effect anymore. Please use OPENSEARCH_ENDPOINT_STRATEGY instead.",
     ),
     EnvVarDeprecation(
-        "PERSIST_ALL",
-        "2.3.2",
-        "LocalStack treats backends and assets the same with respect to persistence. Please remove PERSIST_ALL.",
-    ),
-    EnvVarDeprecation(
         "DNS_LOCAL_NAME_PATTERNS",
         "3.0.0",
         "This option was confusingly named. Please use DNS_NAME_PATTERNS_TO_RESOLVE_UPSTREAM "
         "instead.",
-    ),
-    EnvVarDeprecation(
-        "LAMBDA_EVENTS_INTERNAL_SQS",
-        "4.0.0",
-        "This option is ignored because the LocalStack SQS dependency for event invokes has been removed since 4.0.0"
-        " in favor of a lightweight Lambda-internal SQS implementation.",
-    ),
-    EnvVarDeprecation(
-        "LAMBDA_EVENT_SOURCE_MAPPING",
-        "4.0.0",
-        "This option has no effect anymore. Please remove this environment variable.",
-    ),
-    EnvVarDeprecation(
-        "LAMBDA_SQS_EVENT_SOURCE_MAPPING_INTERVAL_SEC",
-        "4.0.0",
-        "This option is not supported by the new Lambda Event Source Mapping v2 implementation."
-        " Please create a GitHub issue if you experience any performance challenges.",
-    ),
-    EnvVarDeprecation(
-        "PROVIDER_OVERRIDE_STEPFUNCTIONS",
-        "4.0.0",
-        "This option is ignored because the legacy StepFunctions provider (v1) has been removed since 4.0.0."
-        " Please remove PROVIDER_OVERRIDE_STEPFUNCTIONS.",
-    ),
-    EnvVarDeprecation(
-        "EVENT_RULE_ENGINE",
-        "4.0.3",
-        "This option is ignored because the Java-based event ruler has been removed since 4.1.0."
-        " Our latest Python-native implementation introduced in 4.0.3"
-        " is faster, achieves great AWS parity, and fixes compatibility issues with the StepFunctions JSONata feature."
-        " Please remove EVENT_RULE_ENGINE.",
     ),
 ]
 
@@ -333,7 +297,7 @@ def log_env_warning(deprecations: List[EnvVarDeprecation]) -> None:
     :param deprecations: list of affected deprecations to show a warning for
     """
     """
-    Logs a warning if a given environment variable is set (no matter what the value is).
+    Logs a warning if a given environment variable is set (no matter the value).
     :param env_var: to check
     :param deprecation_version: version with which the env variable has been deprecated
     """
@@ -358,24 +322,12 @@ def log_deprecation_warnings(deprecations: Optional[List[EnvVarDeprecation]] = N
     affected_deprecations = collect_affected_deprecations(deprecations)
     log_env_warning(affected_deprecations)
 
-    provider_override_events = os.environ.get("PROVIDER_OVERRIDE_EVENTS")
-    if provider_override_events and provider_override_events in ["v1", "legacy"]:
-        env_var_value = f"PROVIDER_OVERRIDE_EVENTS={provider_override_events}"
-        deprecation_version = "4.0.0"
-        deprecation_path = f"Remove {env_var_value} to use the new EventBridge implementation."
-        LOG.warning(
-            "%s is deprecated (since %s) and will be removed in upcoming releases of LocalStack! %s",
-            env_var_value,
-            deprecation_version,
-            deprecation_path,
-        )
-
 
 def deprecated_endpoint(
     endpoint: Callable, previous_path: str, deprecation_version: str, new_path: str
 ) -> Callable:
     """
-    Wrapper function which logs a warning (and a deprecation path) whenever a deprecated URL is invoked by the router.
+    Wrapper function which logs a warning (and a deprecation path) whenever a deprecated URL is invoked by a router.
 
     :param endpoint: to wrap (log a warning whenever it is invoked)
     :param previous_path: route path it is triggered by

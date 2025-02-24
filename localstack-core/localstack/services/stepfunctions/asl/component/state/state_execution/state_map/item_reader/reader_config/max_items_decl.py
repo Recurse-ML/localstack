@@ -12,13 +12,10 @@ from localstack.services.stepfunctions.asl.component.common.error_name.states_er
 from localstack.services.stepfunctions.asl.component.common.error_name.states_error_name_type import (
     StatesErrorNameType,
 )
-from localstack.services.stepfunctions.asl.component.common.string.string_expression import (
-    StringJSONata,
-    StringSampler,
-)
 from localstack.services.stepfunctions.asl.component.eval_component import EvalComponent
 from localstack.services.stepfunctions.asl.eval.environment import Environment
 from localstack.services.stepfunctions.asl.eval.event.event_detail import EventDetails
+from localstack.services.stepfunctions.asl.utils.json_path import JSONPathUtils
 
 
 class MaxItemsDecl(EvalComponent, abc.ABC):
@@ -45,14 +42,14 @@ class MaxItemsDecl(EvalComponent, abc.ABC):
         env.stack.append(max_items)
 
 
-class MaxItemsInt(MaxItemsDecl):
+class MaxItems(MaxItemsDecl):
     max_items: Final[int]
 
     def __init__(self, max_items: int = MaxItemsDecl.MAX_VALUE):
-        if max_items < 0 or max_items > MaxItemsInt.MAX_VALUE:
+        if max_items < 0 or max_items > MaxItems.MAX_VALUE:
             raise ValueError(
                 f"MaxItems value MUST be a non-negative integer "
-                f"non greater than '{MaxItemsInt.MAX_VALUE}', got '{max_items}'."
+                f"non greater than '{MaxItems.MAX_VALUE}', got '{max_items}'."
             )
         self.max_items = max_items
 
@@ -60,25 +57,13 @@ class MaxItemsInt(MaxItemsDecl):
         return self.max_items
 
 
-class MaxItemsStringJSONata(MaxItemsDecl):
-    string_jsonata: Final[StringJSONata]
-
-    def __init__(self, string_jsonata: StringJSONata):
-        super().__init__()
-        self.string_jsonata = string_jsonata
-
-    def _get_value(self, env: Environment) -> int:
-        # TODO: add snapshot tests to verify AWS's behaviour about non integer values.
-        self.string_jsonata.eval(env=env)
-        max_items: int = int(env.stack.pop())
-        return max_items
-
-
 class MaxItemsPath(MaxItemsDecl):
-    string_sampler: Final[StringSampler]
+    """
+    "MaxItemsPath": computes a MaxItems value equal to the reference path it points to.
+    """
 
-    def __init__(self, string_sampler: StringSampler):
-        self.string_sampler = string_sampler
+    def __init__(self, path: str):
+        self.path: Final[str] = path
 
     def _validate_value(self, env: Environment, value: int) -> None:
         if not isinstance(value, int):
@@ -95,7 +80,7 @@ class MaxItemsPath(MaxItemsDecl):
                             error=error_typ.to_name(),
                             cause=(
                                 f"The MaxItemsPath field refers to value '{value}' "
-                                f"which is not a valid integer: {self.string_sampler.literal_value}"
+                                f"which is not a valid integer: {self.path}"
                             ),
                         )
                     ),
@@ -118,13 +103,7 @@ class MaxItemsPath(MaxItemsDecl):
             )
 
     def _get_value(self, env: Environment) -> int:
-        self.string_sampler.eval(env=env)
-        max_items = env.stack.pop()
-        if isinstance(max_items, str):
-            try:
-                max_items = int(max_items)
-            except Exception:
-                # Pass incorrect type forward for validation and error reporting
-                pass
+        inp = env.stack[-1]
+        max_items = JSONPathUtils.extract_json(self.path, inp)
         self._validate_value(env=env, value=max_items)
         return max_items

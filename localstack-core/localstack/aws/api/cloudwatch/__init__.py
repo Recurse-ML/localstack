@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -27,10 +26,6 @@ DatapointValue = float
 DatapointsToAlarm = int
 DimensionName = str
 DimensionValue = str
-EntityAttributesMapKeyString = str
-EntityAttributesMapValueString = str
-EntityKeyAttributesMapKeyString = str
-EntityKeyAttributesMapValueString = str
 ErrorMessage = str
 EvaluateLowSampleCountPercentile = str
 EvaluationPeriods = int
@@ -86,7 +81,6 @@ Stat = str
 StateReason = str
 StateReasonData = str
 StorageResolution = int
-StrictEntityValidation = bool
 SuppressorPeriod = int
 TagKey = str
 TagValue = str
@@ -95,29 +89,29 @@ Threshold = float
 TreatMissingData = str
 
 
-class ActionsSuppressedBy(StrEnum):
+class ActionsSuppressedBy(str):
     WaitPeriod = "WaitPeriod"
     ExtensionPeriod = "ExtensionPeriod"
     Alarm = "Alarm"
 
 
-class AlarmType(StrEnum):
+class AlarmType(str):
     CompositeAlarm = "CompositeAlarm"
     MetricAlarm = "MetricAlarm"
 
 
-class AnomalyDetectorStateValue(StrEnum):
+class AnomalyDetectorStateValue(str):
     PENDING_TRAINING = "PENDING_TRAINING"
     TRAINED_INSUFFICIENT_DATA = "TRAINED_INSUFFICIENT_DATA"
     TRAINED = "TRAINED"
 
 
-class AnomalyDetectorType(StrEnum):
+class AnomalyDetectorType(str):
     SINGLE_METRIC = "SINGLE_METRIC"
     METRIC_MATH = "METRIC_MATH"
 
 
-class ComparisonOperator(StrEnum):
+class ComparisonOperator(str):
     GreaterThanOrEqualToThreshold = "GreaterThanOrEqualToThreshold"
     GreaterThanThreshold = "GreaterThanThreshold"
     LessThanThreshold = "LessThanThreshold"
@@ -127,32 +121,32 @@ class ComparisonOperator(StrEnum):
     GreaterThanUpperThreshold = "GreaterThanUpperThreshold"
 
 
-class EvaluationState(StrEnum):
+class EvaluationState(str):
     PARTIAL_DATA = "PARTIAL_DATA"
 
 
-class HistoryItemType(StrEnum):
+class HistoryItemType(str):
     ConfigurationUpdate = "ConfigurationUpdate"
     StateUpdate = "StateUpdate"
     Action = "Action"
 
 
-class MetricStreamOutputFormat(StrEnum):
+class MetricStreamOutputFormat(str):
     json = "json"
     opentelemetry0_7 = "opentelemetry0.7"
     opentelemetry1_0 = "opentelemetry1.0"
 
 
-class RecentlyActive(StrEnum):
+class RecentlyActive(str):
     PT3H = "PT3H"
 
 
-class ScanBy(StrEnum):
+class ScanBy(str):
     TimestampDescending = "TimestampDescending"
     TimestampAscending = "TimestampAscending"
 
 
-class StandardUnit(StrEnum):
+class StandardUnit(str):
     Seconds = "Seconds"
     Microseconds = "Microseconds"
     Milliseconds = "Milliseconds"
@@ -182,13 +176,13 @@ class StandardUnit(StrEnum):
     None_ = "None"
 
 
-class StateValue(StrEnum):
+class StateValue(str):
     OK = "OK"
     ALARM = "ALARM"
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 
 
-class Statistic(StrEnum):
+class Statistic(str):
     SampleCount = "SampleCount"
     Average = "Average"
     Sum = "Sum"
@@ -196,7 +190,7 @@ class Statistic(StrEnum):
     Maximum = "Maximum"
 
 
-class StatusCode(StrEnum):
+class StatusCode(str):
     Complete = "Complete"
     InternalError = "InternalError"
     PartialData = "PartialData"
@@ -648,46 +642,6 @@ class EnableInsightRulesOutput(TypedDict, total=False):
     Failures: Optional[BatchFailures]
 
 
-EntityAttributesMap = Dict[EntityAttributesMapKeyString, EntityAttributesMapValueString]
-EntityKeyAttributesMap = Dict[EntityKeyAttributesMapKeyString, EntityKeyAttributesMapValueString]
-
-
-class Entity(TypedDict, total=False):
-    KeyAttributes: Optional[EntityKeyAttributesMap]
-    Attributes: Optional[EntityAttributesMap]
-
-
-Values = List[DatapointValue]
-
-
-class StatisticSet(TypedDict, total=False):
-    SampleCount: DatapointValue
-    Sum: DatapointValue
-    Minimum: DatapointValue
-    Maximum: DatapointValue
-
-
-class MetricDatum(TypedDict, total=False):
-    MetricName: MetricName
-    Dimensions: Optional[Dimensions]
-    Timestamp: Optional[Timestamp]
-    Value: Optional[DatapointValue]
-    StatisticValues: Optional[StatisticSet]
-    Values: Optional[Values]
-    Counts: Optional[Counts]
-    Unit: Optional[StandardUnit]
-    StorageResolution: Optional[StorageResolution]
-
-
-MetricData = List[MetricDatum]
-
-
-class EntityMetricData(TypedDict, total=False):
-    Entity: Optional[Entity]
-    MetricData: Optional[MetricData]
-
-
-EntityMetricDataList = List[EntityMetricData]
 ExtendedStatistics = List[ExtendedStatistic]
 
 
@@ -978,6 +932,29 @@ class ManagedRule(TypedDict, total=False):
 
 
 ManagedRules = List[ManagedRule]
+Values = List[DatapointValue]
+
+
+class StatisticSet(TypedDict, total=False):
+    SampleCount: DatapointValue
+    Sum: DatapointValue
+    Minimum: DatapointValue
+    Maximum: DatapointValue
+
+
+class MetricDatum(TypedDict, total=False):
+    MetricName: MetricName
+    Dimensions: Optional[Dimensions]
+    Timestamp: Optional[Timestamp]
+    Value: Optional[DatapointValue]
+    StatisticValues: Optional[StatisticSet]
+    Values: Optional[Values]
+    Counts: Optional[Counts]
+    Unit: Optional[StandardUnit]
+    StorageResolution: Optional[StorageResolution]
+
+
+MetricData = List[MetricDatum]
 MetricStreamNames = List[MetricStreamName]
 
 
@@ -1065,9 +1042,7 @@ class PutMetricAlarmInput(ServiceRequest):
 
 class PutMetricDataInput(ServiceRequest):
     Namespace: Namespace
-    MetricData: Optional[MetricData]
-    EntityMetricData: Optional[EntityMetricDataList]
-    StrictEntityValidation: Optional[StrictEntityValidation]
+    MetricData: MetricData
 
 
 class PutMetricStreamInput(ServiceRequest):
@@ -1482,13 +1457,7 @@ class CloudwatchApi:
 
     @handler("PutMetricData")
     def put_metric_data(
-        self,
-        context: RequestContext,
-        namespace: Namespace,
-        metric_data: MetricData = None,
-        entity_metric_data: EntityMetricDataList = None,
-        strict_entity_validation: StrictEntityValidation = None,
-        **kwargs,
+        self, context: RequestContext, namespace: Namespace, metric_data: MetricData, **kwargs
     ) -> None:
         raise NotImplementedError
 

@@ -77,8 +77,7 @@ EMAILS_ENDPOINT = "/_aws/ses"
 
 _EMAILS_ENDPOINT_REGISTERED = False
 
-REGEX_TAG_NAME = r"^[A-Za-z0-9_-]*$"
-REGEX_TAG_VALUE = r"^[A-Za-z0-9_\-.@]*$"
+ALLOWED_TAG_CHARS = "^[A-Za-z0-9_-]*$"
 
 ALLOWED_TAG_LEN = 255
 
@@ -231,7 +230,7 @@ class SesProvider(SesApi, ServiceLifecycleHook):
         # TODO: contribute upstream?
         backend = get_ses_backend(context)
         try:
-            backend.config_sets.pop(configuration_set_name)
+            backend.config_set.pop(configuration_set_name)
         except KeyError:
             raise ConfigurationSetDoesNotExistException(
                 f"Configuration set <{configuration_set_name}> does not exist."
@@ -252,7 +251,7 @@ class SesProvider(SesApi, ServiceLifecycleHook):
         backend = get_ses_backend(context)
 
         # the configuration set must exist
-        if configuration_set_name not in backend.config_sets:
+        if configuration_set_name not in backend.config_set:
             raise ConfigurationSetDoesNotExistException(
                 f"Configuration set <{configuration_set_name}> does not exist."
             )
@@ -342,17 +341,15 @@ class SesProvider(SesApi, ServiceLifecycleHook):
                     raise InvalidParameterValue("The tag value must be specified.")
                 if len(tag_name) > 255:
                     raise InvalidParameterValue("Tag name cannot exceed 255 characters.")
-                # The `ses:` prefix is for a special case and disregarded for validation
-                # see https://docs.aws.amazon.com/ses/latest/dg/monitor-using-event-publishing.html#event-publishing-fine-grained-feedback
-                if not re.match(REGEX_TAG_NAME, tag_name.removeprefix("ses:")):
+                if not re.match(ALLOWED_TAG_CHARS, tag_name):
                     raise InvalidParameterValue(
-                        f"Invalid tag name <{tag_name}>: only alphanumeric ASCII characters, '_',  '-' are allowed.",
+                        f"Invalid tag name <{tag_name}>: only alphanumeric ASCII characters, '_', and '-' are allowed.",
                     )
                 if len(tag_value) > 255:
                     raise InvalidParameterValue("Tag value cannot exceed 255 characters.")
-                if not re.match(REGEX_TAG_VALUE, tag_value):
+                if not re.match(ALLOWED_TAG_CHARS, tag_value):
                     raise InvalidParameterValue(
-                        f"Invalid tag value <{tag_value}>: only alphanumeric ASCII characters, '_',  '-' , '.', '@' are allowed.",
+                        f"Invalid tag value <{tag_value}>: only alphanumeric ASCII characters, '_', and '-' are allowed.",
                     )
 
         response = call_moto(context)
@@ -581,7 +578,7 @@ class SNSEmitter:
 
         if emit_source_arn:
             event_payload["mail"]["sourceArn"] = (
-                f"arn:{self.context.partition}:ses:{self.context.region}:{self.context.account_id}:identity/{payload.sender_email}"
+                f"arn:aws:ses:{self.context.region}:{self.context.account_id}:identity/{payload.sender_email}"
             )
 
         client = self._client_for_topic(sns_topic_arn)
@@ -606,7 +603,7 @@ class SNSEmitter:
             "mail": {
                 "timestamp": now.isoformat(),
                 "source": payload.sender_email,
-                "sourceArn": f"arn:{self.context.partition}:ses:{self.context.region}:{self.context.account_id}:identity/{payload.sender_email}",
+                "sourceArn": f"arn:aws:ses:{self.context.region}:{self.context.account_id}:identity/{payload.sender_email}",
                 "sendingAccountId": self.context.account_id,
                 "destination": payload.destination_addresses,
                 "messageId": payload.message_id,
@@ -642,6 +639,4 @@ class SNSEmitter:
 
 class InvalidParameterValue(CommonServiceException):
     def __init__(self, message=None):
-        super().__init__(
-            "InvalidParameterValue", status_code=400, message=message, sender_fault=True
-        )
+        super().__init__("InvalidParameterValue", status_code=400, message=message)

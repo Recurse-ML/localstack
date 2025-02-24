@@ -159,15 +159,6 @@ def checksum_crc32c(string: Union[str, bytes]):
     return base64.b64encode(checksum.digest()).decode()
 
 
-def checksum_crc64nvme(string: Union[str, bytes]):
-    # import botocore locally here to avoid a dependency of the CLI to botocore
-    from botocore.httpchecksum import CrtCrc64NvmeChecksum
-
-    checksum = CrtCrc64NvmeChecksum()
-    checksum.update(to_bytes(string))
-    return base64.b64encode(checksum.digest()).decode()
-
-
 def hash_sha1(string: Union[str, bytes]) -> str:
     digest = hashlib.sha1(to_bytes(string)).digest()
     return base64.b64encode(digest).decode()
@@ -203,28 +194,3 @@ def remove_leading_extra_slashes(input: str) -> str:
     Example: '///foo/bar' -> '/foo/bar'
     """
     return re.sub(r"^/+", "/", input)
-
-
-def prepend_with_slash(input: str) -> str:
-    """
-    Prepend a slash `/` to a given string if it does not have one already.
-    """
-    if not input.startswith("/"):
-        return f"/{input}"
-    return input
-
-
-def key_value_pairs_to_dict(pairs: str, delimiter: str = ",", separator: str = "=") -> dict:
-    """
-    Converts a string of key-value pairs to a dictionary.
-
-    Args:
-        pairs (str): A string containing key-value pairs separated by a delimiter.
-        delimiter (str): The delimiter used to separate key-value pairs (default is comma ',').
-        separator (str): The separator between keys and values (default is '=').
-
-    Returns:
-        dict: A dictionary containing the parsed key-value pairs.
-    """
-    splits = [split_pair.partition(separator) for split_pair in pairs.split(delimiter)]
-    return {key.strip(): value.strip() for key, _, value in splits}

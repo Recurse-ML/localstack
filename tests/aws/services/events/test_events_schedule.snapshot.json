@@ -3,7 +3,7 @@
     "recorded-date": "14-05-2024, 11:23:22",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -12,7 +12,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "rate(1 minute)",
@@ -42,7 +42,7 @@
       "list-targets": {
         "Targets": [
           {
-            "Arn": "arn:<partition>:sqs:<region>:111111111111:<queue-name",
+            "Arn": "arn:aws:sqs:<region>:111111111111:<queue-name",
             "Id": "<target-id>"
           }
         ],
@@ -65,7 +65,7 @@
             "time": "date",
             "region": "<region>",
             "resources": [
-              "arn:<partition>:events:<region>:111111111111:rule/<rule-name>"
+              "arn:aws:events:<region>:111111111111:rule/<rule-name>"
             ],
             "detail": {}
           }
@@ -85,7 +85,7 @@
             "time": "date",
             "region": "<region>",
             "resources": [
-              "arn:<partition>:events:<region>:111111111111:rule/<rule-name>"
+              "arn:aws:events:<region>:111111111111:rule/<rule-name>"
             ],
             "detail": {}
           }
@@ -97,7 +97,7 @@
     "recorded-date": "14-05-2024, 14:50:51",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -106,7 +106,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(0 20 * * ? *)",
@@ -137,7 +137,7 @@
             "time": "date",
             "region": "<region>",
             "resources": [
-              "arn:<partition>:events:<region>:111111111111:rule/<rule-name>"
+              "arn:aws:events:<region>:111111111111:rule/<rule-name>"
             ],
             "detail": {}
           }
@@ -146,10 +146,10 @@
     }
   },
   "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0 10 * * ? *)]": {
-    "recorded-date": "22-01-2025, 13:22:45",
+    "recorded-date": "14-05-2024, 15:43:09",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -158,7 +158,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(0 10 * * ? *)",
@@ -173,10 +173,10 @@
     }
   },
   "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(15 12 * * ? *)]": {
-    "recorded-date": "22-01-2025, 13:22:46",
+    "recorded-date": "14-05-2024, 15:43:09",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -185,7 +185,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(15 12 * * ? *)",
@@ -200,10 +200,10 @@
     }
   },
   "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0 18 ? * MON-FRI *)]": {
-    "recorded-date": "22-01-2025, 13:22:47",
+    "recorded-date": "14-05-2024, 15:43:10",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -212,7 +212,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(0 18 ? * MON-FRI *)",
@@ -227,10 +227,10 @@
     }
   },
   "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0 8 1 * ? *)]": {
-    "recorded-date": "22-01-2025, 13:22:47",
+    "recorded-date": "14-05-2024, 15:43:11",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -239,7 +239,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(0 8 1 * ? *)",
@@ -254,10 +254,10 @@
     }
   },
   "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0/15 * * * ? *)]": {
-    "recorded-date": "22-01-2025, 13:22:48",
+    "recorded-date": "14-05-2024, 15:43:12",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -266,7 +266,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(0/15 * * * ? *)",
@@ -281,10 +281,10 @@
     }
   },
   "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0/10 * ? * MON-FRI *)]": {
-    "recorded-date": "22-01-2025, 13:22:48",
+    "recorded-date": "14-05-2024, 15:43:12",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -293,7 +293,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(0/10 * ? * MON-FRI *)",
@@ -308,10 +308,10 @@
     }
   },
   "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0/5 8-17 ? * MON-FRI *)]": {
-    "recorded-date": "22-01-2025, 13:22:49",
+    "recorded-date": "14-05-2024, 15:43:13",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -320,7 +320,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(0/5 8-17 ? * MON-FRI *)",
@@ -335,10 +335,10 @@
     }
   },
   "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0/30 20-23 ? * MON-FRI *)]": {
-    "recorded-date": "22-01-2025, 13:22:49",
+    "recorded-date": "14-05-2024, 15:43:14",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -347,7 +347,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(0/30 20-23 ? * MON-FRI *)",
@@ -362,10 +362,10 @@
     }
   },
   "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0/30 0-2 ? * MON-FRI *)]": {
-    "recorded-date": "22-01-2025, 13:22:50",
+    "recorded-date": "14-05-2024, 15:43:14",
     "recorded-content": {
       "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+        "RuleArn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -374,7 +374,7 @@
       "list-rules": {
         "Rules": [
           {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
+            "Arn": "arn:aws:events:<region>:111111111111:rule/<rule-name>",
             "EventBusName": "default",
             "Name": "<rule-name>",
             "ScheduleExpression": "cron(0/30 0-2 ? * MON-FRI *)",
@@ -416,270 +416,6 @@
           }
         }
       ]
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_invalid_schedule_cron[cron(INVALID)]": {
-    "recorded-date": "22-01-2025, 13:55:49",
-    "recorded-content": {
-      "invalid-put-rule": {
-        "Error": {
-          "Code": "ValidationException",
-          "Message": "Parameter ScheduleExpression is not valid."
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 400
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_invalid_schedule_cron[cron(0 dummy ? * MON-FRI *)]": {
-    "recorded-date": "22-01-2025, 13:55:50",
-    "recorded-content": {
-      "invalid-put-rule": {
-        "Error": {
-          "Code": "ValidationException",
-          "Message": "Parameter ScheduleExpression is not valid."
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 400
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0 2 ? * SAT *)]": {
-    "recorded-date": "22-01-2025, 13:22:42",
-    "recorded-content": {
-      "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "list-rules": {
-        "Rules": [
-          {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-            "EventBusName": "default",
-            "Name": "<rule-name>",
-            "ScheduleExpression": "cron(0 2 ? * SAT *)",
-            "State": "ENABLED"
-          }
-        ],
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0 12 * * ? *)]": {
-    "recorded-date": "22-01-2025, 13:22:42",
-    "recorded-content": {
-      "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "list-rules": {
-        "Rules": [
-          {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-            "EventBusName": "default",
-            "Name": "<rule-name>",
-            "ScheduleExpression": "cron(0 12 * * ? *)",
-            "State": "ENABLED"
-          }
-        ],
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(5,35 14 * * ? *)]": {
-    "recorded-date": "22-01-2025, 13:22:43",
-    "recorded-content": {
-      "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "list-rules": {
-        "Rules": [
-          {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-            "EventBusName": "default",
-            "Name": "<rule-name>",
-            "ScheduleExpression": "cron(5,35 14 * * ? *)",
-            "State": "ENABLED"
-          }
-        ],
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(15 10 ? * 6L 2002-2005)]": {
-    "recorded-date": "22-01-2025, 13:22:43",
-    "recorded-content": {
-      "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "list-rules": {
-        "Rules": [
-          {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-            "EventBusName": "default",
-            "Name": "<rule-name>",
-            "ScheduleExpression": "cron(15 10 ? * 6L 2002-2005)",
-            "State": "ENABLED"
-          }
-        ],
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0 2 ? * SAT#3 *)]": {
-    "recorded-date": "22-01-2025, 13:22:44",
-    "recorded-content": {
-      "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "list-rules": {
-        "Rules": [
-          {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-            "EventBusName": "default",
-            "Name": "<rule-name>",
-            "ScheduleExpression": "cron(0 2 ? * SAT#3 *)",
-            "State": "ENABLED"
-          }
-        ],
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(* * ? * SAT#3 *)]": {
-    "recorded-date": "22-01-2025, 13:22:44",
-    "recorded-content": {
-      "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "list-rules": {
-        "Rules": [
-          {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-            "EventBusName": "default",
-            "Name": "<rule-name>",
-            "ScheduleExpression": "cron(* * ? * SAT#3 *)",
-            "State": "ENABLED"
-          }
-        ],
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_schedule_cron[cron(0/5 5 ? JAN 1-5 2022)]": {
-    "recorded-date": "22-01-2025, 13:22:45",
-    "recorded-content": {
-      "put-rule": {
-        "RuleArn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "list-rules": {
-        "Rules": [
-          {
-            "Arn": "arn:<partition>:events:<region>:111111111111:rule/<rule-name>",
-            "EventBusName": "default",
-            "Name": "<rule-name>",
-            "ScheduleExpression": "cron(0/5 5 ? JAN 1-5 2022)",
-            "State": "ENABLED"
-          }
-        ],
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_invalid_schedule_cron[cron(7 20 * * NOT *)]": {
-    "recorded-date": "22-01-2025, 13:55:49",
-    "recorded-content": {
-      "invalid-put-rule": {
-        "Error": {
-          "Code": "ValidationException",
-          "Message": "Parameter ScheduleExpression is not valid."
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 400
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_invalid_schedule_cron[cron(71 8 1 * ? *)]": {
-    "recorded-date": "22-01-2025, 13:55:50",
-    "recorded-content": {
-      "invalid-put-rule": {
-        "Error": {
-          "Code": "ValidationException",
-          "Message": "Parameter ScheduleExpression is not valid."
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 400
-        }
-      }
-    }
-  },
-  "tests/aws/services/events/test_events_schedule.py::TestScheduleCron::tests_put_rule_with_invalid_schedule_cron[cron(0 1 * * * *)]": {
-    "recorded-date": "22-01-2025, 13:55:48",
-    "recorded-content": {
-      "invalid-put-rule": {
-        "Error": {
-          "Code": "ValidationException",
-          "Message": "Parameter ScheduleExpression is not valid."
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 400
-        }
-      }
     }
   }
 }

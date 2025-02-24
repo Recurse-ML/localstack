@@ -275,10 +275,8 @@ def convert_data_types(type_conversions: dict[str, Callable], params: dict) -> d
 
 def log_not_available_message(resource_type: str, message: str):
     LOG.warning(
-        "%s. To find out if %s is supported in LocalStack Pro, "
-        "please check out our docs at https://docs.localstack.cloud/user-guide/aws/cloudformation/#resources-pro--enterprise-edition",
-        message,
-        resource_type,
+        f"{message}. To find out if {resource_type} is supported in LocalStack Pro, "
+        "please check out our docs at https://docs.localstack.cloud/user-guide/aws/cloudformation/#resources-pro--enterprise-edition"
     )
 
 

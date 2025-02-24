@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -15,7 +14,6 @@ DeletionTaskIdType = str
 EvalDecisionSourceType = str
 LineNumber = int
 OpenIDConnectProviderUrlType = str
-OrganizationIdType = str
 PolicyIdentifierType = str
 ReasonType = str
 RegionNameType = str
@@ -81,7 +79,6 @@ policyNameType = str
 policyNotAttachableMessage = str
 policyPathType = str
 policyVersionIdType = str
-privateKeyIdType = str
 privateKeyType = str
 publicKeyFingerprintType = str
 publicKeyIdType = str
@@ -112,12 +109,12 @@ userNameType = str
 virtualMFADeviceName = str
 
 
-class AccessAdvisorUsageGranularityType(StrEnum):
+class AccessAdvisorUsageGranularityType(str):
     SERVICE_LEVEL = "SERVICE_LEVEL"
     ACTION_LEVEL = "ACTION_LEVEL"
 
 
-class ContextKeyTypeEnum(StrEnum):
+class ContextKeyTypeEnum(str):
     string = "string"
     stringList = "stringList"
     numeric = "numeric"
@@ -132,14 +129,14 @@ class ContextKeyTypeEnum(StrEnum):
     dateList = "dateList"
 
 
-class DeletionTaskStatusType(StrEnum):
+class DeletionTaskStatusType(str):
     SUCCEEDED = "SUCCEEDED"
     IN_PROGRESS = "IN_PROGRESS"
     FAILED = "FAILED"
     NOT_STARTED = "NOT_STARTED"
 
 
-class EntityType(StrEnum):
+class EntityType(str):
     User = "User"
     Role = "Role"
     Group = "Group"
@@ -147,22 +144,17 @@ class EntityType(StrEnum):
     AWSManagedPolicy = "AWSManagedPolicy"
 
 
-class FeatureType(StrEnum):
-    RootCredentialsManagement = "RootCredentialsManagement"
-    RootSessions = "RootSessions"
-
-
-class PermissionsBoundaryAttachmentType(StrEnum):
+class PermissionsBoundaryAttachmentType(str):
     PermissionsBoundaryPolicy = "PermissionsBoundaryPolicy"
 
 
-class PolicyEvaluationDecisionType(StrEnum):
+class PolicyEvaluationDecisionType(str):
     allowed = "allowed"
     explicitDeny = "explicitDeny"
     implicitDeny = "implicitDeny"
 
 
-class PolicySourceType(StrEnum):
+class PolicySourceType(str):
     user = "user"
     group = "group"
     role = "role"
@@ -172,78 +164,73 @@ class PolicySourceType(StrEnum):
     none = "none"
 
 
-class PolicyUsageType(StrEnum):
+class PolicyUsageType(str):
     PermissionsPolicy = "PermissionsPolicy"
     PermissionsBoundary = "PermissionsBoundary"
 
 
-class ReportFormatType(StrEnum):
+class ReportFormatType(str):
     text_csv = "text/csv"
 
 
-class ReportStateType(StrEnum):
+class ReportStateType(str):
     STARTED = "STARTED"
     INPROGRESS = "INPROGRESS"
     COMPLETE = "COMPLETE"
 
 
-class assertionEncryptionModeType(StrEnum):
-    Required = "Required"
-    Allowed = "Allowed"
-
-
-class assignmentStatusType(StrEnum):
+class assignmentStatusType(str):
     Assigned = "Assigned"
     Unassigned = "Unassigned"
     Any = "Any"
 
 
-class encodingType(StrEnum):
+class encodingType(str):
     SSH = "SSH"
     PEM = "PEM"
 
 
-class globalEndpointTokenVersion(StrEnum):
+class globalEndpointTokenVersion(str):
     v1Token = "v1Token"
     v2Token = "v2Token"
 
 
-class jobStatusType(StrEnum):
+class jobStatusType(str):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
 
-class policyOwnerEntityType(StrEnum):
+class policyOwnerEntityType(str):
     USER = "USER"
     ROLE = "ROLE"
     GROUP = "GROUP"
 
 
-class policyScopeType(StrEnum):
+class policyScopeType(str):
     All = "All"
     AWS = "AWS"
     Local = "Local"
 
 
-class policyType(StrEnum):
+class policyType(str):
     INLINE = "INLINE"
     MANAGED = "MANAGED"
 
 
-class sortKeyType(StrEnum):
+class sortKeyType(str):
     SERVICE_NAMESPACE_ASCENDING = "SERVICE_NAMESPACE_ASCENDING"
     SERVICE_NAMESPACE_DESCENDING = "SERVICE_NAMESPACE_DESCENDING"
     LAST_AUTHENTICATED_TIME_ASCENDING = "LAST_AUTHENTICATED_TIME_ASCENDING"
     LAST_AUTHENTICATED_TIME_DESCENDING = "LAST_AUTHENTICATED_TIME_DESCENDING"
 
 
-class statusType(StrEnum):
+class statusType(str):
     Active = "Active"
     Inactive = "Inactive"
 
 
-class summaryKeyType(StrEnum):
+class summaryKeyType(str):
     Users = "Users"
     UsersQuota = "UsersQuota"
     Groups = "Groups"
@@ -259,7 +246,6 @@ class summaryKeyType(StrEnum):
     MFADevicesInUse = "MFADevicesInUse"
     AccountMFAEnabled = "AccountMFAEnabled"
     AccountAccessKeysPresent = "AccountAccessKeysPresent"
-    AccountPasswordPresent = "AccountPasswordPresent"
     AccountSigningCertificatesPresent = "AccountSigningCertificatesPresent"
     AttachedPoliciesPerGroupQuota = "AttachedPoliciesPerGroupQuota"
     AttachedPoliciesPerRoleQuota = "AttachedPoliciesPerRoleQuota"
@@ -271,18 +257,6 @@ class summaryKeyType(StrEnum):
     PolicyVersionsInUseQuota = "PolicyVersionsInUseQuota"
     VersionsPerPolicyQuota = "VersionsPerPolicyQuota"
     GlobalEndpointTokenVersion = "GlobalEndpointTokenVersion"
-
-
-class AccountNotManagementOrDelegatedAdministratorException(ServiceException):
-    code: str = "AccountNotManagementOrDelegatedAdministratorException"
-    sender_fault: bool = False
-    status_code: int = 400
-
-
-class CallerIsNotManagementAccountException(ServiceException):
-    code: str = "CallerIsNotManagementAccountException"
-    sender_fault: bool = False
-    status_code: int = 400
 
 
 class ConcurrentModificationException(ServiceException):
@@ -405,18 +379,6 @@ class OpenIdIdpCommunicationErrorException(ServiceException):
     status_code: int = 400
 
 
-class OrganizationNotFoundException(ServiceException):
-    code: str = "OrganizationNotFoundException"
-    sender_fault: bool = False
-    status_code: int = 400
-
-
-class OrganizationNotInAllFeaturesModeException(ServiceException):
-    code: str = "OrganizationNotInAllFeaturesModeException"
-    sender_fault: bool = False
-    status_code: int = 400
-
-
 class PasswordPolicyViolationException(ServiceException):
     code: str = "PasswordPolicyViolation"
     sender_fault: bool = True
@@ -439,12 +401,6 @@ class ReportGenerationLimitExceededException(ServiceException):
     code: str = "ReportGenerationLimitExceeded"
     sender_fault: bool = True
     status_code: int = 409
-
-
-class ServiceAccessNotEnabledException(ServiceException):
-    code: str = "ServiceAccessNotEnabledException"
-    sender_fault: bool = False
-    status_code: int = 400
 
 
 class ServiceFailureException(ServiceException):
@@ -495,7 +451,7 @@ class AccessKey(TypedDict, total=False):
 
 
 class AccessKeyLastUsed(TypedDict, total=False):
-    LastUsedDate: Optional[dateType]
+    LastUsedDate: dateType
     ServiceName: stringType
     Region: stringType
 
@@ -655,8 +611,8 @@ class CreateInstanceProfileResponse(TypedDict, total=False):
 
 
 class CreateLoginProfileRequest(ServiceRequest):
-    UserName: Optional[userNameType]
-    Password: Optional[passwordType]
+    UserName: userNameType
+    Password: passwordType
     PasswordResetRequired: Optional[booleanType]
 
 
@@ -748,8 +704,6 @@ class CreateSAMLProviderRequest(ServiceRequest):
     SAMLMetadataDocument: SAMLMetadataDocumentType
     Name: SAMLProviderNameType
     Tags: Optional[tagListType]
-    AssertionEncryptionMode: Optional[assertionEncryptionModeType]
-    AddPrivateKey: Optional[privateKeyType]
 
 
 class CreateSAMLProviderResponse(TypedDict, total=False):
@@ -828,7 +782,7 @@ class CreateVirtualMFADeviceResponse(TypedDict, total=False):
 
 
 class DeactivateMFADeviceRequest(ServiceRequest):
-    UserName: Optional[existingUserNameType]
+    UserName: existingUserNameType
     SerialNumber: serialNumberType
 
 
@@ -855,7 +809,7 @@ class DeleteInstanceProfileRequest(ServiceRequest):
 
 
 class DeleteLoginProfileRequest(ServiceRequest):
-    UserName: Optional[userNameType]
+    UserName: userNameType
 
 
 class DeleteOpenIDConnectProviderRequest(ServiceRequest):
@@ -960,50 +914,11 @@ class DetachUserPolicyRequest(ServiceRequest):
     PolicyArn: arnType
 
 
-class DisableOrganizationsRootCredentialsManagementRequest(ServiceRequest):
-    pass
-
-
-FeaturesListType = List[FeatureType]
-
-
-class DisableOrganizationsRootCredentialsManagementResponse(TypedDict, total=False):
-    OrganizationId: Optional[OrganizationIdType]
-    EnabledFeatures: Optional[FeaturesListType]
-
-
-class DisableOrganizationsRootSessionsRequest(ServiceRequest):
-    pass
-
-
-class DisableOrganizationsRootSessionsResponse(TypedDict, total=False):
-    OrganizationId: Optional[OrganizationIdType]
-    EnabledFeatures: Optional[FeaturesListType]
-
-
 class EnableMFADeviceRequest(ServiceRequest):
     UserName: existingUserNameType
     SerialNumber: serialNumberType
     AuthenticationCode1: authenticationCodeType
     AuthenticationCode2: authenticationCodeType
-
-
-class EnableOrganizationsRootCredentialsManagementRequest(ServiceRequest):
-    pass
-
-
-class EnableOrganizationsRootCredentialsManagementResponse(TypedDict, total=False):
-    OrganizationId: Optional[OrganizationIdType]
-    EnabledFeatures: Optional[FeaturesListType]
-
-
-class EnableOrganizationsRootSessionsRequest(ServiceRequest):
-    pass
-
-
-class EnableOrganizationsRootSessionsResponse(TypedDict, total=False):
-    OrganizationId: Optional[OrganizationIdType]
-    EnabledFeatures: Optional[FeaturesListType]
 
 
 class EntityInfo(TypedDict, total=False):
@@ -1291,7 +1206,7 @@ class GetInstanceProfileResponse(TypedDict, total=False):
 
 
 class GetLoginProfileRequest(ServiceRequest):
-    UserName: Optional[userNameType]
+    UserName: userNameType
 
 
 class GetLoginProfileResponse(TypedDict, total=False):
@@ -1381,22 +1296,11 @@ class GetSAMLProviderRequest(ServiceRequest):
     SAMLProviderArn: arnType
 
 
-class SAMLPrivateKey(TypedDict, total=False):
-    KeyId: Optional[privateKeyIdType]
-    Timestamp: Optional[dateType]
-
-
-privateKeyList = List[SAMLPrivateKey]
-
-
 class GetSAMLProviderResponse(TypedDict, total=False):
-    SAMLProviderUUID: Optional[privateKeyIdType]
     SAMLMetadataDocument: Optional[SAMLMetadataDocumentType]
     CreateDate: Optional[dateType]
     ValidUntil: Optional[dateType]
     Tags: Optional[tagListType]
-    AssertionEncryptionMode: Optional[assertionEncryptionModeType]
-    PrivateKeyList: Optional[privateKeyList]
 
 
 class GetSSHPublicKeyRequest(ServiceRequest):
@@ -1775,15 +1679,6 @@ OpenIDConnectProviderListType = List[OpenIDConnectProviderListEntry]
 
 class ListOpenIDConnectProvidersResponse(TypedDict, total=False):
     OpenIDConnectProviderList: Optional[OpenIDConnectProviderListType]
-
-
-class ListOrganizationsFeaturesRequest(ServiceRequest):
-    pass
-
-
-class ListOrganizationsFeaturesResponse(TypedDict, total=False):
-    OrganizationId: Optional[OrganizationIdType]
-    EnabledFeatures: Optional[FeaturesListType]
 
 
 class PolicyGrantingServiceAccess(TypedDict, total=False):
@@ -2320,11 +2215,8 @@ class UpdateRoleResponse(TypedDict, total=False):
 
 
 class UpdateSAMLProviderRequest(ServiceRequest):
-    SAMLMetadataDocument: Optional[SAMLMetadataDocumentType]
+    SAMLMetadataDocument: SAMLMetadataDocumentType
     SAMLProviderArn: arnType
-    AssertionEncryptionMode: Optional[assertionEncryptionModeType]
-    AddPrivateKey: Optional[privateKeyType]
-    RemovePrivateKey: Optional[privateKeyIdType]
 
 
 class UpdateSAMLProviderResponse(TypedDict, total=False):
@@ -2488,8 +2380,8 @@ class IamApi:
     def create_login_profile(
         self,
         context: RequestContext,
-        user_name: userNameType = None,
-        password: passwordType = None,
+        user_name: userNameType,
+        password: passwordType,
         password_reset_required: booleanType = None,
         **kwargs,
     ) -> CreateLoginProfileResponse:
@@ -2553,8 +2445,6 @@ class IamApi:
         saml_metadata_document: SAMLMetadataDocumentType,
         name: SAMLProviderNameType,
         tags: tagListType = None,
-        assertion_encryption_mode: assertionEncryptionModeType = None,
-        add_private_key: privateKeyType = None,
         **kwargs,
     ) -> CreateSAMLProviderResponse:
         raise NotImplementedError
@@ -2603,8 +2493,8 @@ class IamApi:
     def deactivate_mfa_device(
         self,
         context: RequestContext,
+        user_name: existingUserNameType,
         serial_number: serialNumberType,
-        user_name: existingUserNameType = None,
         **kwargs,
     ) -> None:
         raise NotImplementedError
@@ -2651,7 +2541,7 @@ class IamApi:
 
     @handler("DeleteLoginProfile")
     def delete_login_profile(
-        self, context: RequestContext, user_name: userNameType = None, **kwargs
+        self, context: RequestContext, user_name: userNameType, **kwargs
     ) -> None:
         raise NotImplementedError
 
@@ -2789,18 +2679,6 @@ class IamApi:
     ) -> None:
         raise NotImplementedError
 
-    @handler("DisableOrganizationsRootCredentialsManagement")
-    def disable_organizations_root_credentials_management(
-        self, context: RequestContext, **kwargs
-    ) -> DisableOrganizationsRootCredentialsManagementResponse:
-        raise NotImplementedError
-
-    @handler("DisableOrganizationsRootSessions")
-    def disable_organizations_root_sessions(
-        self, context: RequestContext, **kwargs
-    ) -> DisableOrganizationsRootSessionsResponse:
-        raise NotImplementedError
-
     @handler("EnableMFADevice")
     def enable_mfa_device(
         self,
@@ -2811,18 +2689,6 @@ class IamApi:
         authentication_code2: authenticationCodeType,
         **kwargs,
     ) -> None:
-        raise NotImplementedError
-
-    @handler("EnableOrganizationsRootCredentialsManagement")
-    def enable_organizations_root_credentials_management(
-        self, context: RequestContext, **kwargs
-    ) -> EnableOrganizationsRootCredentialsManagementResponse:
-        raise NotImplementedError
-
-    @handler("EnableOrganizationsRootSessions")
-    def enable_organizations_root_sessions(
-        self, context: RequestContext, **kwargs
-    ) -> EnableOrganizationsRootSessionsResponse:
         raise NotImplementedError
 
     @handler("GenerateCredentialReport")
@@ -2929,7 +2795,7 @@ class IamApi:
 
     @handler("GetLoginProfile")
     def get_login_profile(
-        self, context: RequestContext, user_name: userNameType = None, **kwargs
+        self, context: RequestContext, user_name: userNameType, **kwargs
     ) -> GetLoginProfileResponse:
         raise NotImplementedError
 
@@ -3235,12 +3101,6 @@ class IamApi:
     def list_open_id_connect_providers(
         self, context: RequestContext, **kwargs
     ) -> ListOpenIDConnectProvidersResponse:
-        raise NotImplementedError
-
-    @handler("ListOrganizationsFeatures")
-    def list_organizations_features(
-        self, context: RequestContext, **kwargs
-    ) -> ListOrganizationsFeaturesResponse:
         raise NotImplementedError
 
     @handler("ListPolicies")
@@ -3826,11 +3686,8 @@ class IamApi:
     def update_saml_provider(
         self,
         context: RequestContext,
+        saml_metadata_document: SAMLMetadataDocumentType,
         saml_provider_arn: arnType,
-        saml_metadata_document: SAMLMetadataDocumentType = None,
-        assertion_encryption_mode: assertionEncryptionModeType = None,
-        add_private_key: privateKeyType = None,
-        remove_private_key: privateKeyIdType = None,
         **kwargs,
     ) -> UpdateSAMLProviderResponse:
         raise NotImplementedError

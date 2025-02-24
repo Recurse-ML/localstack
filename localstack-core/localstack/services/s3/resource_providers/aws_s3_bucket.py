@@ -442,7 +442,7 @@ class S3BucketProvider(ResourceProvider[S3BucketProperties]):
 
         self._create_bucket_if_does_not_exist(model, request.region_name, s3_client)
 
-        self._setup_post_creation_attributes(model, request.region_name)
+        self._setup_post_creation_attributes(model)
 
         if put_config := self._get_s3_bucket_notification_config(model):
             s3_client.put_bucket_notification_configuration(**put_config)
@@ -586,8 +586,8 @@ class S3BucketProvider(ResourceProvider[S3BucketProperties]):
 
         return result
 
-    def _setup_post_creation_attributes(self, model, region: str):
-        model["Arn"] = arns.s3_bucket_arn(model["BucketName"], region=region)
+    def _setup_post_creation_attributes(self, model):
+        model["Arn"] = arns.s3_bucket_arn(model["BucketName"])
         domain_name = f"{model['BucketName']}.{S3_VIRTUAL_HOSTNAME}"
         model["DomainName"] = domain_name
         model["RegionalDomainName"] = domain_name
@@ -604,7 +604,7 @@ class S3BucketProvider(ResourceProvider[S3BucketProperties]):
         try:
             s3_client.head_bucket(Bucket=model["BucketName"])
         except ClientError as e:
-            if e.response["ResponseMetadata"]["HTTPStatusCode"] != 404:
+            if e.response["Error"]["Message"] != "Not Found":
                 return
 
             params = {
@@ -721,13 +721,3 @@ class S3BucketProvider(ResourceProvider[S3BucketProperties]):
           - iam:PassRole
         """
         raise NotImplementedError
-
-    def list(
-        self,
-        request: ResourceRequest[S3BucketProperties],
-    ) -> ProgressEvent[S3BucketProperties]:
-        buckets = request.aws_client_factory.s3.list_buckets()
-        final_buckets = []
-        for bucket in buckets["Buckets"]:
-            final_buckets.append(S3BucketProperties(BucketName=bucket["Name"]))
-        return ProgressEvent(status=OperationStatus.SUCCESS, resource_models=final_buckets)

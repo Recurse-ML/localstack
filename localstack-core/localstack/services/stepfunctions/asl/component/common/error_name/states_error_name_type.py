@@ -22,7 +22,6 @@ class StatesErrorNameType(Enum):
     StatesItemReaderFailed = ASLLexer.ERRORNAMEStatesItemReaderFailed
     StatesResultWriterFailed = ASLLexer.ERRORNAMEStatesResultWriterFailed
     StatesRuntime = ASLLexer.ERRORNAMEStatesRuntime
-    StatesQueryEvaluationError = ASLLexer.ERRORNAMEStatesQueryEvaluationError
 
     def to_name(self) -> str:
         return _error_name(self)

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import base64
 import json
 import logging
 import re
 import time
-from typing import Any, Final, Optional, Union
+from typing import Final, Optional, Union
 
 import moto.secretsmanager.exceptions as moto_exception
 from botocore.utils import InvalidArnException
@@ -173,20 +172,9 @@ class SecretsmanagerProvider(SecretsmanagerApi):
         self, context: RequestContext, request: CreateSecretRequest
     ) -> CreateSecretResponse:
         self._raise_if_missing_client_req_token(request)
-        # Some providers need to create keys which are not usually creatable by users
-        if not any(
-            tag_entry["Key"] == "BYPASS_SECRET_ID_VALIDATION"
-            for tag_entry in request.get("Tags", [])
-        ):
-            self._raise_if_invalid_secret_id(request["Name"])
-        else:
-            request["Tags"] = [
-                tag_entry
-                for tag_entry in request.get("Tags", [])
-                if tag_entry["Key"] != "BYPASS_SECRET_ID_VALIDATION"
-            ]
+        self._raise_if_invalid_secret_id(request["Name"])
 
-        return call_moto(context, request)
+        return call_moto(context)
 
     @handler("DeleteResourcePolicy", expand=False)
     def delete_resource_policy(
@@ -251,24 +239,14 @@ class SecretsmanagerProvider(SecretsmanagerApi):
         secret_id = request.get("SecretId")
         version_id = request.get("VersionId")
         version_stage = request.get("VersionStage")
-        if not version_id and not version_stage:
-            version_stage = "AWSCURRENT"
         self._raise_if_invalid_secret_id(secret_id)
         backend = SecretsmanagerProvider.get_moto_backend_for_resource(secret_id, context)
         self._raise_if_default_kms_key(secret_id, context, backend)
         try:
             response = backend.get_secret_value(secret_id, version_id, version_stage)
-            response = decode_secret_binary_from_response(response)
         except moto_exception.SecretNotFoundException:
             raise ResourceNotFoundException(
                 f"Secrets Manager can't find the specified secret value for staging label: {version_stage}"
-            )
-        except moto_exception.ResourceNotFoundException:
-            error_message = (
-                f"VersionId: {version_id}" if version_id else f"staging label: {version_stage}"
-            )
-            raise ResourceNotFoundException(
-                f"Secrets Manager can't find the specified secret value for {error_message}"
             )
         except moto_exception.SecretStageVersionMismatchException:
             raise InvalidRequestException(
@@ -499,7 +477,7 @@ def moto_smb_create_secret(fn, self, name, *args, **kwargs):
     if secret is not None and secret.deleted_date is not None:
         raise InvalidRequestException(AWS_INVALID_REQUEST_MESSAGE_CREATE_WITH_SCHEDULED_DELETION)
 
-    if name in self.secrets:
+    if name in self.secrets.keys():
         raise ResourceExistsException(
             f"The operation failed because the secret {name} already exists."
         )
@@ -737,14 +715,14 @@ def backend_rotate_secret(
 
     if rotation_lambda_arn:
         if len(rotation_lambda_arn) > 2048:
-            msg = "RotationLambdaARN must <= 2048 characters long."
+            msg = "RotationLambdaARN " "must <= 2048 characters long."
             raise InvalidParameterException(msg)
 
     if rotation_rules:
         if rotation_days in rotation_rules:
             rotation_period = rotation_rules[rotation_days]
             if rotation_period < 1 or rotation_period > 1000:
-                msg = "RotationRules.AutomaticallyAfterDays must be within 1-1000."
+                msg = "RotationRules.AutomaticallyAfterDays " "must be within 1-1000."
                 raise InvalidParameterException(msg)
 
     try:
@@ -874,13 +852,6 @@ def get_resource_policy_model(self, secret_id):
 def get_resource_policy_response(self):
     secret_id = self._get_param("SecretId")
     return self.backend.get_resource_policy(secret_id=secret_id)
-
-
-def decode_secret_binary_from_response(response: dict[str, Any]):
-    if "SecretBinary" in response:
-        response["SecretBinary"] = base64.b64decode(response["SecretBinary"])
-
-    return response
 
 
 def delete_resource_policy_model(self, secret_id):

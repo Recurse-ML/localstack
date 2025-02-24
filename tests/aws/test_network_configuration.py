@@ -1,4 +1,3 @@
-from localstack.constants import AWS_REGION_US_EAST_1
 from localstack.testing.pytest import markers
 from localstack.utils.urls import localstack_host
 
@@ -82,11 +81,10 @@ class TestOpenSearch:
 class TestS3:
     @markers.aws.only_localstack
     def test_non_us_east_1_location(
-        self, s3_empty_bucket, cleanups, assert_host_customisation, aws_client_factory
+        self, s3_empty_bucket, cleanups, assert_host_customisation, aws_client
     ):
-        client_us_east_1 = aws_client_factory(region_name=AWS_REGION_US_EAST_1).s3
         bucket_name = f"bucket-{short_uid()}"
-        res = client_us_east_1.create_bucket(
+        res = aws_client.s3.create_bucket(
             Bucket=bucket_name,
             CreateBucketConfiguration={
                 "LocationConstraint": "eu-west-1",
@@ -95,7 +93,7 @@ class TestS3:
 
         def cleanup():
             s3_empty_bucket(bucket_name)
-            client_us_east_1.delete_bucket(Bucket=bucket_name)
+            aws_client.s3.delete_bucket(Bucket=bucket_name)
 
         cleanups.append(cleanup)
 
@@ -216,7 +214,7 @@ class TestLambda:
         create_lambda_function(
             func_name=function_name,
             handler_file=handler_file,
-            runtime=Runtime.python3_12,
+            runtime=Runtime.python3_9,
         )
 
         function_url = aws_client.lambda_.create_function_url_config(
@@ -239,7 +237,7 @@ class TestLambda:
         create_lambda_function(
             func_name=function_name,
             handler_file=handler_file,
-            runtime=Runtime.python3_12,
+            runtime=Runtime.python3_9,
         )
 
         client = aws_http_client_factory("lambda", signer_factory=SigV4Auth)

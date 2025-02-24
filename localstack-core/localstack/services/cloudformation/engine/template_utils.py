@@ -2,7 +2,6 @@ import re
 from typing import Any
 
 from localstack.services.cloudformation.deployment_utils import PLACEHOLDER_AWS_NO_VALUE
-from localstack.services.cloudformation.engine.errors import TemplateError
 from localstack.utils.urls import localstack_host
 
 AWS_URL_SUFFIX = localstack_host().host  # value is "amazonaws.com" in real AWS
@@ -143,24 +142,6 @@ def resolve_pseudo_parameter(
             return AWS_URL_SUFFIX
 
 
-def resolve_conditional_mapping_ref(
-    ref_name, account_id: str, region_name: str, stack_name: str, parameters
-):
-    if ref_name.startswith("AWS::"):
-        ref_value = resolve_pseudo_parameter(account_id, region_name, ref_name, stack_name)
-        if ref_value is None:
-            raise TemplateError(f"Invalid pseudo parameter '{ref_name}'")
-    else:
-        param = parameters.get(ref_name)
-        if not param:
-            raise TemplateError(
-                f"Invalid reference: '{ref_name}' does not exist in parameters: '{parameters}'"
-            )
-        ref_value = param.get("ResolvedValue") or param.get("ParameterValue")
-
-    return ref_value
-
-
 def resolve_condition(
     account_id: str, region_name: str, condition, conditions, parameters, mappings, stack_name
 ):
@@ -200,43 +181,7 @@ def resolve_condition(
                     )
                 case "Fn::FindInMap":
                     map_name, top_level_key, second_level_key = v
-                    if isinstance(map_name, dict) and "Ref" in map_name:
-                        ref_name = map_name["Ref"]
-                        map_name = resolve_conditional_mapping_ref(
-                            ref_name, account_id, region_name, stack_name, parameters
-                        )
-
-                    if isinstance(top_level_key, dict) and "Ref" in top_level_key:
-                        ref_name = top_level_key["Ref"]
-                        top_level_key = resolve_conditional_mapping_ref(
-                            ref_name, account_id, region_name, stack_name, parameters
-                        )
-
-                    if isinstance(second_level_key, dict) and "Ref" in second_level_key:
-                        ref_name = second_level_key["Ref"]
-                        second_level_key = resolve_conditional_mapping_ref(
-                            ref_name, account_id, region_name, stack_name, parameters
-                        )
-
-                    mapping = mappings.get(map_name)
-                    if not mapping:
-                        raise TemplateError(
-                            f"Invalid reference: '{map_name}' could not be found in the template mappings: '{list(mappings.keys())}'"
-                        )
-
-                    top_level_map = mapping.get(top_level_key)
-                    if not top_level_map:
-                        raise TemplateError(
-                            f"Invalid reference: '{top_level_key}' could not be found in the '{map_name}' mapping: '{list(mapping.keys())}'"
-                        )
-
-                    value = top_level_map.get(second_level_key)
-                    if not value:
-                        raise TemplateError(
-                            f"Invalid reference: '{second_level_key}' could not be found in the '{top_level_key}' mapping: '{top_level_map}'"
-                        )
-
-                    return value
+                    return mappings[map_name][top_level_key][second_level_key]
                 case "Fn::If":
                     if_condition_name, true_branch, false_branch = v
                     if resolve_condition(

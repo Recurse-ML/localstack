@@ -24,56 +24,13 @@ from localstack.services.events.scheduler import JobScheduler, convert_schedule_
 
 TARGET_ID_REGEX = re.compile(r"^[\.\-_A-Za-z0-9]+$")
 TARGET_ARN_REGEX = re.compile(r"arn:[\d\w:\-/]*")
-CRON_REGEX = (  # borrowed from https://regex101.com/r/I80Eu0/1
-    r"^(?:cron[(](?:(?:(?:[0-5]?[0-9])|[*])(?:(?:[-](?:(?:[0-5]?[0-9])|[*]))|(?:[/][0-9]+))?"
-    r"(?:[,](?:(?:[0-5]?[0-9])|[*])(?:(?:[-](?:(?:[0-5]?[0-9])|[*]))|(?:[/][0-9]+))?)*)[ ]+"
-    r"(?:(?:(?:[0-2]?[0-9])|[*])(?:(?:[-](?:(?:[0-2]?[0-9])|[*]))|(?:[/][0-9]+))?"
-    r"(?:[,](?:(?:[0-2]?[0-9])|[*])(?:(?:[-](?:(?:[0-2]?[0-9])|[*]))|(?:[/][0-9]+))?)*)[ ]+"
-    r"(?:(?:[?][ ]+(?:(?:(?:[1]?[0-9])|(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)|[*])"
-    r"(?:(?:[-](?:(?:[1]?[0-9])|(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)|[*])(?:[/][0-9]+)?)|"
-    r"(?:[/][0-9]+))?(?:[,](?:(?:[1]?[0-9])|(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)|[*])"
-    r"(?:(?:[-](?:(?:[1]?[0-9])|(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)|[*])(?:[/][0-9]+)?)|"
-    r"(?:[/][0-9]+))?)*)[ ]+(?:(?:(?:[1-7]|(?:SUN|MON|TUE|WED|THU|FRI|SAT))[#][0-5])|"
-    r"(?:(?:(?:(?:[1-7]|(?:SUN|MON|TUE|WED|THU|FRI|SAT))L?)|[L*])(?:(?:[-](?:(?:(?:[1-7]|"
-    r"(?:SUN|MON|TUE|WED|THU|FRI|SAT))L?)|[L*]))|(?:[/][0-9]+))?(?:[,](?:(?:(?:[1-7]|"
-    r"(?:SUN|MON|TUE|WED|THU|FRI|SAT))L?)|[L*])(?:(?:[-](?:(?:(?:[1-7]|(?:SUN|MON|TUE|WED|THU|FRI|SAT))L?)|"
-    r"[L*]))|(?:[/][0-9]+))?)*)))|(?:(?:(?:(?:(?:[1-3]?[0-9])W?)|LW|[L*])(?:(?:[-](?:(?:(?:[1-3]?[0-9])W?)|"
-    r"LW|[L*]))|(?:[/][0-9]+))?(?:[,](?:(?:(?:[1-3]?[0-9])W?)|LW|[L*])(?:(?:[-](?:(?:(?:[1-3]?[0-9])W?)|"
-    r"LW|[L*]))|(?:[/][0-9]+))?)*)[ ]+(?:(?:(?:[1]?[0-9])|(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)|"
-    r"[*])(?:(?:[-](?:(?:[1]?[0-9])|(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)|[*])(?:[/][0-9]+)?)|"
-    r"(?:[/][0-9]+))?(?:[,](?:(?:[1]?[0-9])|(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)|[*])"
-    r"(?:(?:[-](?:(?:[1]?[0-9])|(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)|[*])(?:[/][0-9]+)?)|"
-    r"(?:[/][0-9]+))?)*)[ ]+[?]))[ ]+(?:(?:(?:[12][0-9]{3})|[*])(?:(?:[-](?:(?:[12][0-9]{3})|[*]))|"
-    r"(?:[/][0-9]+))?(?:[,](?:(?:[12][0-9]{3})|[*])(?:(?:[-](?:(?:[12][0-9]{3})|[*]))|(?:[/][0-9]+))?)*)[)])$"
-)
-RULE_SCHEDULE_CRON_REGEX = re.compile(CRON_REGEX)
+RULE_SCHEDULE_CRON_REGEX = re.compile(r"^cron\(.*\)")
 RULE_SCHEDULE_RATE_REGEX = re.compile(r"^rate\(\d*\s(minute|minutes|hour|hours|day|days)\)")
 
 
 class RuleService:
-    name: RuleName
-    region: str
-    account_id: str
-    schedule_expression: ScheduleExpression | None
-    event_pattern: EventPattern | None
-    description: RuleDescription | None
-    role_arn: Arn | None
-    tags: TagList | None
-    event_bus_name: EventBusName | None
-    targets: TargetDict | None
-    managed_by: ManagedBy
-    rule: Rule
-
-    def __init__(self, rule: Rule):
-        self.rule = rule
-        if rule.schedule_expression:
-            self.schedule_cron = self._get_schedule_cron(rule.schedule_expression)
-        else:
-            self.schedule_cron = None
-
-    @classmethod
-    def create_rule_service(
-        cls,
+    def __init__(
+        self,
         name: RuleName,
         region: Optional[str] = None,
         account_id: Optional[str] = None,
@@ -87,23 +44,25 @@ class RuleService:
         targets: Optional[TargetDict] = None,
         managed_by: Optional[ManagedBy] = None,
     ):
-        cls._validate_input(event_pattern, schedule_expression, event_bus_name)
+        self._validate_input(event_pattern, schedule_expression, event_bus_name)
+        if schedule_expression:
+            self.schedule_cron = self._get_schedule_cron(schedule_expression)
+        else:
+            self.schedule_cron = None
         # required to keep data and functionality separate for persistence
-        return cls(
-            Rule(
-                name,
-                region,
-                account_id,
-                schedule_expression,
-                event_pattern,
-                state,
-                description,
-                role_arn,
-                tags,
-                event_bus_name,
-                targets,
-                managed_by,
-            )
+        self.rule = Rule(
+            name,
+            region,
+            account_id,
+            schedule_expression,
+            event_pattern,
+            state,
+            description,
+            role_arn,
+            tags,
+            event_bus_name,
+            targets,
+            managed_by,
         )
 
     @property
@@ -206,9 +165,8 @@ class RuleService:
 
         return validation_errors
 
-    @classmethod
     def _validate_input(
-        cls,
+        self,
         event_pattern: Optional[EventPattern],
         schedule_expression: Optional[ScheduleExpression],
         event_bus_name: Optional[EventBusName] = "default",

@@ -10,9 +10,9 @@ import struct
 import uuid
 from collections import namedtuple
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, hmac
 from cryptography.hazmat.primitives import serialization as crypto_serialization
@@ -21,19 +21,14 @@ from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePrivateKey
 from cryptography.hazmat.primitives.asymmetric.padding import PSS, PKCS1v15
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.serialization import load_der_public_key
 
 from localstack.aws.api.kms import (
     CreateAliasRequest,
     CreateGrantRequest,
     CreateKeyRequest,
     EncryptionContextType,
-    InvalidKeyUsageException,
     KeyMetadata,
-    KeySpec,
     KeyState,
-    KeyUsageType,
     KMSInvalidMacException,
     KMSInvalidSignatureException,
     MacAlgorithmSpec,
@@ -44,14 +39,12 @@ from localstack.aws.api.kms import (
     OriginType,
     ReplicateKeyRequest,
     SigningAlgorithmSpec,
-    TagList,
     UnsupportedOperationException,
 )
-from localstack.constants import TAG_KEY_CUSTOM_ID
-from localstack.services.kms.exceptions import TagException, ValidationException
-from localstack.services.kms.utils import is_valid_key_arn, validate_tag
+from localstack.services.kms.exceptions import ValidationException
+from localstack.services.kms.utils import is_valid_key_arn
 from localstack.services.stores import AccountRegionBundle, BaseStore, LocalAttribute
-from localstack.utils.aws.arns import get_partition, kms_alias_arn, kms_key_arn
+from localstack.utils.aws.arns import kms_alias_arn, kms_key_arn
 from localstack.utils.crypto import decrypt, encrypt
 from localstack.utils.strings import long_uid, to_bytes, to_str
 
@@ -114,6 +107,8 @@ RESERVED_ALIASES = [
 # list of key names that should be skipped when serializing the encryption context
 IGNORED_CONTEXT_KEYS = ["aws-crypto-public-key"]
 
+# special tag name to allow specifying a custom ID for created keys
+TAG_KEY_CUSTOM_ID = "_custom_id_"
 # special tag name to allow specifying a custom key material for created keys
 TAG_KEY_CUSTOM_KEY_MATERIAL = "_custom_key_material_"
 
@@ -264,9 +259,7 @@ class KmsKey:
         self.tags = {}
         self.add_tags(create_key_request.get("Tags"))
         # Same goes for the policy. It is in the request, but not in the metadata.
-        self.policy = create_key_request.get("Policy") or self._get_default_key_policy(
-            account_id, region
-        )
+        self.policy = create_key_request.get("Policy") or self._get_default_key_policy(account_id)
         # https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html
         # "Automatic key rotation is disabled by default on customer managed keys but authorized users can enable and
         # disable it."
@@ -319,20 +312,6 @@ class KmsKey:
             self.crypto_key.key_material, ciphertext.ciphertext, ciphertext.iv, ciphertext.tag, aad
         )
 
-    def decrypt_rsa(self, encrypted: bytes) -> bytes:
-        private_key = crypto_serialization.load_der_private_key(
-            self.crypto_key.private_key, password=None, backend=default_backend()
-        )
-        decrypted = private_key.decrypt(
-            encrypted,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None,
-            ),
-        )
-        return decrypted
-
     def sign(
         self, data: bytes, message_type: MessageType, signing_algorithm: SigningAlgorithmSpec
     ) -> bytes:
@@ -366,35 +345,6 @@ class KmsKey:
         except InvalidSignature:
             # AWS itself raises this exception without any additional message.
             raise KMSInvalidSignatureException()
-
-    def derive_shared_secret(self, public_key: bytes) -> bytes:
-        key_spec = self.metadata.get("KeySpec")
-        match key_spec:
-            case KeySpec.ECC_NIST_P256 | KeySpec.ECC_SECG_P256K1:
-                algorithm = hashes.SHA256()
-            case KeySpec.ECC_NIST_P384:
-                algorithm = hashes.SHA384()
-            case KeySpec.ECC_NIST_P521:
-                algorithm = hashes.SHA512()
-            case _:
-                raise InvalidKeyUsageException(
-                    f"{self.metadata['Arn']} key usage is {self.metadata['KeyUsage']} which is not valid for DeriveSharedSecret."
-                )
-
-        # Deserialize public key from DER encoded data to EllipticCurvePublicKey.
-        try:
-            pub_key = load_der_public_key(public_key)
-        except (UnsupportedAlgorithm, ValueError):
-            raise ValidationException("")
-        shared_secret = self.crypto_key.key.exchange(ec.ECDH(), pub_key)
-        # Perform shared secret derivation.
-        return HKDF(
-            algorithm=algorithm,
-            salt=None,
-            info=b"",
-            length=algorithm.digest_size,
-            backend=default_backend(),
-        ).derive(shared_secret)
 
     # This method gets called when a key is replicated to another region. It's meant to populate the required metadata
     # fields in a new replica key.
@@ -557,23 +507,15 @@ class KmsKey:
                 ReplicaKeys=[],
             )
 
-    def add_tags(self, tags: TagList) -> None:
+    def add_tags(self, tags: List) -> None:
         # Just in case we get None from somewhere.
         if not tags:
             return
 
-        unique_tag_keys = {tag["TagKey"] for tag in tags}
-        if len(unique_tag_keys) < len(tags):
-            raise TagException("Duplicate tag keys")
-
-        if len(tags) > 50:
-            raise TagException("Too many tags")
-
         # Do not care if we overwrite an existing tag:
         # https://docs.aws.amazon.com/kms/latest/APIReference/API_TagResource.html
         # "To edit a tag, specify an existing tag key and a new tag value."
-        for i, tag in enumerate(tags, start=1):
-            validate_tag(i, tag)
+        for tag in tags:
             self.tags[tag.get("TagKey")] = tag.get("TagValue")
 
     def schedule_key_deletion(self, pending_window_in_days: int) -> None:
@@ -591,7 +533,7 @@ class KmsKey:
     # https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-overview.html
     # The default statement is here:
     # https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-default.html#key-policy-default-allow-root-enable-iam
-    def _get_default_key_policy(self, account_id: str, region: str) -> str:
+    def _get_default_key_policy(self, account_id: str) -> str:
         return json.dumps(
             {
                 "Version": "2012-10-17",
@@ -600,7 +542,7 @@ class KmsKey:
                     {
                         "Sid": "Enable IAM User Permissions",
                         "Effect": "Allow",
-                        "Principal": {"AWS": f"arn:{get_partition(region)}:iam::{account_id}:root"},
+                        "Principal": {"AWS": f"arn:aws:iam::{account_id}:root"},
                         "Action": "kms:*",
                         "Resource": "*",
                     }
@@ -659,27 +601,14 @@ class KmsKey:
                 raise ValidationException(
                     "You must specify a KeyUsage value for all KMS keys except for symmetric encryption keys."
                 )
-            elif request_key_usage != KeyUsageType.GENERATE_VERIFY_MAC:
+            elif request_key_usage != "GENERATE_VERIFY_MAC":
                 raise ValidationException(
                     f"1 validation error detected: Value '{request_key_usage}' at 'keyUsage' "
                     f"failed to satisfy constraint: Member must satisfy enum value set: "
                     f"[ENCRYPT_DECRYPT, SIGN_VERIFY, GENERATE_VERIFY_MAC]"
                 )
             else:
-                return KeyUsageType.GENERATE_VERIFY_MAC
-        elif request_key_usage == KeyUsageType.KEY_AGREEMENT:
-            if key_spec not in [
-                KeySpec.ECC_NIST_P256,
-                KeySpec.ECC_NIST_P384,
-                KeySpec.ECC_NIST_P521,
-                KeySpec.ECC_SECG_P256K1,
-                KeySpec.SM2,
-            ]:
-                raise ValidationException(
-                    f"KeyUsage {request_key_usage} is not compatible with KeySpec {key_spec}"
-                )
-            else:
-                return request_key_usage
+                return "GENERATE_VERIFY_MAC"
         else:
             return request_key_usage or "ENCRYPT_DECRYPT"
 

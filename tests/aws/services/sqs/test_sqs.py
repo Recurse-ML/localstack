@@ -26,12 +26,13 @@ from localstack.testing.config import (
 )
 from localstack.testing.pytest import markers
 from localstack.utils.aws import arns
-from localstack.utils.aws.arns import get_partition
 from localstack.utils.aws.request_context import mock_aws_request_headers
 from localstack.utils.common import poll_condition, retry, short_uid, to_str
 from localstack.utils.urls import localstack_host
 from tests.aws.services.lambda_.functions import lambda_integration
 from tests.aws.services.lambda_.test_lambda import TEST_LAMBDA_PYTHON
+
+from .utils import sqs_collect_messages
 
 if TYPE_CHECKING:
     from mypy_boto3_sqs import SQSClient
@@ -250,51 +251,6 @@ class TestSqsProvider:
         snapshot.match("send_max_number_of_messages", e.value.response)
 
     @markers.aws.validated
-    def test_receive_empty_queue(self, sqs_queue, snapshot, aws_sqs_client):
-        queue_url = sqs_queue
-
-        empty_short_poll_resp = aws_sqs_client.receive_message(
-            QueueUrl=queue_url, MaxNumberOfMessages=1
-        )
-        snapshot.match("empty_short_poll_resp", empty_short_poll_resp)
-
-        empty_long_poll_resp = aws_sqs_client.receive_message(
-            QueueUrl=queue_url, MaxNumberOfMessages=1, WaitTimeSeconds=1
-        )
-        snapshot.match("empty_long_poll_resp", empty_long_poll_resp)
-
-    @markers.aws.validated
-    @markers.snapshot.skip_snapshot_verify(paths=["$..Error.Detail"])
-    def test_send_receive_wait_time_seconds(self, sqs_queue, snapshot, aws_sqs_client):
-        queue_url = sqs_queue
-        send_result_1 = aws_sqs_client.send_message(QueueUrl=queue_url, MessageBody="message")
-        assert send_result_1["MessageId"]
-
-        send_result_2 = aws_sqs_client.send_message(QueueUrl=queue_url, MessageBody="message")
-        assert send_result_2["MessageId"]
-
-        MAX_WAIT_TIME_SECONDS = 20
-        with pytest.raises(ClientError) as e:
-            aws_sqs_client.receive_message(
-                QueueUrl=queue_url, WaitTimeSeconds=MAX_WAIT_TIME_SECONDS + 1
-            )
-        snapshot.match("recieve_message_error_too_large", e.value.response)
-
-        with pytest.raises(ClientError) as e:
-            aws_sqs_client.receive_message(QueueUrl=queue_url, WaitTimeSeconds=-1)
-        snapshot.match("recieve_message_error_too_small", e.value.response)
-
-        empty_short_poll_by_default_resp = aws_sqs_client.receive_message(
-            QueueUrl=queue_url, MaxNumberOfMessages=1
-        )
-        snapshot.match("empty_short_poll_by_default_resp", empty_short_poll_by_default_resp)
-
-        empty_short_poll_explicit_resp = aws_sqs_client.receive_message(
-            QueueUrl=queue_url, MaxNumberOfMessages=1, WaitTimeSeconds=0
-        )
-        snapshot.match("empty_short_poll_explicit_resp", empty_short_poll_explicit_resp)
-
-    @markers.aws.validated
     def test_receive_message_attributes_timestamp_types(self, sqs_queue, aws_sqs_client):
         aws_sqs_client.send_message(QueueUrl=sqs_queue, MessageBody="message")
 
@@ -482,16 +438,6 @@ class TestSqsProvider:
         snapshot.match("send_oversized_message_batch", response)
 
     @markers.aws.validated
-    def test_send_message_to_standard_queue_with_empty_message_group_id(
-        self, sqs_create_queue, aws_client, snapshot
-    ):
-        queue = sqs_create_queue()
-
-        with pytest.raises(ClientError) as e:
-            aws_client.sqs.send_message(QueueUrl=queue, MessageBody="message", MessageGroupId="")
-        snapshot.match("error-response", e.value.response)
-
-    @markers.aws.validated
     def test_tag_untag_queue(self, sqs_create_queue, aws_sqs_client, snapshot):
         queue_url = sqs_create_queue()
 
@@ -607,9 +553,9 @@ class TestSqsProvider:
         took = time.time() - then
         assert took < 2  # should take much less than 5 seconds
 
-        assert len(response.get("Messages", [])) >= 1, (
-            f"unexpected number of messages in {response}"
-        )
+        assert (
+            len(response.get("Messages", [])) >= 1
+        ), f"unexpected number of messages in {response}"
 
     @markers.aws.validated
     def test_wait_time_seconds_waits_correctly(self, sqs_queue, aws_sqs_client):
@@ -619,9 +565,9 @@ class TestSqsProvider:
         Timer(1, _send_message).start()  # send message asynchronously after 1 second
         response = aws_sqs_client.receive_message(QueueUrl=sqs_queue, WaitTimeSeconds=10)
 
-        assert len(response.get("Messages", [])) == 1, (
-            f"unexpected number of messages in response {response}"
-        )
+        assert (
+            len(response.get("Messages", [])) == 1
+        ), f"unexpected number of messages in response {response}"
 
     @markers.aws.validated
     def test_wait_time_seconds_queue_attribute_waits_correctly(
@@ -639,9 +585,9 @@ class TestSqsProvider:
         Timer(1, _send_message).start()  # send message asynchronously after 1 second
         response = aws_sqs_client.receive_message(QueueUrl=queue_url)
 
-        assert len(response.get("Messages", [])) == 1, (
-            f"unexpected number of messages in response {response}"
-        )
+        assert (
+            len(response.get("Messages", [])) == 1
+        ), f"unexpected number of messages in response {response}"
 
     @markers.aws.validated
     def test_create_queue_with_default_attributes_is_idempotent(self, sqs_create_queue):
@@ -1037,9 +983,9 @@ class TestSqsProvider:
         assert "Messages" in result
         message_receipt_1 = result["Messages"][0]
 
-        assert message_receipt_0["ReceiptHandle"] != message_receipt_1["ReceiptHandle"], (
-            "receipt handles should be different"
-        )
+        assert (
+            message_receipt_0["ReceiptHandle"] != message_receipt_1["ReceiptHandle"]
+        ), "receipt handles should be different"
 
     @markers.aws.validated
     def test_receive_terminate_visibility_timeout(self, sqs_queue, aws_sqs_client):
@@ -1055,9 +1001,9 @@ class TestSqsProvider:
         assert "Messages" in result
         message_receipt_1 = result["Messages"][0]
 
-        assert message_receipt_0["ReceiptHandle"] != message_receipt_1["ReceiptHandle"], (
-            "receipt handles should be different"
-        )
+        assert (
+            message_receipt_0["ReceiptHandle"] != message_receipt_1["ReceiptHandle"]
+        ), "receipt handles should be different"
 
         # TODO: check if this is correct (whether receive with VisibilityTimeout = 0 is permanent)
         result = aws_sqs_client.receive_message(QueueUrl=queue_url)
@@ -1080,9 +1026,7 @@ class TestSqsProvider:
             )
             assert aws_sqs_client.receive_message(QueueUrl=queue_url).get("Messages", []) == []
 
-        messages = aws_sqs_client.receive_message(QueueUrl=queue_url, WaitTimeSeconds=5).get(
-            "Messages", []
-        )
+        messages = aws_sqs_client.receive_message(QueueUrl=queue_url, WaitTimeSeconds=5)["Messages"]
         assert messages[0]["Body"] == "test"
         assert len(messages) == 1
 
@@ -1289,7 +1233,7 @@ class TestSqsProvider:
         create_lambda_function(
             func_name=lambda_name,
             handler_file=TEST_LAMBDA_PYTHON,
-            runtime=Runtime.python3_12,
+            runtime=Runtime.python3_9,
         )
         delete_batch_payload = {lambda_integration.MSG_BODY_DELETE_BATCH: queue_url}
         batch = []
@@ -1363,9 +1307,9 @@ class TestSqsProvider:
             messages.extend(response.get("Messages", []))
             return len(messages)
 
-        assert poll_condition(lambda: collect_messages() >= 9, timeout=10), (
-            f"gave up waiting messages, got {len(messages)} from 9"
-        )
+        assert poll_condition(
+            lambda: collect_messages() >= 9, timeout=10
+        ), f"gave up waiting messages, got {len(messages)} from 9"
 
         bodies = {message["Body"] for message in messages}
         assert bodies == {"0", "1", "2", "3", "4", "5", "6", "7", "8"}
@@ -2334,7 +2278,7 @@ class TestSqsProvider:
         while len(result_recv) < message_count and i < message_count:
             result = aws_sqs_client.receive_message(
                 QueueUrl=queue_url, MaxNumberOfMessages=message_count
-            ).get("Messages", [])
+            )["Messages"]
             if result:
                 result_recv.extend(result)
                 i += 1
@@ -2565,41 +2509,6 @@ class TestSqsProvider:
         aws_sqs_client.set_queue_attributes(
             QueueUrl=queue_url, Attributes={"RedrivePolicy": json.dumps(_valid_redrive_policy)}
         )
-
-    @markers.aws.validated
-    def test_set_empty_redrive_policy(self, sqs_create_queue, sqs_get_queue_arn, aws_sqs_client):
-        dl_queue_name = f"dl-queue-{short_uid()}"
-        dl_queue_url = sqs_create_queue(QueueName=dl_queue_name)
-        dl_target_arn = sqs_get_queue_arn(dl_queue_url)
-
-        attributes = {"RedrivePolicy": ""}
-        aws_sqs_client.set_queue_attributes(QueueUrl=dl_queue_name, Attributes=attributes)
-
-        attributes = aws_sqs_client.get_queue_attributes(
-            QueueUrl=dl_queue_name, AttributeNames=["All"]
-        )["Attributes"]
-        assert "RedrivePolicy" not in attributes.keys()
-
-        # check if this behaviour holds on existing Policies as well
-        _valid_redrive_policy = {
-            "deadLetterTargetArn": dl_target_arn,
-            "maxReceiveCount": "42",
-        }
-        aws_sqs_client.set_queue_attributes(
-            QueueUrl=dl_queue_url, Attributes={"RedrivePolicy": json.dumps(_valid_redrive_policy)}
-        )
-
-        attributes = aws_sqs_client.get_queue_attributes(
-            QueueUrl=dl_queue_url, AttributeNames=["All"]
-        )["Attributes"]
-        assert dl_target_arn in attributes["RedrivePolicy"]
-
-        attributes = {"RedrivePolicy": ""}
-        aws_sqs_client.set_queue_attributes(QueueUrl=dl_queue_url, Attributes=attributes)
-        attributes = aws_sqs_client.get_queue_attributes(
-            QueueUrl=dl_queue_url, AttributeNames=["All"]
-        )["Attributes"]
-        assert "RedrivePolicy" not in attributes.keys()
 
     @markers.aws.validated
     @pytest.mark.skip(reason="behavior not implemented yet")
@@ -2872,7 +2781,9 @@ class TestSqsProvider:
     def test_dead_letter_queue_list_sources(self, sqs_create_queue, aws_sqs_client, region_name):
         dl_queue_url = sqs_create_queue()
         url_parts = dl_queue_url.split("/")
-        dl_target_arn = f"arn:{get_partition(region_name)}:sqs:{region_name}:{url_parts[len(url_parts) - 2]}:{url_parts[-1]}"
+        dl_target_arn = "arn:aws:sqs:{}:{}:{}".format(
+            region_name, url_parts[len(url_parts) - 2], url_parts[-1]
+        )
 
         conf = {"deadLetterTargetArn": dl_target_arn, "maxReceiveCount": 50}
         attributes = {"RedrivePolicy": json.dumps(conf)}
@@ -2924,9 +2835,9 @@ class TestSqsProvider:
 
         # check the DLQ
         dlq_receive_response = aws_sqs_client.receive_message(QueueUrl=dlq_url, WaitTimeSeconds=10)
-        assert len(dlq_receive_response["Messages"]) == 1, (
-            f"invalid number of messages in DLQ response {dlq_receive_response}"
-        )
+        assert (
+            len(dlq_receive_response["Messages"]) == 1
+        ), f"invalid number of messages in DLQ response {dlq_receive_response}"
         message_1 = dlq_receive_response["Messages"][0]
         assert message_1["MessageId"] == message_id_1
         assert message_1["Body"] == "foobar"
@@ -2991,7 +2902,6 @@ class TestSqsProvider:
         sqs_create_queue,
         sqs_get_queue_arn,
         snapshot,
-        sqs_collect_messages,
     ):
         sqs = aws_client.sqs
 
@@ -3046,6 +2956,7 @@ class TestSqsProvider:
         snapshot.match("rec-pre-dlq", messages)
 
         messages = sqs_collect_messages(
+            sqs,
             dl_queue_url,
             expected=2,
             timeout=10,
@@ -3155,7 +3066,9 @@ class TestSqsProvider:
             AttributeNames=["QueueArn"],
         )
         # asserts
-        constructed_arn = f"arn:{get_partition(region_name)}:sqs:{region_name}:{url_parts[len(url_parts) - 2]}:{url_parts[-1]}"
+        constructed_arn = "arn:aws:sqs:{}:{}:{}".format(
+            region_name, url_parts[len(url_parts) - 2], url_parts[-1]
+        )
         redrive_policy = json.loads(get_two_attributes.get("Attributes").get("RedrivePolicy"))
         assert message_retention_period == get_two_attributes.get("Attributes").get(
             "MessageRetentionPeriod"
@@ -3606,7 +3519,7 @@ class TestSqsProvider:
         create_lambda_function(
             func_name=lambda_name,
             handler_file=TEST_LAMBDA_PYTHON,
-            runtime=Runtime.python3_12,
+            runtime=Runtime.python3_9,
         )
         # create arn
         url_parts = queue_url.split("/")
@@ -4600,7 +4513,7 @@ def sqs_http_client(aws_http_client_factory, region_name):
 
 class TestSqsQueryApi:
     @markers.aws.validated
-    def test_get_queue_attributes_all(self, sqs_create_queue, sqs_http_client, region_name):
+    def test_get_queue_attributes_all(self, sqs_create_queue, sqs_http_client):
         queue_url = sqs_create_queue()
         response = sqs_http_client.get(
             queue_url,
@@ -4612,17 +4525,14 @@ class TestSqsQueryApi:
 
         assert response.ok
         assert "<GetQueueAttributesResponse" in response.text
-        assert (
-            f"<Attribute><Name>QueueArn</Name><Value>arn:{get_partition(region_name)}:sqs:"
-            in response.text
-        )
+        assert "<Attribute><Name>QueueArn</Name><Value>arn:aws:sqs:" in response.text
         assert "<Attribute><Name>VisibilityTimeout</Name><Value>30" in response.text
         assert queue_url.split("/")[-1] in response.text
 
     @markers.aws.only_localstack
     @pytest.mark.parametrize("strategy", ["standard", "domain", "path"])
     def test_get_queue_attributes_works_without_authparams(
-        self, monkeypatch, sqs_create_queue, strategy, region_name
+        self, monkeypatch, sqs_create_queue, strategy
     ):
         monkeypatch.setattr(config, "SQS_ENDPOINT_STRATEGY", strategy)
 
@@ -4637,17 +4547,12 @@ class TestSqsQueryApi:
 
         assert response.ok
         assert "<GetQueueAttributesResponse" in response.text
-        assert (
-            f"<Attribute><Name>QueueArn</Name><Value>arn:{get_partition(region_name)}:sqs:"
-            in response.text
-        )
+        assert "<Attribute><Name>QueueArn</Name><Value>arn:aws:sqs:" in response.text
         assert "<Attribute><Name>VisibilityTimeout</Name><Value>30" in response.text
         assert queue_url.split("/")[-1] in response.text
 
     @markers.aws.validated
-    def test_get_queue_attributes_with_query_args(
-        self, sqs_create_queue, sqs_http_client, region_name
-    ):
+    def test_get_queue_attributes_with_query_args(self, sqs_create_queue, sqs_http_client):
         queue_url = sqs_create_queue()
         response = sqs_http_client.get(
             queue_url,
@@ -4659,10 +4564,7 @@ class TestSqsQueryApi:
 
         assert response.ok
         assert "<GetQueueAttributesResponse" in response.text
-        assert (
-            f"<Attribute><Name>QueueArn</Name><Value>arn:{get_partition(region_name)}:sqs:"
-            in response.text
-        )
+        assert "<Attribute><Name>QueueArn</Name><Value>arn:aws:sqs:" in response.text
         assert "<Attribute><Name>VisibilityTimeout</Name>" not in response.text
         assert queue_url.split("/")[-1] in response.text
 
@@ -4980,7 +4882,7 @@ class TestSqsQueryApi:
         )
 
     @markers.aws.validated
-    def test_overwrite_queue_url_in_params(self, sqs_create_queue, sqs_http_client, region_name):
+    def test_overwrite_queue_url_in_params(self, sqs_create_queue, sqs_http_client):
         # here, queue1 url simply serves as AWS endpoint but we pass queue2 url in the request arg
         queue1_url = sqs_create_queue()
         queue2_url = sqs_create_queue()
@@ -4995,10 +4897,7 @@ class TestSqsQueryApi:
         )
 
         assert response.ok
-        assert (
-            f"<Attribute><Name>QueueArn</Name><Value>arn:{get_partition(region_name)}:sqs:"
-            in response.text
-        )
+        assert "<Attribute><Name>QueueArn</Name><Value>arn:aws:sqs:" in response.text
         assert queue1_url.split("/")[-1] not in response.text
         assert queue2_url.split("/")[-1] in response.text
 

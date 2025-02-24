@@ -16,17 +16,16 @@ from requests.structures import CaseInsensitiveDict
 from localstack import config
 from localstack.aws.api.lambda_ import Runtime
 from localstack.aws.handlers import cors
-from localstack.constants import TAG_KEY_CUSTOM_ID
-from localstack.services.apigateway.helpers import (
-    host_based_url,
-    localstack_path_based_url,
-    path_based_url,
+from localstack.constants import (
+    APPLICATION_JSON,
 )
-from localstack.services.apigateway.legacy.helpers import (
+from localstack.services.apigateway.helpers import (
+    TAG_KEY_CUSTOM_ID,
     get_resource_for_path,
     get_rest_api_paths,
+    host_based_url,
+    path_based_url,
 )
-from localstack.testing.aws.util import in_default_partition
 from localstack.testing.config import (
     TEST_AWS_ACCESS_KEY_ID,
     TEST_AWS_ACCOUNT_ID,
@@ -64,7 +63,9 @@ from tests.aws.services.apigateway.conftest import (
     APIGATEWAY_DYNAMODB_POLICY,
     APIGATEWAY_KINESIS_POLICY,
     APIGATEWAY_LAMBDA_POLICY,
-    is_next_gen_api,
+    APIGATEWAY_S3_POLICY,
+    APIGATEWAY_STEPFUNCTIONS_POLICY,
+    STEPFUNCTIONS_ASSUME_ROLE_POLICY,
 )
 from tests.aws.services.lambda_.test_lambda import (
     TEST_LAMBDA_NODEJS,
@@ -94,6 +95,25 @@ ApiGatewayLambdaProxyIntegrationTestResult = namedtuple(
         "path_with_replace",
     ],
 )
+# template used to transform incoming requests at the API Gateway (stream name to be filled in later)
+APIGATEWAY_DATA_INBOUND_TEMPLATE = """{
+    "StreamName": "%s",
+    "Records": [
+        #set( $numRecords = $input.path('$.records').size() )
+        #if($numRecords > 0)
+        #set( $maxIndex = $numRecords - 1 )
+        #foreach( $idx in [0..$maxIndex] )
+        #set( $elem = $input.path("$.records[${idx}]") )
+        #set( $elemJsonB64 = $util.base64Encode($elem.data) )
+        {
+            "Data": "$elemJsonB64",
+            "PartitionKey": #if( $elem.partitionKey != '')"$elem.partitionKey"
+                            #else"$elemJsonB64.length()"#end
+        }#if($foreach.hasNext),#end
+        #end
+        #end
+    ]
+}"""
 
 API_PATH_LAMBDA_PROXY_BACKEND = "/lambda/foo1"
 API_PATH_LAMBDA_PROXY_BACKEND_WITH_PATH_PARAM = "/lambda/{test_param1}"
@@ -136,14 +156,10 @@ class TestAPIGateway:
         assert "Invalid API identifier specified" in e.value.response["Error"]["Message"]
         assert "foobar" in e.value.response["Error"]["Message"]
 
-    @pytest.mark.parametrize(
-        "url_function", [path_based_url, host_based_url, localstack_path_based_url]
-    )
+    @pytest.mark.parametrize("url_function", [path_based_url, host_based_url])
     @markers.aws.only_localstack
     # This is not a possible feature on aws.
     def test_create_rest_api_with_custom_id(self, create_rest_apigw, url_function, aws_client):
-        if not is_next_gen_api() and url_function == localstack_path_based_url:
-            pytest.skip("This URL type is not supported in the legacy implementation")
         apigw_name = f"gw-{short_uid()}"
         test_id = "testId123"
         api_id, name, _ = create_rest_apigw(name=apigw_name, tags={TAG_KEY_CUSTOM_ID: test_id})
@@ -299,18 +315,13 @@ class TestAPIGateway:
         assert response.headers["Content-Type"] == "text/html"
         assert response.headers["Access-Control-Allow-Origin"] == "*"
 
-    @pytest.mark.parametrize(
-        "url_type", [UrlType.HOST_BASED, UrlType.PATH_BASED, UrlType.LS_PATH_BASED]
-    )
+    @pytest.mark.parametrize("url_type", [UrlType.HOST_BASED, UrlType.PATH_BASED])
     @pytest.mark.parametrize("disable_custom_cors", [True, False])
     @pytest.mark.parametrize("origin", ["http://allowed", "http://denied"])
     @markers.aws.only_localstack
     def test_invoke_endpoint_cors_headers(
         self, url_type, disable_custom_cors, origin, monkeypatch, aws_client
     ):
-        if not is_next_gen_api() and url_type == UrlType.LS_PATH_BASED:
-            pytest.skip("This URL type is not supported with the legacy implementation")
-
         monkeypatch.setattr(config, "DISABLE_CUSTOM_CORS_APIGATEWAY", disable_custom_cors)
         monkeypatch.setattr(
             cors, "ALLOWED_CORS_ORIGINS", cors.ALLOWED_CORS_ORIGINS + ["http://allowed"]
@@ -332,7 +343,6 @@ class TestAPIGateway:
             integration_type="MOCK",
             integration_responses=responses,
             stage_name=TEST_STAGE_NAME,
-            request_templates={"application/json": json.dumps({"statusCode": 200})},
         )
 
         # invoke endpoint with Origin header
@@ -356,7 +366,6 @@ class TestAPIGateway:
     @pytest.mark.parametrize(
         "api_path", [API_PATH_LAMBDA_PROXY_BACKEND, API_PATH_LAMBDA_PROXY_BACKEND_WITH_PATH_PARAM]
     )
-    @pytest.mark.skipif(condition=is_next_gen_api(), reason="Failing and not validated")
     def test_api_gateway_lambda_proxy_integration(
         self, api_path, integration_lambda, aws_client, create_iam_role_with_policy
     ):
@@ -377,7 +386,6 @@ class TestAPIGateway:
     # This test fails as it tries to create a lambda locally?
     # It then leaves some resources behind, apigateway and policies
     @markers.aws.needs_fixing
-    @pytest.mark.skipif(condition=is_next_gen_api(), reason="Failing and not validated")
     def test_api_gateway_lambda_proxy_integration_with_is_base_64_encoded(
         self, integration_lambda, aws_client, create_iam_role_with_policy
     ):
@@ -536,7 +544,6 @@ class TestAPIGateway:
     # This test fails as it tries to create a lambda locally?
     # It then leaves some resources behind, apigateway and policies
     @markers.aws.needs_fixing
-    @pytest.mark.skipif(condition=is_next_gen_api(), reason="Failing and not validated")
     def test_api_gateway_lambda_proxy_integration_any_method(self, integration_lambda):
         self._test_api_gateway_lambda_proxy_integration_any_method(
             integration_lambda, API_PATH_LAMBDA_PROXY_BACKEND_ANY_METHOD
@@ -545,7 +552,6 @@ class TestAPIGateway:
     # This test fails as it tries to create a lambda locally?
     # It then leaves some resources behind, apigateway and policies
     @markers.aws.needs_fixing
-    @pytest.mark.skipif(condition=is_next_gen_api(), reason="Failing and not validated")
     def test_api_gateway_lambda_proxy_integration_any_method_with_path_param(
         self, integration_lambda
     ):
@@ -865,7 +871,6 @@ class TestAPIGateway:
 
     @markers.aws.needs_fixing
     # Missing role, proper url and doesn't clean up after itself. Should be move to dynamodb test file and use fixtures that clean their resources
-    @pytest.mark.skipif(condition=is_next_gen_api(), reason="Failing and not validated")
     def test_put_integration_dynamodb_proxy_validation_without_request_template(self, aws_client):
         api_id = self.create_api_gateway_and_deploy(aws_client.apigateway, aws_client.dynamodb)
         url = path_based_url(api_id=api_id, stage_name="staging", path="/")
@@ -878,7 +883,6 @@ class TestAPIGateway:
 
     @markers.aws.needs_fixing
     # Missing role, proper url and doesn't clean up after itself. Should be move to dynamodb test file and use fixtures that clean their resources
-    @pytest.mark.skipif(condition=is_next_gen_api(), reason="Failing and not validated")
     def test_put_integration_dynamodb_proxy_validation_with_request_template(
         self,
         aws_client,
@@ -929,7 +933,7 @@ class TestAPIGateway:
 
     @markers.aws.needs_fixing
     # Doesn't use a fixture that cleans up after itself, and most likely missing roles. Should be moved to common
-    def test_multiple_api_keys_validate(self, aws_client, create_iam_role_with_policy, cleanups):
+    def test_multiple_api_keys_validate(self, aws_client, create_iam_role_with_policy):
         request_templates = {
             "application/json": json.dumps(
                 {
@@ -985,7 +989,6 @@ class TestAPIGateway:
             }
             aws_client.apigateway.create_usage_plan_key(**payload)
             api_keys.append(api_key["value"])
-            cleanups.append(lambda: aws_client.apigateway.delete_api_key(apiKey=api_key["id"]))
 
         response = requests.put(
             url,
@@ -1007,8 +1010,170 @@ class TestAPIGateway:
         for usage_plan_id in usage_plan_ids:
             aws_client.apigateway.delete_usage_plan(usagePlanId=usage_plan_id)
 
+    @markers.aws.validated
+    @pytest.mark.parametrize("action", ["StartExecution", "DeleteStateMachine"])
+    def test_apigateway_with_step_function_integration(
+        self,
+        action,
+        create_lambda_function,
+        create_rest_apigw,
+        create_iam_role_with_policy,
+        aws_client,
+        account_id,
+        snapshot,
+    ):
+        snapshot.add_transformer(snapshot.transform.key_value("executionArn", "executionArn"))
+        snapshot.add_transformer(
+            snapshot.transform.jsonpath(
+                jsonpath="$..startDate",
+                value_replacement="<startDate>",
+                reference_replacement=False,
+            )
+        )
+
+        region_name = aws_client.apigateway._client_config.region_name
+
+        # create lambda
+        fn_name = f"lambda-sfn-apigw-{short_uid()}"
+        lambda_arn = create_lambda_function(
+            handler_file=TEST_LAMBDA_PYTHON_ECHO,
+            func_name=fn_name,
+            runtime=Runtime.python3_9,
+        )["CreateFunctionResponse"]["FunctionArn"]
+
+        # create state machine and permissions for step function to invoke lambda
+        role_arn = create_iam_role_with_policy(
+            RoleName=f"sfn_role-{short_uid()}",
+            PolicyName=f"sfn-role-policy-{short_uid()}",
+            RoleDefinition=STEPFUNCTIONS_ASSUME_ROLE_POLICY,
+            PolicyDefinition=APIGATEWAY_LAMBDA_POLICY,
+        )
+
+        state_machine_name = f"test-{short_uid()}"
+        state_machine_def = {
+            "Comment": "Hello World example",
+            "StartAt": "step1",
+            "States": {
+                "step1": {"Type": "Task", "Resource": "__tbd__", "End": True},
+            },
+        }
+        state_machine_def["States"]["step1"]["Resource"] = lambda_arn
+        result = aws_client.stepfunctions.create_state_machine(
+            name=state_machine_name,
+            definition=json.dumps(state_machine_def),
+            roleArn=role_arn,
+            type="EXPRESS",
+        )
+        sm_arn = result["stateMachineArn"]
+
+        # create REST API with integrations
+        rest_api, _, root_id = create_rest_apigw(
+            name=f"test-{short_uid()}", description="test-step-function-integration"
+        )
+        aws_client.apigateway.put_method(
+            restApiId=rest_api,
+            resourceId=root_id,
+            httpMethod="POST",
+            authorizationType="NONE",
+        )
+        create_rest_api_method_response(
+            aws_client.apigateway,
+            restApiId=rest_api,
+            resourceId=root_id,
+            httpMethod="POST",
+            statusCode="200",
+        )
+
+        # give permission to api gateway to invoke step function
+        uri = f"arn:aws:apigateway:{region_name}:states:action/{action}"
+        assume_role_arn = create_iam_role_with_policy(
+            RoleName=f"role-apigw-{short_uid()}",
+            PolicyName=f"policy-apigw-{short_uid()}",
+            RoleDefinition=APIGATEWAY_ASSUME_ROLE_POLICY,
+            PolicyDefinition=APIGATEWAY_STEPFUNCTIONS_POLICY,
+        )
+
+        def _prepare_integration(request_template=None, response_template=None):
+            aws_client.apigateway.put_integration(
+                restApiId=rest_api,
+                resourceId=root_id,
+                httpMethod="POST",
+                integrationHttpMethod="POST",
+                type="AWS",
+                uri=uri,
+                credentials=assume_role_arn,
+                requestTemplates=request_template,
+            )
+
+            aws_client.apigateway.put_integration_response(
+                restApiId=rest_api,
+                resourceId=root_id,
+                selectionPattern="",
+                responseTemplates=response_template,
+                httpMethod="POST",
+                statusCode="200",
+            )
+
+        test_data = {"test": "test-value"}
+        url = api_invoke_url(api_id=rest_api, stage="dev", path="/")
+
+        req_template = {
+            "application/json": """
+            {
+            "input": "$util.escapeJavaScript($input.json('$'))",
+            "stateMachineArn": "%s"
+            }
+            """
+            % sm_arn
+        }
+        match action:
+            case "StartExecution":
+                _prepare_integration(req_template, response_template={})
+                aws_client.apigateway.create_deployment(restApiId=rest_api, stageName="dev")
+
+                # invoke stepfunction via API GW, assert results
+                def _invoke_start_step_function():
+                    resp = requests.post(url, data=json.dumps(test_data))
+                    assert resp.ok
+                    content = json.loads(resp.content)
+                    assert "executionArn" in content
+                    assert "startDate" in content
+                    return content
+
+                body = retry(_invoke_start_step_function, retries=15, sleep=0.8)
+                snapshot.match("start_execution_response", body)
+
+            case "StartSyncExecution":
+                resp_template = {APPLICATION_JSON: "$input.path('$.output')"}
+                _prepare_integration(req_template, resp_template)
+                aws_client.apigateway.create_deployment(restApiId=rest_api, stageName="dev")
+                input_data = {"input": json.dumps(test_data), "name": "MyExecution"}
+
+                def _invoke_start_sync_step_function():
+                    input_data["name"] += "1"
+                    resp = requests.post(url, data=json.dumps(input_data))
+                    assert resp.ok
+                    body = json.loads(resp.content)
+                    assert test_data == body
+                    return body
+
+                body = retry(_invoke_start_sync_step_function, retries=15, sleep=0.8)
+                snapshot.match("start_sync_response", body)
+
+            case "DeleteStateMachine":
+                _prepare_integration({}, {})
+                aws_client.apigateway.create_deployment(restApiId=rest_api, stageName="dev")
+
+                def _invoke_step_function():
+                    resp = requests.post(url, data=json.dumps({"stateMachineArn": sm_arn}))
+                    # If the action is successful, the service sends back an HTTP 200 response with an empty HTTP body.
+                    assert resp.ok
+                    return json.loads(resp.content)
+
+                body = retry(_invoke_step_function, retries=15, sleep=1)
+                snapshot.match("delete_state_machine_response", body)
+
     @markers.aws.needs_fixing
-    @pytest.mark.skipif(condition=is_next_gen_api(), reason="Failing and not validated")
     def test_api_gateway_http_integration_with_path_request_parameter(
         self, create_rest_apigw, echo_http_server, aws_client
     ):
@@ -1081,7 +1246,6 @@ class TestAPIGateway:
 
     @markers.aws.needs_fixing
     # Doesn't use fixture that cleans up after itself. Should be moved to common
-    @pytest.mark.skipif(condition=is_next_gen_api(), reason="Failing and not validated")
     def test_api_mock_integration_response_params(self, aws_client):
         resps = [
             {
@@ -1509,9 +1673,6 @@ def test_apigw_call_api_with_aws_endpoint_url(aws_client, region_name):
     assert isinstance(content.get("item"), list)
 
 
-@pytest.mark.skipif(
-    not in_default_partition(), reason="Test not applicable in non-default partitions"
-)
 @pytest.mark.parametrize("method", ["GET", "ANY"])
 @pytest.mark.parametrize("url_type", [path_based_url, UrlType.HOST_BASED])
 @markers.aws.validated
@@ -1577,7 +1738,7 @@ def test_rest_api_multi_region(
     lambda_eu_arn = create_lambda_function(
         handler_file=TEST_LAMBDA_NODEJS,
         func_name=lambda_name,
-        runtime=Runtime.nodejs20_x,
+        runtime=Runtime.nodejs16_x,
         region_name="eu-west-1",
         client=lambda_eu_west_1_client,
     )["CreateFunctionResponse"]["FunctionArn"]
@@ -1585,7 +1746,7 @@ def test_rest_api_multi_region(
     lambda_us_arn = create_lambda_function(
         handler_file=TEST_LAMBDA_NODEJS,
         func_name=lambda_name,
-        runtime=Runtime.nodejs20_x,
+        runtime=Runtime.nodejs16_x,
         region_name="us-west-1",
         client=lambda_us_west_1_client,
     )["CreateFunctionResponse"]["FunctionArn"]
@@ -1637,6 +1798,51 @@ def test_rest_api_multi_region(
 
 
 class TestIntegrations:
+    @markers.aws.needs_fixing
+    # Attempts to create invalid integration with proxy
+    def test_api_gateway_s3_get_integration(
+        self, create_rest_apigw, aws_client, create_iam_role_with_policy
+    ):
+        s3_client = aws_client.s3
+
+        bucket_name = f"test-bucket-{short_uid()}"
+        apigateway_name = f"test-api-{short_uid()}"
+        object_name = "test.json"
+        object_content = '{ "success": "true" }'
+        object_content_type = "application/json"
+
+        api_id, _, _ = create_rest_apigw(name=apigateway_name)
+
+        try:
+            resource_util.get_or_create_bucket(bucket_name, s3_client=s3_client)
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=object_name,
+                Body=object_content,
+                ContentType=object_content_type,
+            )
+
+            role_arn = create_iam_role_with_policy(
+                RoleName=f"role-apigw-s3-{short_uid()}",
+                PolicyName=f"policy-apigw-s3-{short_uid()}",
+                RoleDefinition=APIGATEWAY_ASSUME_ROLE_POLICY,
+                PolicyDefinition=APIGATEWAY_S3_POLICY,
+            )
+
+            self.connect_api_gateway_to_s3(
+                aws_client.apigateway, bucket_name, object_name, api_id, "GET", role_arn
+            )
+
+            aws_client.apigateway.create_deployment(restApiId=api_id, stageName="test")
+            url = path_based_url(api_id, "test", f"/{object_name}")
+            result = requests.get(url)
+            assert 200 == result.status_code
+            assert object_content == result.text
+            assert object_content_type == result.headers["content-type"]
+        finally:
+            s3_client.delete_object(Bucket=bucket_name, Key=object_name)
+            s3_client.delete_bucket(Bucket=bucket_name)
+
     @pytest.mark.parametrize("method", ["GET", "POST"])
     @pytest.mark.parametrize("url_type", [UrlType.PATH_BASED, UrlType.HOST_BASED])
     @pytest.mark.parametrize(
@@ -1706,9 +1912,6 @@ class TestIntegrations:
 
     @pytest.mark.parametrize("int_type", ["custom", "proxy"])
     @markers.aws.needs_fixing
-    @pytest.mark.skipif(
-        condition=is_next_gen_api(), reason="Failing and not validated, not deploying"
-    )
     # TODO replace with fixtures that will clean resources and replave the  `echo_http_server` with `create_echo_http_server`.
     #  Also has hardcoded localhost endpoint in helper functions
     def test_api_gateway_http_integrations(
@@ -1764,6 +1967,96 @@ class TestIntegrations:
         expected = custom_result if int_type == "custom" else data
         assert expected == content["data"]
         assert ctype == headers["content-type"]
+
+    # ==================
+    # Helper methods
+    # TODO: replace with fixtures, to allow passing aws_client and enable snapshot testing
+    # ==================
+
+    def connect_api_gateway_to_s3(
+        self,
+        apigw_client,
+        bucket_name: str,
+        file_name: str,
+        api_id: str,
+        method: str,
+        role_arn: str,
+    ):
+        """Connects the root resource of an api gateway to the given object of an s3 bucket."""
+        s3_uri = "arn:aws:apigateway:{}:s3:path/{}/{{proxy}}".format(
+            TEST_AWS_REGION_NAME, bucket_name
+        )
+
+        resources = apigw_client.get_resources(restApiId=api_id)
+        # using the root resource '/' directly for this test
+        root_resource_id = resources["items"][0]["id"]
+        proxy_resource = apigw_client.create_resource(
+            restApiId=api_id, parentId=root_resource_id, pathPart="{proxy+}"
+        )
+        apigw_client.put_method(
+            restApiId=api_id,
+            resourceId=proxy_resource["id"],
+            httpMethod=method,
+            authorizationType="NONE",
+            apiKeyRequired=False,
+            requestParameters={},
+        )
+        apigw_client.put_integration(
+            restApiId=api_id,
+            resourceId=proxy_resource["id"],
+            httpMethod=method,
+            type="AWS",
+            integrationHttpMethod=method,
+            uri=s3_uri,
+            credentials=role_arn,
+            requestParameters={"integration.request.path.proxy": "method.request.path.proxy"},
+        )
+
+    def connect_api_gateway_to_kinesis(
+        self,
+        client,
+        gateway_name: str,
+        kinesis_stream: str,
+        region_name: str,
+        role_arn: str,
+    ):
+        template = APIGATEWAY_DATA_INBOUND_TEMPLATE % kinesis_stream
+        resources = {
+            "data": [
+                {
+                    "httpMethod": "POST",
+                    "authorizationType": "NONE",
+                    "requestModels": {"application/json": "Empty"},
+                    "integrations": [
+                        {
+                            "type": "AWS",
+                            "uri": f"arn:aws:apigateway:{region_name}:kinesis:action/PutRecords",
+                            "requestTemplates": {"application/json": template},
+                            "credentials": role_arn,
+                        }
+                    ],
+                },
+                {
+                    "httpMethod": "GET",
+                    "authorizationType": "NONE",
+                    "requestModels": {"application/json": "Empty"},
+                    "integrations": [
+                        {
+                            "type": "AWS",
+                            "uri": f"arn:aws:apigateway:{region_name}:kinesis:action/ListStreams",
+                            "requestTemplates": {"application/json": "{}"},
+                            "credentials": role_arn,
+                        }
+                    ],
+                },
+            ]
+        }
+        return resource_util.create_api_gateway(
+            name=gateway_name,
+            resources=resources,
+            stage_name=TEST_STAGE_NAME,
+            client=client,
+        )
 
     def connect_api_gateway_to_http(
         self, int_type, gateway_name, target_url, methods=None, path=None

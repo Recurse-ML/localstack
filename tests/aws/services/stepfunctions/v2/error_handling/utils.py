@@ -6,15 +6,14 @@ from localstack.utils.strings import short_uid
 
 @staticmethod
 def _test_sfn_scenario(
-    target_aws_client,
-    create_state_machine_iam_role,
+    stepfunctions_client,
+    create_iam_role_for_sfn,
     create_state_machine,
     sfn_snapshot,
     definition,
     execution_input,
 ):
-    stepfunctions_client = target_aws_client.stepfunctions
-    snf_role_arn = create_state_machine_iam_role(target_aws_client)
+    snf_role_arn = create_iam_role_for_sfn()
     sfn_snapshot.add_transformer(RegexTransformer(snf_role_arn, "snf_role_arn"))
     sfn_snapshot.add_transformer(
         RegexTransformer(
@@ -27,9 +26,7 @@ def _test_sfn_scenario(
     )
 
     sm_name: str = f"statemachine_{short_uid()}"
-    creation_resp = create_state_machine(
-        target_aws_client, name=sm_name, definition=definition, roleArn=snf_role_arn
-    )
+    creation_resp = create_state_machine(name=sm_name, definition=definition, roleArn=snf_role_arn)
     sfn_snapshot.add_transformer(sfn_snapshot.transform.sfn_sm_create_arn(creation_resp, 0))
     state_machine_arn = creation_resp["stateMachineArn"]
 

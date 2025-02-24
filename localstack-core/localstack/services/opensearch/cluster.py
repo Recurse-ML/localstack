@@ -17,6 +17,7 @@ from localstack.aws.api.opensearch import (
 from localstack.http.client import SimpleRequestsClient
 from localstack.http.proxy import ProxyHandler
 from localstack.services.edge import ROUTER
+from localstack.services.infra import DEFAULT_BACKEND_HOST
 from localstack.services.opensearch import versions
 from localstack.services.opensearch.packages import elasticsearch_package, opensearch_package
 from localstack.utils.aws.arns import parse_arn
@@ -35,7 +36,6 @@ from localstack.utils.urls import localstack_host
 
 LOG = logging.getLogger(__name__)
 INTERNAL_USER_AUTH = ("localstack-internal", "localstack-internal")
-DEFAULT_BACKEND_HOST = "127.0.0.1"
 
 CommandSettings = Dict[str, str]
 
@@ -243,10 +243,10 @@ def register_cluster(
     strategy = config.OPENSEARCH_ENDPOINT_STRATEGY
     # custom endpoints override any endpoint strategy
     if custom_endpoint and custom_endpoint.enabled:
-        LOG.debug("Registering route from %s%s to %s", host, path, endpoint.proxy.forward_base_url)
-        assert not (host == localstack_host().host and (not path or path == "/")), (
-            "trying to register an illegal catch all route"
-        )
+        LOG.debug(f"Registering route from {host}{path} to {endpoint.proxy.forward_base_url}")
+        assert not (
+            host == localstack_host().host and (not path or path == "/")
+        ), "trying to register an illegal catch all route"
         rules.append(
             ROUTER.add(
                 path=path,
@@ -262,7 +262,7 @@ def register_cluster(
             )
         )
     elif strategy == "domain":
-        LOG.debug("Registering route from %s to %s", host, endpoint.proxy.forward_base_url)
+        LOG.debug(f"Registering route from {host} to {endpoint.proxy.forward_base_url}")
         assert not host == localstack_host().host, "trying to register an illegal catch all route"
         rules.append(
             ROUTER.add(
@@ -279,13 +279,13 @@ def register_cluster(
             )
         )
     elif strategy == "path":
-        LOG.debug("Registering route from %s to %s", path, endpoint.proxy.forward_base_url)
+        LOG.debug(f"Registering route from {path} to {endpoint.proxy.forward_base_url}")
         assert path and not path == "/", "trying to register an illegal catch all route"
         rules.append(ROUTER.add(path, endpoint=endpoint))
         rules.append(ROUTER.add(f"{path}/<path:path>", endpoint=endpoint))
 
     elif strategy != "port":
-        LOG.warning("Attempted to register route for cluster with invalid strategy '%s'", strategy)
+        LOG.warning(f"Attempted to register route for cluster with invalid strategy '{strategy}'")
 
     return rules
 
@@ -466,7 +466,6 @@ class OpensearchCluster(Server):
 
     def _create_env_vars(self, directories: Directories) -> Dict:
         env_vars = {
-            "JAVA_HOME": os.path.join(directories.install, "jdk"),
             "OPENSEARCH_JAVA_OPTS": os.environ.get("OPENSEARCH_JAVA_OPTS", "-Xms200m -Xmx600m"),
             "OPENSEARCH_TMPDIR": directories.tmp,
         }
@@ -675,24 +674,13 @@ class ElasticsearchCluster(OpensearchCluster):
         settings = {
             "http.port": self.port,
             "http.publish_port": self.port,
+            "transport.port": "0",
             "network.host": self.host,
             "http.compression": "false",
             "path.data": f'"{dirs.data}"',
             "path.repo": f'"{dirs.backup}"',
+            "discovery.type": "single-node",
         }
-
-        # This config option was renamed between 6.7 and 6.8, yet not documented as a breaking change
-        # See https://github.com/elastic/elasticsearch/blob/f220abaf/build-tools/src/main/java/org/elasticsearch/gradle/testclusters/ElasticsearchNode.java#L1349-L1353
-        if self.version.startswith("Elasticsearch_5.") or (
-            self.version.startswith("Elasticsearch_6.") and self.version != "Elasticsearch_6.8"
-        ):
-            settings["transport.tcp.port"] = "0"
-        else:
-            settings["transport.port"] = "0"
-
-        # `discovery.type` had a different meaning in 5.x
-        if not self.version.startswith("Elasticsearch_5."):
-            settings["discovery.type"] = "single-node"
 
         if os.path.exists(os.path.join(dirs.mods, "x-pack-ml")):
             settings["xpack.ml.enabled"] = "false"
@@ -701,7 +689,6 @@ class ElasticsearchCluster(OpensearchCluster):
 
     def _create_env_vars(self, directories: Directories) -> Dict:
         return {
-            **elasticsearch_package.get_installer(self.version).get_java_env_vars(),
             "ES_JAVA_OPTS": os.environ.get("ES_JAVA_OPTS", "-Xms200m -Xmx600m"),
             "ES_TMPDIR": directories.tmp,
         }

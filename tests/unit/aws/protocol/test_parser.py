@@ -6,6 +6,7 @@ import pytest
 from botocore.awsrequest import prepare_request_dict
 from botocore.serialize import create_serializer
 
+from localstack import config
 from localstack.aws.protocol.parser import (
     OperationNotFoundParserError,
     ProtocolParserError,
@@ -678,52 +679,6 @@ def test_json_cbor_blob_parsing():
     assert parsed_request["PartitionKey"] == "partitionkey"
 
 
-def test_json_cbor_blob_parsing_w_timestamp(snapshot):
-    serialized_request = {
-        "url_path": "/",
-        "query_string": "",
-        "method": "POST",
-        "headers": {
-            "Host": "localhost:4566",
-            "amz-sdk-invocation-id": "d77968c6-b536-155d-7228-d4dfe6372154",
-            "amz-sdk-request": "attempt=1; max=3",
-            "Content-Length": "103",
-            "Content-Type": "application/x-amz-cbor-1.1",
-            "X-Amz-Date": "20220721T081553Z",
-            "X-Amz-Target": "Kinesis_20131202.SubscribeToShard",
-            "x-localstack-tgt-api": "kinesis",
-        },
-        "body": b"\xa3kConsumerARNs<test-consumer-arn>gShardIdo<test-shard-id>pStartingPosition\xa2dTypelAT_TIMESTAMPiTimestampm1718960048123",
-        "url": "/",
-        "context": {},
-    }
-
-    prepare_request_dict(serialized_request, "")
-    split_url = urlsplit(serialized_request.get("url"))
-    path = split_url.path
-    query_string = split_url.query
-
-    # Use our parser to parse the serialized body
-    # Load the appropriate service
-    service = load_service("kinesis")
-    operation_model = service.operation_model("SubscribeToShard")
-    parser = create_parser(service)
-    parsed_operation_model, parsed_request = parser.parse(
-        HttpRequest(
-            method=serialized_request.get("method"),
-            path=unquote(path),
-            query_string=to_str(query_string),
-            headers=serialized_request.get("headers"),
-            body=serialized_request["body"],
-            raw_path=path,
-        )
-    )
-
-    # Check if the determined operation_model is correct
-    assert parsed_operation_model == operation_model
-    snapshot.match("parsed_request", parsed_request)
-
-
 def test_restjson_parser_xray_with_botocore():
     _botocore_parser_integration_test(
         service="xray",
@@ -1233,6 +1188,9 @@ def test_restxml_header_date_parsing():
     )
 
 
+@pytest.mark.skipif(
+    config.LEGACY_V2_S3_PROVIDER, reason="v2 provider does not rely on virtual host parser"
+)
 def test_s3_virtual_host_addressing():
     """Test the parsing of an S3 bucket request using the bucket encoded in the domain."""
     request = HttpRequest(method="PUT", headers={"host": "test-bucket.s3.example.com"})

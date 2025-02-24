@@ -23,13 +23,7 @@ class EvalComponent(Component, abc.ABC):
         return self.__heap_key
 
     def _log_evaluation_step(self, subject: str = "Generic") -> None:
-        if LOG.isEnabledFor(logging.DEBUG):
-            LOG.debug(
-                "[ASL] [%s] [%s]: '%s'",
-                subject.lower()[:4],
-                self.__class__.__name__,
-                repr(self),
-            )
+        LOG.debug(f"[ASL] [{subject.lower()[:4]}] [{self.__class__.__name__}]: '{repr(self)}'")
 
     def _log_failure_event_exception(self, failure_event_exception: FailureEventException) -> None:
         error_log_parts = ["Exception=FailureEventException"]
@@ -44,7 +38,7 @@ class EvalComponent(Component, abc.ABC):
 
         error_log = ", ".join(error_log_parts)
         component_repr = repr(self)
-        LOG.error("%s at '%s'", error_log, component_repr)
+        LOG.error(f"{error_log} at '{component_repr}'")
 
     def _log_exception(self, exception: Exception) -> None:
         exception_name = exception.__class__.__name__
@@ -59,15 +53,12 @@ class EvalComponent(Component, abc.ABC):
 
         error_log = ", ".join(error_log_parts)
         component_repr = repr(self)
-        LOG.error("%s at '%s'", error_log, component_repr)
+        LOG.error(f"{error_log} at '{component_repr}'")
 
     def eval(self, env: Environment) -> None:
         if env.is_running():
             self._log_evaluation_step("Computing")
             try:
-                field_name = self._field_name()
-                if field_name is not None:
-                    env.next_field_name = field_name
                 self._eval_body(env)
             except FailureEventException as failure_event_exception:
                 self._log_failure_event_exception(failure_event_exception=failure_event_exception)
@@ -81,6 +72,3 @@ class EvalComponent(Component, abc.ABC):
     @abc.abstractmethod
     def _eval_body(self, env: Environment) -> None:
         raise NotImplementedError()
-
-    def _field_name(self) -> Optional[str]:
-        return self.__class__.__name__

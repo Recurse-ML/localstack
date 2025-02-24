@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -22,7 +21,6 @@ Configuration = str
 ConfigurationAggregatorArn = str
 ConfigurationAggregatorName = str
 ConfigurationItemMD5Hash = str
-ConfigurationRecorderFilterValue = str
 ConfigurationStateId = str
 ConformancePackArn = str
 ConformancePackId = str
@@ -46,7 +44,6 @@ IncludeGlobalResourceTypes = bool
 Integer = int
 Limit = int
 ListResourceEvaluationsPageItemLimit = int
-MaxResults = int
 Name = str
 NextToken = str
 OrganizationConfigRuleName = str
@@ -70,15 +67,12 @@ ResourceEvaluationId = str
 ResourceId = str
 ResourceName = str
 ResourceTypeString = str
-ResourceTypeValue = str
 RetentionConfigurationName = str
 RetentionPeriodInDays = int
 RuleLimit = int
 SSMDocumentName = str
 SSMDocumentVersion = str
 SchemaVersionId = str
-ServicePrincipal = str
-ServicePrincipalValue = str
 StackArn = str
 String = str
 StringWithCharLimit1024 = str
@@ -98,51 +92,47 @@ Value = str
 Version = str
 
 
-class AggregateConformancePackComplianceSummaryGroupKey(StrEnum):
+class AggregateConformancePackComplianceSummaryGroupKey(str):
     ACCOUNT_ID = "ACCOUNT_ID"
     AWS_REGION = "AWS_REGION"
 
 
-class AggregatedSourceStatusType(StrEnum):
+class AggregatedSourceStatusType(str):
     FAILED = "FAILED"
     SUCCEEDED = "SUCCEEDED"
     OUTDATED = "OUTDATED"
 
 
-class AggregatedSourceType(StrEnum):
+class AggregatedSourceType(str):
     ACCOUNT = "ACCOUNT"
     ORGANIZATION = "ORGANIZATION"
 
 
-class AggregatorFilterType(StrEnum):
-    INCLUDE = "INCLUDE"
-
-
-class ChronologicalOrder(StrEnum):
+class ChronologicalOrder(str):
     Reverse = "Reverse"
     Forward = "Forward"
 
 
-class ComplianceType(StrEnum):
+class ComplianceType(str):
     COMPLIANT = "COMPLIANT"
     NON_COMPLIANT = "NON_COMPLIANT"
     NOT_APPLICABLE = "NOT_APPLICABLE"
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 
 
-class ConfigRuleComplianceSummaryGroupKey(StrEnum):
+class ConfigRuleComplianceSummaryGroupKey(str):
     ACCOUNT_ID = "ACCOUNT_ID"
     AWS_REGION = "AWS_REGION"
 
 
-class ConfigRuleState(StrEnum):
+class ConfigRuleState(str):
     ACTIVE = "ACTIVE"
     DELETING = "DELETING"
     DELETING_RESULTS = "DELETING_RESULTS"
     EVALUATING = "EVALUATING"
 
 
-class ConfigurationItemStatus(StrEnum):
+class ConfigurationItemStatus(str):
     OK = "OK"
     ResourceDiscovered = "ResourceDiscovered"
     ResourceNotRecorded = "ResourceNotRecorded"
@@ -150,17 +140,13 @@ class ConfigurationItemStatus(StrEnum):
     ResourceDeletedNotRecorded = "ResourceDeletedNotRecorded"
 
 
-class ConfigurationRecorderFilterName(StrEnum):
-    recordingScope = "recordingScope"
-
-
-class ConformancePackComplianceType(StrEnum):
+class ConformancePackComplianceType(str):
     COMPLIANT = "COMPLIANT"
     NON_COMPLIANT = "NON_COMPLIANT"
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 
 
-class ConformancePackState(StrEnum):
+class ConformancePackState(str):
     CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
     CREATE_COMPLETE = "CREATE_COMPLETE"
     CREATE_FAILED = "CREATE_FAILED"
@@ -168,22 +154,22 @@ class ConformancePackState(StrEnum):
     DELETE_FAILED = "DELETE_FAILED"
 
 
-class DeliveryStatus(StrEnum):
+class DeliveryStatus(str):
     Success = "Success"
     Failure = "Failure"
     Not_Applicable = "Not_Applicable"
 
 
-class EvaluationMode(StrEnum):
+class EvaluationMode(str):
     DETECTIVE = "DETECTIVE"
     PROACTIVE = "PROACTIVE"
 
 
-class EventSource(StrEnum):
+class EventSource(str):
     aws_config = "aws.config"
 
 
-class MaximumExecutionFrequency(StrEnum):
+class MaximumExecutionFrequency(str):
     One_Hour = "One_Hour"
     Three_Hours = "Three_Hours"
     Six_Hours = "Six_Hours"
@@ -191,7 +177,7 @@ class MaximumExecutionFrequency(StrEnum):
     TwentyFour_Hours = "TwentyFour_Hours"
 
 
-class MemberAccountRuleStatus(StrEnum):
+class MemberAccountRuleStatus(str):
     CREATE_SUCCESSFUL = "CREATE_SUCCESSFUL"
     CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
     CREATE_FAILED = "CREATE_FAILED"
@@ -203,25 +189,25 @@ class MemberAccountRuleStatus(StrEnum):
     UPDATE_FAILED = "UPDATE_FAILED"
 
 
-class MessageType(StrEnum):
+class MessageType(str):
     ConfigurationItemChangeNotification = "ConfigurationItemChangeNotification"
     ConfigurationSnapshotDeliveryCompleted = "ConfigurationSnapshotDeliveryCompleted"
     ScheduledNotification = "ScheduledNotification"
     OversizedConfigurationItemChangeNotification = "OversizedConfigurationItemChangeNotification"
 
 
-class OrganizationConfigRuleTriggerType(StrEnum):
+class OrganizationConfigRuleTriggerType(str):
     ConfigurationItemChangeNotification = "ConfigurationItemChangeNotification"
     OversizedConfigurationItemChangeNotification = "OversizedConfigurationItemChangeNotification"
     ScheduledNotification = "ScheduledNotification"
 
 
-class OrganizationConfigRuleTriggerTypeNoSN(StrEnum):
+class OrganizationConfigRuleTriggerTypeNoSN(str):
     ConfigurationItemChangeNotification = "ConfigurationItemChangeNotification"
     OversizedConfigurationItemChangeNotification = "OversizedConfigurationItemChangeNotification"
 
 
-class OrganizationResourceDetailedStatus(StrEnum):
+class OrganizationResourceDetailedStatus(str):
     CREATE_SUCCESSFUL = "CREATE_SUCCESSFUL"
     CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
     CREATE_FAILED = "CREATE_FAILED"
@@ -233,7 +219,7 @@ class OrganizationResourceDetailedStatus(StrEnum):
     UPDATE_FAILED = "UPDATE_FAILED"
 
 
-class OrganizationResourceStatus(StrEnum):
+class OrganizationResourceStatus(str):
     CREATE_SUCCESSFUL = "CREATE_SUCCESSFUL"
     CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
     CREATE_FAILED = "CREATE_FAILED"
@@ -245,7 +231,7 @@ class OrganizationResourceStatus(StrEnum):
     UPDATE_FAILED = "UPDATE_FAILED"
 
 
-class OrganizationRuleStatus(StrEnum):
+class OrganizationRuleStatus(str):
     CREATE_SUCCESSFUL = "CREATE_SUCCESSFUL"
     CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
     CREATE_FAILED = "CREATE_FAILED"
@@ -257,69 +243,63 @@ class OrganizationRuleStatus(StrEnum):
     UPDATE_FAILED = "UPDATE_FAILED"
 
 
-class Owner(StrEnum):
+class Owner(str):
     CUSTOM_LAMBDA = "CUSTOM_LAMBDA"
     AWS = "AWS"
     CUSTOM_POLICY = "CUSTOM_POLICY"
 
 
-class RecorderStatus(StrEnum):
+class RecorderStatus(str):
     Pending = "Pending"
     Success = "Success"
     Failure = "Failure"
-    NotApplicable = "NotApplicable"
 
 
-class RecordingFrequency(StrEnum):
+class RecordingFrequency(str):
     CONTINUOUS = "CONTINUOUS"
     DAILY = "DAILY"
 
 
-class RecordingScope(StrEnum):
-    INTERNAL = "INTERNAL"
-    PAID = "PAID"
-
-
-class RecordingStrategyType(StrEnum):
+class RecordingStrategyType(str):
     ALL_SUPPORTED_RESOURCE_TYPES = "ALL_SUPPORTED_RESOURCE_TYPES"
     INCLUSION_BY_RESOURCE_TYPES = "INCLUSION_BY_RESOURCE_TYPES"
     EXCLUSION_BY_RESOURCE_TYPES = "EXCLUSION_BY_RESOURCE_TYPES"
 
 
-class RemediationExecutionState(StrEnum):
+class RemediationExecutionState(str):
     QUEUED = "QUEUED"
     IN_PROGRESS = "IN_PROGRESS"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
 
 
-class RemediationExecutionStepState(StrEnum):
+class RemediationExecutionStepState(str):
     SUCCEEDED = "SUCCEEDED"
     PENDING = "PENDING"
     FAILED = "FAILED"
 
 
-class RemediationTargetType(StrEnum):
+class RemediationTargetType(str):
     SSM_DOCUMENT = "SSM_DOCUMENT"
 
 
-class ResourceConfigurationSchemaType(StrEnum):
+class ResourceConfigurationSchemaType(str):
     CFN_RESOURCE_SCHEMA = "CFN_RESOURCE_SCHEMA"
 
 
-class ResourceCountGroupKey(StrEnum):
+class ResourceCountGroupKey(str):
     RESOURCE_TYPE = "RESOURCE_TYPE"
     ACCOUNT_ID = "ACCOUNT_ID"
     AWS_REGION = "AWS_REGION"
 
 
-class ResourceEvaluationStatus(StrEnum):
+class ResourceEvaluationStatus(str):
     IN_PROGRESS = "IN_PROGRESS"
     FAILED = "FAILED"
     SUCCEEDED = "SUCCEEDED"
 
 
-class ResourceType(StrEnum):
+class ResourceType(str):
     AWS_EC2_CustomerGateway = "AWS::EC2::CustomerGateway"
     AWS_EC2_EIP = "AWS::EC2::EIP"
     AWS_EC2_Host = "AWS::EC2::Host"
@@ -743,23 +723,17 @@ class ResourceType(StrEnum):
     AWS_SSM_Document = "AWS::SSM::Document"
 
 
-class ResourceValueType(StrEnum):
+class ResourceValueType(str):
     RESOURCE_ID = "RESOURCE_ID"
 
 
-class SortBy(StrEnum):
+class SortBy(str):
     SCORE = "SCORE"
 
 
-class SortOrder(StrEnum):
+class SortOrder(str):
     ASCENDING = "ASCENDING"
     DESCENDING = "DESCENDING"
-
-
-class ConflictException(ServiceException):
-    code: str = "ConflictException"
-    sender_fault: bool = False
-    status_code: int = 400
 
 
 class ConformancePackTemplateValidationException(ServiceException):
@@ -1080,12 +1054,6 @@ class TooManyTagsException(ServiceException):
     status_code: int = 400
 
 
-class UnmodifiableEntityException(ServiceException):
-    code: str = "UnmodifiableEntityException"
-    sender_fault: bool = False
-    status_code: int = 400
-
-
 class ValidationException(ServiceException):
     code: str = "ValidationException"
     sender_fault: bool = False
@@ -1238,82 +1206,6 @@ class AggregationAuthorization(TypedDict, total=False):
 
 
 AggregationAuthorizationList = List[AggregationAuthorization]
-ResourceTypeValueList = List[ResourceTypeValue]
-
-
-class AggregatorFilterResourceType(TypedDict, total=False):
-    Type: Optional[AggregatorFilterType]
-    Value: Optional[ResourceTypeValueList]
-
-
-ServicePrincipalValueList = List[ServicePrincipalValue]
-
-
-class AggregatorFilterServicePrincipal(TypedDict, total=False):
-    Type: Optional[AggregatorFilterType]
-    Value: Optional[ServicePrincipalValueList]
-
-
-class AggregatorFilters(TypedDict, total=False):
-    ResourceType: Optional[AggregatorFilterResourceType]
-    ServicePrincipal: Optional[AggregatorFilterServicePrincipal]
-
-
-ResourceTypeList = List[ResourceType]
-
-
-class AssociateResourceTypesRequest(ServiceRequest):
-    ConfigurationRecorderArn: AmazonResourceName
-    ResourceTypes: ResourceTypeList
-
-
-RecordingModeResourceTypesList = List[ResourceType]
-
-
-class RecordingModeOverride(TypedDict, total=False):
-    description: Optional[Description]
-    resourceTypes: RecordingModeResourceTypesList
-    recordingFrequency: RecordingFrequency
-
-
-RecordingModeOverrides = List[RecordingModeOverride]
-
-
-class RecordingMode(TypedDict, total=False):
-    recordingFrequency: RecordingFrequency
-    recordingModeOverrides: Optional[RecordingModeOverrides]
-
-
-class RecordingStrategy(TypedDict, total=False):
-    useOnly: Optional[RecordingStrategyType]
-
-
-class ExclusionByResourceTypes(TypedDict, total=False):
-    resourceTypes: Optional[ResourceTypeList]
-
-
-class RecordingGroup(TypedDict, total=False):
-    allSupported: Optional[AllSupported]
-    includeGlobalResourceTypes: Optional[IncludeGlobalResourceTypes]
-    resourceTypes: Optional[ResourceTypeList]
-    exclusionByResourceTypes: Optional[ExclusionByResourceTypes]
-    recordingStrategy: Optional[RecordingStrategy]
-
-
-class ConfigurationRecorder(TypedDict, total=False):
-    arn: Optional[AmazonResourceName]
-    name: Optional[RecorderName]
-    roleARN: Optional[String]
-    recordingGroup: Optional[RecordingGroup]
-    recordingMode: Optional[RecordingMode]
-    recordingScope: Optional[RecordingScope]
-    servicePrincipal: Optional[ServicePrincipal]
-
-
-class AssociateResourceTypesResponse(TypedDict, total=False):
-    ConfigurationRecorder: ConfigurationRecorder
-
-
 AutoRemediationAttemptSeconds = int
 ConfigurationItemDeliveryTime = datetime
 SupplementaryConfiguration = Dict[SupplementaryConfigurationName, SupplementaryConfigurationValue]
@@ -1520,7 +1412,6 @@ class ConfigurationAggregator(TypedDict, total=False):
     CreationTime: Optional[Date]
     LastUpdatedTime: Optional[Date]
     CreatedBy: Optional[StringWithCharLimit256]
-    AggregatorFilters: Optional[AggregatorFilters]
 
 
 ConfigurationAggregatorList = List[ConfigurationAggregator]
@@ -1563,21 +1454,54 @@ class ConfigurationItem(TypedDict, total=False):
 
 
 ConfigurationItemList = List[ConfigurationItem]
-ConfigurationRecorderFilterValues = List[ConfigurationRecorderFilterValue]
+RecordingModeResourceTypesList = List[ResourceType]
 
 
-class ConfigurationRecorderFilter(TypedDict, total=False):
-    filterName: Optional[ConfigurationRecorderFilterName]
-    filterValue: Optional[ConfigurationRecorderFilterValues]
+class RecordingModeOverride(TypedDict, total=False):
+    description: Optional[Description]
+    resourceTypes: RecordingModeResourceTypesList
+    recordingFrequency: RecordingFrequency
 
 
-ConfigurationRecorderFilterList = List[ConfigurationRecorderFilter]
+RecordingModeOverrides = List[RecordingModeOverride]
+
+
+class RecordingMode(TypedDict, total=False):
+    recordingFrequency: RecordingFrequency
+    recordingModeOverrides: Optional[RecordingModeOverrides]
+
+
+class RecordingStrategy(TypedDict, total=False):
+    useOnly: Optional[RecordingStrategyType]
+
+
+ResourceTypeList = List[ResourceType]
+
+
+class ExclusionByResourceTypes(TypedDict, total=False):
+    resourceTypes: Optional[ResourceTypeList]
+
+
+class RecordingGroup(TypedDict, total=False):
+    allSupported: Optional[AllSupported]
+    includeGlobalResourceTypes: Optional[IncludeGlobalResourceTypes]
+    resourceTypes: Optional[ResourceTypeList]
+    exclusionByResourceTypes: Optional[ExclusionByResourceTypes]
+    recordingStrategy: Optional[RecordingStrategy]
+
+
+class ConfigurationRecorder(TypedDict, total=False):
+    name: Optional[RecorderName]
+    roleARN: Optional[String]
+    recordingGroup: Optional[RecordingGroup]
+    recordingMode: Optional[RecordingMode]
+
+
 ConfigurationRecorderList = List[ConfigurationRecorder]
 ConfigurationRecorderNameList = List[RecorderName]
 
 
 class ConfigurationRecorderStatus(TypedDict, total=False):
-    arn: Optional[AmazonResourceName]
     name: Optional[String]
     lastStartTime: Optional[Date]
     lastStopTime: Optional[Date]
@@ -1586,20 +1510,9 @@ class ConfigurationRecorderStatus(TypedDict, total=False):
     lastErrorCode: Optional[String]
     lastErrorMessage: Optional[String]
     lastStatusChangeTime: Optional[Date]
-    servicePrincipal: Optional[ServicePrincipal]
 
 
 ConfigurationRecorderStatusList = List[ConfigurationRecorderStatus]
-
-
-class ConfigurationRecorderSummary(TypedDict, total=False):
-    arn: AmazonResourceName
-    name: RecorderName
-    servicePrincipal: Optional[ServicePrincipal]
-    recordingScope: RecordingScope
-
-
-ConfigurationRecorderSummaries = List[ConfigurationRecorderSummary]
 ConformancePackConfigRuleNames = List[StringWithCharLimit64]
 
 
@@ -1796,15 +1709,6 @@ class DeleteRetentionConfigurationRequest(ServiceRequest):
     RetentionConfigurationName: RetentionConfigurationName
 
 
-class DeleteServiceLinkedConfigurationRecorderRequest(ServiceRequest):
-    ServicePrincipal: ServicePrincipal
-
-
-class DeleteServiceLinkedConfigurationRecorderResponse(TypedDict, total=False):
-    Arn: AmazonResourceName
-    Name: RecorderName
-
-
 class DeleteStoredQueryRequest(ServiceRequest):
     QueryName: QueryName
 
@@ -1953,8 +1857,6 @@ class DescribeConfigurationAggregatorsResponse(TypedDict, total=False):
 
 class DescribeConfigurationRecorderStatusRequest(ServiceRequest):
     ConfigurationRecorderNames: Optional[ConfigurationRecorderNameList]
-    ServicePrincipal: Optional[ServicePrincipal]
-    Arn: Optional[AmazonResourceName]
 
 
 class DescribeConfigurationRecorderStatusResponse(TypedDict, total=False):
@@ -1963,8 +1865,6 @@ class DescribeConfigurationRecorderStatusResponse(TypedDict, total=False):
 
 class DescribeConfigurationRecordersRequest(ServiceRequest):
     ConfigurationRecorderNames: Optional[ConfigurationRecorderNameList]
-    ServicePrincipal: Optional[ServicePrincipal]
-    Arn: Optional[AmazonResourceName]
 
 
 class DescribeConfigurationRecordersResponse(TypedDict, total=False):
@@ -2312,15 +2212,6 @@ RetentionConfigurationList = List[RetentionConfiguration]
 class DescribeRetentionConfigurationsResponse(TypedDict, total=False):
     RetentionConfigurations: Optional[RetentionConfigurationList]
     NextToken: Optional[NextToken]
-
-
-class DisassociateResourceTypesRequest(ServiceRequest):
-    ConfigurationRecorderArn: AmazonResourceName
-    ResourceTypes: ResourceTypeList
-
-
-class DisassociateResourceTypesResponse(TypedDict, total=False):
-    ConfigurationRecorder: ConfigurationRecorder
 
 
 DiscoveredResourceIdentifierList = List[AggregateResourceIdentifier]
@@ -2712,17 +2603,6 @@ class ListAggregateDiscoveredResourcesResponse(TypedDict, total=False):
     NextToken: Optional[NextToken]
 
 
-class ListConfigurationRecordersRequest(ServiceRequest):
-    Filters: Optional[ConfigurationRecorderFilterList]
-    MaxResults: Optional[MaxResults]
-    NextToken: Optional[NextToken]
-
-
-class ListConfigurationRecordersResponse(TypedDict, total=False):
-    ConfigurationRecorderSummaries: ConfigurationRecorderSummaries
-    NextToken: Optional[NextToken]
-
-
 class ListConformancePackComplianceScoresRequest(ServiceRequest):
     Filters: Optional[ConformancePackComplianceScoresFilters]
     SortOrder: Optional[SortOrder]
@@ -2873,7 +2753,6 @@ class PutConfigurationAggregatorRequest(ServiceRequest):
     AccountAggregationSources: Optional[AccountAggregationSourceList]
     OrganizationAggregationSource: Optional[OrganizationAggregationSource]
     Tags: Optional[TagsList]
-    AggregatorFilters: Optional[AggregatorFilters]
 
 
 class PutConfigurationAggregatorResponse(TypedDict, total=False):
@@ -2882,7 +2761,6 @@ class PutConfigurationAggregatorResponse(TypedDict, total=False):
 
 class PutConfigurationRecorderRequest(ServiceRequest):
     ConfigurationRecorder: ConfigurationRecorder
-    Tags: Optional[TagsList]
 
 
 class PutConformancePackRequest(ServiceRequest):
@@ -2984,16 +2862,6 @@ class PutRetentionConfigurationResponse(TypedDict, total=False):
     RetentionConfiguration: Optional[RetentionConfiguration]
 
 
-class PutServiceLinkedConfigurationRecorderRequest(ServiceRequest):
-    ServicePrincipal: ServicePrincipal
-    Tags: Optional[TagsList]
-
-
-class PutServiceLinkedConfigurationRecorderResponse(TypedDict, total=False):
-    Arn: Optional[AmazonResourceName]
-    Name: Optional[RecorderName]
-
-
 class PutStoredQueryRequest(ServiceRequest):
     StoredQuery: StoredQuery
     Tags: Optional[TagsList]
@@ -3091,16 +2959,6 @@ class UntagResourceRequest(ServiceRequest):
 class ConfigApi:
     service = "config"
     version = "2014-11-12"
-
-    @handler("AssociateResourceTypes")
-    def associate_resource_types(
-        self,
-        context: RequestContext,
-        configuration_recorder_arn: AmazonResourceName,
-        resource_types: ResourceTypeList,
-        **kwargs,
-    ) -> AssociateResourceTypesResponse:
-        raise NotImplementedError
 
     @handler("BatchGetAggregateResourceConfig")
     def batch_get_aggregate_resource_config(
@@ -3234,12 +3092,6 @@ class ConfigApi:
     ) -> None:
         raise NotImplementedError
 
-    @handler("DeleteServiceLinkedConfigurationRecorder")
-    def delete_service_linked_configuration_recorder(
-        self, context: RequestContext, service_principal: ServicePrincipal, **kwargs
-    ) -> DeleteServiceLinkedConfigurationRecorderResponse:
-        raise NotImplementedError
-
     @handler("DeleteStoredQuery")
     def delete_stored_query(
         self, context: RequestContext, query_name: QueryName, **kwargs
@@ -3356,8 +3208,6 @@ class ConfigApi:
         self,
         context: RequestContext,
         configuration_recorder_names: ConfigurationRecorderNameList = None,
-        service_principal: ServicePrincipal = None,
-        arn: AmazonResourceName = None,
         **kwargs,
     ) -> DescribeConfigurationRecorderStatusResponse:
         raise NotImplementedError
@@ -3367,8 +3217,6 @@ class ConfigApi:
         self,
         context: RequestContext,
         configuration_recorder_names: ConfigurationRecorderNameList = None,
-        service_principal: ServicePrincipal = None,
-        arn: AmazonResourceName = None,
         **kwargs,
     ) -> DescribeConfigurationRecordersResponse:
         raise NotImplementedError
@@ -3517,16 +3365,6 @@ class ConfigApi:
         next_token: NextToken = None,
         **kwargs,
     ) -> DescribeRetentionConfigurationsResponse:
-        raise NotImplementedError
-
-    @handler("DisassociateResourceTypes")
-    def disassociate_resource_types(
-        self,
-        context: RequestContext,
-        configuration_recorder_arn: AmazonResourceName,
-        resource_types: ResourceTypeList,
-        **kwargs,
-    ) -> DisassociateResourceTypesResponse:
         raise NotImplementedError
 
     @handler("GetAggregateComplianceDetailsByConfigRule")
@@ -3743,17 +3581,6 @@ class ConfigApi:
     ) -> ListAggregateDiscoveredResourcesResponse:
         raise NotImplementedError
 
-    @handler("ListConfigurationRecorders")
-    def list_configuration_recorders(
-        self,
-        context: RequestContext,
-        filters: ConfigurationRecorderFilterList = None,
-        max_results: MaxResults = None,
-        next_token: NextToken = None,
-        **kwargs,
-    ) -> ListConfigurationRecordersResponse:
-        raise NotImplementedError
-
     @handler("ListConformancePackComplianceScores")
     def list_conformance_pack_compliance_scores(
         self,
@@ -3838,18 +3665,13 @@ class ConfigApi:
         account_aggregation_sources: AccountAggregationSourceList = None,
         organization_aggregation_source: OrganizationAggregationSource = None,
         tags: TagsList = None,
-        aggregator_filters: AggregatorFilters = None,
         **kwargs,
     ) -> PutConfigurationAggregatorResponse:
         raise NotImplementedError
 
     @handler("PutConfigurationRecorder")
     def put_configuration_recorder(
-        self,
-        context: RequestContext,
-        configuration_recorder: ConfigurationRecorder,
-        tags: TagsList = None,
-        **kwargs,
+        self, context: RequestContext, configuration_recorder: ConfigurationRecorder, **kwargs
     ) -> None:
         raise NotImplementedError
 
@@ -3962,16 +3784,6 @@ class ConfigApi:
     def put_retention_configuration(
         self, context: RequestContext, retention_period_in_days: RetentionPeriodInDays, **kwargs
     ) -> PutRetentionConfigurationResponse:
-        raise NotImplementedError
-
-    @handler("PutServiceLinkedConfigurationRecorder")
-    def put_service_linked_configuration_recorder(
-        self,
-        context: RequestContext,
-        service_principal: ServicePrincipal,
-        tags: TagsList = None,
-        **kwargs,
-    ) -> PutServiceLinkedConfigurationRecorderResponse:
         raise NotImplementedError
 
     @handler("PutStoredQuery")

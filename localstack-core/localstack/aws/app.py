@@ -4,7 +4,7 @@ from localstack.aws.api import RequestContext
 from localstack.aws.chain import HandlerChain
 from localstack.aws.handlers.metric_handler import MetricHandler
 from localstack.aws.handlers.service_plugin import ServiceLoader, ServiceLoaderForDataPlane
-from localstack.http.trace import TracingHandlerChain
+from localstack.aws.trace import TracingHandlerChain
 from localstack.services.plugins import SERVICE_PLUGINS, ServiceManager, ServicePluginManager
 from localstack.utils.ssl import create_ssl_cert, install_predefined_cert_if_available
 
@@ -28,6 +28,7 @@ class LocalstackAwsGateway(Gateway):
         # the main request handler chain
         self.request_handlers.extend(
             [
+                handlers.push_request_context,
                 handlers.add_internal_request_params,
                 handlers.handle_runtime_shutdown,
                 metric_collector.create_metric_handler_item,
@@ -36,16 +37,13 @@ class LocalstackAwsGateway(Gateway):
                 handlers.parse_service_name,  # enforce_cors and content_decoder depend on the service name
                 handlers.enforce_cors,
                 handlers.content_decoder,
-                handlers.validate_request_schema,  # validate request schema for public LS endpoints
-                handlers.serve_localstack_resources,  # try to serve endpoints in /_localstack
+                handlers.serve_localstack_resources,  # try to serve internal resources in /_localstack first
                 handlers.serve_edge_router_rules,
                 # start aws handler chain
                 handlers.parse_pre_signed_url_request,
                 handlers.inject_auth_header_if_missing,
                 handlers.add_region_from_header,
-                handlers.rewrite_region,
                 handlers.add_account_id,
-                handlers.parse_trace_context,
                 handlers.parse_service_request,
                 metric_collector.record_parsed_request,
                 handlers.serve_custom_service_request_handlers,
@@ -69,7 +67,6 @@ class LocalstackAwsGateway(Gateway):
         # response post-processing
         self.response_handlers.extend(
             [
-                handlers.validate_response_schema,  # validate response schema for public LS endpoints
                 handlers.modify_service_response,
                 handlers.parse_service_response,
                 handlers.run_custom_response_handlers,
@@ -85,6 +82,7 @@ class LocalstackAwsGateway(Gateway):
             [
                 handlers.set_close_connection_header,
                 handlers.run_custom_finalizers,
+                handlers.pop_request_context,
             ]
         )
 

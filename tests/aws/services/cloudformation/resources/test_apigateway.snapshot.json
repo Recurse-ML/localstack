@@ -16,7 +16,7 @@
         "rootResourceId": "<root-resource-id:1>",
         "tags": {
           "aws:cloudformation:logical-id": "<name:1>",
-          "aws:cloudformation:stack-id": "arn:<partition>:cloudformation:<region>:111111111111:stack/stack-name/<resource:1>",
+          "aws:cloudformation:stack-id": "arn:aws:cloudformation:<region>:111111111111:stack/stack-name/<resource:1>",
           "aws:cloudformation:stack-name": "stack-name"
         },
         "ResponseMetadata": {
@@ -96,7 +96,7 @@
         "rootResourceId": "<root-resource-id:1>",
         "tags": {
           "aws:cloudformation:logical-id": "MyApi",
-          "aws:cloudformation:stack-id": "arn:<partition>:cloudformation:<region>:111111111111:stack/stack-name/<resource:1>",
+          "aws:cloudformation:stack-id": "arn:aws:cloudformation:<region>:111111111111:stack/stack-name/<resource:1>",
           "aws:cloudformation:stack-name": "stack-name"
         },
         "ResponseMetadata": {
@@ -107,7 +107,7 @@
     }
   },
   "tests/aws/services/cloudformation/resources/test_apigateway.py::test_cfn_deploy_apigateway_from_s3_swagger": {
-    "recorded-date": "24-09-2024, 20:22:38",
+    "recorded-date": "15-04-2024, 22:59:18",
     "recorded-content": {
       "rest-api": {
         "apiKeySource": "HEADER",
@@ -123,7 +123,7 @@
         "rootResourceId": "<id:2>",
         "tags": {
           "aws:cloudformation:logical-id": "ApiGatewayRestApi",
-          "aws:cloudformation:stack-id": "arn:<partition>:cloudformation:<region>:111111111111:stack/stack-name/<resource:1>",
+          "aws:cloudformation:stack-id": "arn:aws:cloudformation:<region>:111111111111:stack/stack-name/<resource:1>",
           "aws:cloudformation:stack-name": "stack-name"
         },
         "version": "1.0.0",
@@ -161,49 +161,11 @@
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
         }
-      },
-      "get-stage": {
-        "cacheClusterEnabled": false,
-        "cacheClusterStatus": "NOT_AVAILABLE",
-        "createdDate": "datetime",
-        "deploymentId": "<deployment-id:1>",
-        "description": "Test Stage 123",
-        "lastUpdatedDate": "datetime",
-        "methodSettings": {
-          "*/*": {
-            "cacheDataEncrypted": false,
-            "cacheTtlInSeconds": 300,
-            "cachingEnabled": false,
-            "dataTraceEnabled": true,
-            "loggingLevel": "ERROR",
-            "metricsEnabled": true,
-            "requireAuthorizationForCacheControl": true,
-            "throttlingBurstLimit": 5000,
-            "throttlingRateLimit": 10000.0,
-            "unauthorizedCacheControlHeaderStrategy": "SUCCEED_WITH_RESPONSE_HEADER"
-          }
-        },
-        "stageName": "local",
-        "tags": {
-          "aws:cloudformation:logical-id": "ApiGWStage",
-          "aws:cloudformation:stack-id": "arn:<partition>:cloudformation:<region>:111111111111:stack/stack-name/<resource:1>",
-          "aws:cloudformation:stack-name": "stack-name"
-        },
-        "tracingEnabled": true,
-        "variables": {
-          "TestCasing": "myvar",
-          "testCasingTwo": "myvar2",
-          "testlowcasing": "myvar3"
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
       }
     }
   },
   "tests/aws/services/cloudformation/resources/test_apigateway.py::test_cfn_deploy_apigateway_models": {
-    "recorded-date": "21-06-2024, 00:09:05",
+    "recorded-date": "19-12-2023, 19:04:52",
     "recorded-content": {
       "get-resources": {
         "items": [
@@ -335,7 +297,7 @@
     }
   },
   "tests/aws/services/cloudformation/resources/test_apigateway.py::test_cfn_with_apigateway_resources": {
-    "recorded-date": "20-06-2024, 23:54:26",
+    "recorded-date": "05-07-2023, 20:54:14",
     "recorded-content": {
       "get-method-post": {
         "apiKeyRequired": false,
@@ -346,6 +308,7 @@
           "cacheNamespace": "<cache-namespace:1>",
           "integrationResponses": {
             "202": {
+              "responseParameters": {},
               "responseTemplates": {
                 "application/json": {
                   "operation": "celeste_account_create",
@@ -358,16 +321,8 @@
               "selectionPattern": "2\\d{2}",
               "statusCode": "202"
             },
-            "404": {
-              "responseTemplates": {
-                "application/json": {
-                  "message": "Not Found"
-                }
-              },
-              "selectionPattern": "404",
-              "statusCode": "404"
-            },
             "500": {
+              "responseParameters": {},
               "responseTemplates": {
                 "application/json": {
                   "message": "Unknown <name:2>"
@@ -378,6 +333,7 @@
             }
           },
           "passthroughBehavior": "WHEN_NO_TEMPLATES",
+          "requestParameters": {},
           "requestTemplates": {
             "application/json": "<name:3>"
           },
@@ -389,16 +345,19 @@
             "responseModels": {
               "application/json": "<name:4>"
             },
+            "responseParameters": {},
             "statusCode": "202"
           },
           "500": {
             "responseModels": {
               "application/json": "<name:4>"
             },
+            "responseParameters": {},
             "statusCode": "500"
           }
         },
         "operationName": "create_account",
+        "requestModels": {},
         "requestParameters": {
           "method.request.path.account": true
         },
@@ -571,7 +530,7 @@
     }
   },
   "tests/aws/services/cloudformation/resources/test_apigateway.py::test_update_usage_plan": {
-    "recorded-date": "13-09-2024, 09:57:21",
+    "recorded-date": "20-03-2024, 22:33:14",
     "recorded-content": {
       "usage-plan": {
         "apiStages": [
@@ -587,13 +546,7 @@
           "offset": 0,
           "period": "MONTH"
         },
-        "tags": {
-          "aws:cloudformation:logical-id": "UsagePlan",
-          "aws:cloudformation:stack-id": "arn:<partition>:cloudformation:<region>:111111111111:stack/<aws:cloudformation:stack-name:1>/<resource:1>",
-          "aws:cloudformation:stack-name": "<aws:cloudformation:stack-name:1>",
-          "test": "value1",
-          "test2": "hardcoded"
-        },
+        "tags": {},
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200
@@ -613,56 +566,7 @@
           "offset": 0,
           "period": "MONTH"
         },
-        "tags": {
-          "aws:cloudformation:logical-id": "UsagePlan",
-          "aws:cloudformation:stack-id": "arn:<partition>:cloudformation:<region>:111111111111:stack/<aws:cloudformation:stack-name:1>/<resource:1>",
-          "aws:cloudformation:stack-name": "<aws:cloudformation:stack-name:1>",
-          "test": "value-updated",
-          "test2": "hardcoded"
-        },
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      }
-    }
-  },
-  "tests/aws/services/cloudformation/resources/test_apigateway.py::test_update_apigateway_stage": {
-    "recorded-date": "07-11-2024, 05:35:20",
-    "recorded-content": {
-      "created-stage": {
-        "cacheClusterEnabled": false,
-        "cacheClusterStatus": "NOT_AVAILABLE",
-        "createdDate": "datetime",
-        "deploymentId": "<deployment-id:1>",
-        "lastUpdatedDate": "datetime",
-        "methodSettings": {},
-        "stageName": "dev",
-        "tags": {
-          "aws:cloudformation:logical-id": "Stage",
-          "aws:cloudformation:stack-id": "arn:<partition>:cloudformation:<region>:111111111111:stack/<aws:cloudformation:stack-name:1>/<resource:1>",
-          "aws:cloudformation:stack-name": "<aws:cloudformation:stack-name:1>"
-        },
-        "tracingEnabled": false,
-        "ResponseMetadata": {
-          "HTTPHeaders": {},
-          "HTTPStatusCode": 200
-        }
-      },
-      "updated-stage": {
-        "cacheClusterEnabled": false,
-        "cacheClusterStatus": "NOT_AVAILABLE",
-        "createdDate": "datetime",
-        "deploymentId": "<deployment-id:1>",
-        "lastUpdatedDate": "datetime",
-        "methodSettings": {},
-        "stageName": "dev",
-        "tags": {
-          "aws:cloudformation:logical-id": "Stage",
-          "aws:cloudformation:stack-id": "arn:<partition>:cloudformation:<region>:111111111111:stack/<aws:cloudformation:stack-name:1>/<resource:1>",
-          "aws:cloudformation:stack-name": "<aws:cloudformation:stack-name:1>"
-        },
-        "tracingEnabled": false,
+        "tags": {},
         "ResponseMetadata": {
           "HTTPHeaders": {},
           "HTTPStatusCode": 200

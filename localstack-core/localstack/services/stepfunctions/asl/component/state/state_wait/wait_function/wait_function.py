@@ -24,16 +24,13 @@ class WaitFunction(EvalComponent, abc.ABC):
         elif env.is_running():
             # Unrelated interrupt: continue waiting.
             LOG.warning(
-                "Wait function '%s' successfully reentered waiting for another '%s' seconds.",
-                self,
-                wait_seconds_delta,
+                f"Wait function '{self}' successfully reentered waiting for "
+                f"another '{wait_seconds_delta}' seconds."
             )
             return self._wait_interval(env=env, wait_seconds=wait_seconds_delta)
         else:
             LOG.info(
-                "Wait function '%s' successfully interrupted after '%s' seconds.",
-                self,
-                round_sec_waited,
+                f"Wait function '{self}' successfully interrupted after '{round_sec_waited}' seconds."
             )
 
     def _eval_body(self, env: Environment) -> None:

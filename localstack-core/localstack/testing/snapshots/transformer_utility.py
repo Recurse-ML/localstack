@@ -16,12 +16,7 @@ from localstack_snapshot.snapshots.transformer import (
 )
 
 from localstack.aws.api.secretsmanager import CreateSecretResponse
-from localstack.aws.api.stepfunctions import (
-    CreateStateMachineOutput,
-    LongArn,
-    StartExecutionOutput,
-    StartSyncExecutionOutput,
-)
+from localstack.aws.api.stepfunctions import CreateStateMachineOutput, LongArn, StartExecutionOutput
 from localstack.utils.net import IP_REGEX
 
 LOG = logging.getLogger(__name__)
@@ -193,43 +188,6 @@ class TransformerUtility:
         ]
 
     @staticmethod
-    def apigateway_invocation_headers():
-        return [
-            TransformerUtility.key_value("apigw-id"),
-            TransformerUtility.key_value("Via"),
-            TransformerUtility.key_value(
-                "Date", value_replacement="<Date>", reference_replacement=False
-            ),
-            TransformerUtility.key_value(
-                "x-amz-apigw-id",
-                value_replacement="<x-amz-apigw-id>",
-                reference_replacement=False,
-            ),
-            TransformerUtility.key_value(
-                "x-amzn-Remapped-Date",
-                value_replacement="<x-amzn-Remapped-Date>",
-                reference_replacement=False,
-            ),
-            TransformerUtility.key_value(
-                "X-Amzn-Trace-Id",
-                value_replacement="<X-Amzn-Trace-Id>",
-                reference_replacement=False,
-            ),
-            TransformerUtility.key_value("X-Amzn-Apigateway-Api-Id"),
-            TransformerUtility.key_value("X-Forwarded-For"),
-            TransformerUtility.key_value(
-                "X-Forwarded-Port",
-                value_replacement="<X-Forwarded-Port>",
-                reference_replacement=False,
-            ),
-            TransformerUtility.key_value(
-                "X-Forwarded-Proto",
-                value_replacement="<X-Forwarded-Proto>",
-                reference_replacement=False,
-            ),
-        ]
-
-    @staticmethod
     def apigatewayv2_jwt_authorizer_event():
         return [
             TransformerUtility.jsonpath("$..claims.auth_time", "claims-auth-time"),
@@ -325,19 +283,6 @@ class TransformerUtility:
         ]
 
     @staticmethod
-    def dynamodb_streams_api():
-        return [
-            TransformerUtility.key_value("TableName"),
-            TransformerUtility.key_value("TableStatus"),
-            TransformerUtility.key_value("LatestStreamLabel"),
-            TransformerUtility.key_value("StartingSequenceNumber", reference_replacement=False),
-            TransformerUtility.key_value("ShardId"),
-            TransformerUtility.key_value("StreamLabel"),
-            TransformerUtility.key_value("SequenceNumber"),
-            TransformerUtility.key_value("eventID"),
-        ]
-
-    @staticmethod
     def iam_api():
         """
         :return: array with Transformers, for iam api.
@@ -349,7 +294,6 @@ class TransformerUtility:
             TransformerUtility.key_value("RoleName"),
             TransformerUtility.key_value("PolicyName"),
             TransformerUtility.key_value("PolicyId"),
-            TransformerUtility.key_value("GroupName"),
         ]
 
     @staticmethod
@@ -677,31 +621,13 @@ class TransformerUtility:
         return RegexTransformer(arn_part, arn_part_repl)
 
     @staticmethod
-    def sfn_sm_express_exec_arn(start_exec: StartExecutionOutput, index: int):
-        arn_parts = start_exec["executionArn"].split(":")
-        return [
-            RegexTransformer(arn_parts[-2], f"<ExpressExecArn_Part1_{index}idx>"),
-            RegexTransformer(arn_parts[-1], f"<ExpressExecArn_Part2_{index}idx>"),
-        ]
-
-    @staticmethod
-    def sfn_sm_sync_exec_arn(start_exec: StartSyncExecutionOutput, index: int):
-        arn_parts = start_exec["executionArn"].split(":")
-        return [
-            RegexTransformer(arn_parts[-2], f"<SyncExecArn_Part1_{index}idx>"),
-            RegexTransformer(arn_parts[-1], f"<SyncExecArn_Part2_{index}idx>"),
-        ]
-
-    @staticmethod
     def sfn_map_run_arn(map_run_arn: LongArn, index: int) -> list[RegexTransformer]:
         map_run_arn_part = map_run_arn.split("/")[-1]
         arn_parts = map_run_arn_part.split(":")
-        transformers = [
+        return [
+            RegexTransformer(arn_parts[0], f"<MapRunArnPart0_{index}idx>"),
             RegexTransformer(arn_parts[1], f"<MapRunArnPart1_{index}idx>"),
         ]
-        if re.match(PATTERN_UUID, arn_parts[0]):
-            transformers.append(RegexTransformer(arn_parts[0], f"<MapRunArnPart0_{index}idx>"))
-        return transformers
 
     @staticmethod
     def sfn_sqs_integration():
@@ -710,40 +636,29 @@ class TransformerUtility:
             # Transform MD5OfMessageBody value bindings as in StepFunctions these are not deterministic
             # about the input message.
             TransformerUtility.key_value("MD5OfMessageBody"),
-            TransformerUtility.key_value("MD5OfMessageAttributes"),
         ]
 
     @staticmethod
     def stepfunctions_api():
         return [
             JsonpathTransformer(
-                "$..SdkHttpMetadata..Date",
+                "$..SdkHttpMetadata.AllHttpHeaders.Date",
                 "date",
                 replace_reference=False,
             ),
             JsonpathTransformer(
-                "$..SdkResponseMetadata..RequestId",
-                "RequestId",
-                replace_reference=False,
-            ),
-            JsonpathTransformer(
-                "$..X-Amzn-Trace-Id",
+                "$..SdkHttpMetadata.AllHttpHeaders.X-Amzn-Trace-Id",
                 "X-Amzn-Trace-Id",
                 replace_reference=False,
             ),
             JsonpathTransformer(
-                "$..X-Amzn-Trace-Id",
+                "$..SdkHttpMetadata.HttpHeaders.Date",
+                "date",
+                replace_reference=False,
+            ),
+            JsonpathTransformer(
+                "$..SdkHttpMetadata.HttpHeaders.X-Amzn-Trace-Id",
                 "X-Amzn-Trace-Id",
-                replace_reference=False,
-            ),
-            JsonpathTransformer(
-                "$..x-amz-crc32",
-                "x-amz-crc32",
-                replace_reference=False,
-            ),
-            JsonpathTransformer(
-                "$..x-amzn-RequestId",
-                "x-amzn-RequestId",
                 replace_reference=False,
             ),
             KeyValueBasedTransformer(_transform_stepfunctions_cause_details, "json-input"),

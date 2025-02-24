@@ -6,8 +6,6 @@ import ssl
 from asyncio.selector_events import BaseSelectorEventLoop
 
 from localstack.utils.asyncio import run_sync
-from localstack.utils.objects import singleton_factory
-from localstack.utils.patch import Patch, patch
 
 # set up logger
 LOG = logging.getLogger(__name__)
@@ -54,7 +52,6 @@ class DuplexSocket(ssl.SSLSocket):
                 return False
 
 
-@singleton_factory
 def enable_duplex_socket():
     """
     Function which replaces the ssl.SSLContext.sslsocket_class with the DuplexSocket, enabling serving both,
@@ -62,16 +59,21 @@ def enable_duplex_socket():
     """
 
     # set globally defined SSL socket implementation class
-    Patch(ssl.SSLContext, "sslsocket_class", DuplexSocket).apply()
+    ssl.SSLContext.sslsocket_class = DuplexSocket
 
-    if hasattr(BaseSelectorEventLoop, "_accept_connection2"):
+    async def _accept_connection2(self, protocol_factory, conn, extra, sslcontext, *args, **kwargs):
+        is_ssl_socket = await run_sync(DuplexSocket.is_ssl_socket, conn)
+        if is_ssl_socket is False:
+            sslcontext = None
+        result = await _accept_connection2_orig(
+            self, protocol_factory, conn, extra, sslcontext, *args, **kwargs
+        )
+        return result
 
-        @patch(BaseSelectorEventLoop._accept_connection2)
-        async def _accept_connection2(
-            fn, self, protocol_factory, conn, extra, sslcontext, *args, **kwargs
-        ):
-            is_ssl_socket = await run_sync(DuplexSocket.is_ssl_socket, conn)
-            if is_ssl_socket is False:
-                sslcontext = None
-            result = await fn(self, protocol_factory, conn, extra, sslcontext, *args, **kwargs)
-            return result
+    # patch asyncio server to accept SSL and non-SSL traffic over same port
+    if hasattr(BaseSelectorEventLoop, "_accept_connection2") and not hasattr(
+        BaseSelectorEventLoop, "_ls_patched"
+    ):
+        _accept_connection2_orig = BaseSelectorEventLoop._accept_connection2
+        BaseSelectorEventLoop._accept_connection2 = _accept_connection2
+        BaseSelectorEventLoop._ls_patched = True

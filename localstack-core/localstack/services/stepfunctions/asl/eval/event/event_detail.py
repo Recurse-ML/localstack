@@ -7,7 +7,6 @@ from localstack.aws.api.stepfunctions import (
     ActivityStartedEventDetails,
     ActivitySucceededEventDetails,
     ActivityTimedOutEventDetails,
-    EvaluationFailedEventDetails,
     ExecutionAbortedEventDetails,
     ExecutionFailedEventDetails,
     ExecutionStartedEventDetails,
@@ -51,7 +50,6 @@ class EventDetails(TypedDict):
     taskSubmittedEventDetails: NotRequired[TaskSubmittedEventDetails]
     taskSucceededEventDetails: NotRequired[TaskSucceededEventDetails]
     taskTimedOutEventDetails: NotRequired[TaskTimedOutEventDetails]
-    evaluationFailedEventDetails: NotRequired[EvaluationFailedEventDetails]
     executionFailedEventDetails: NotRequired[ExecutionFailedEventDetails]
     executionStartedEventDetails: NotRequired[ExecutionStartedEventDetails]
     executionSucceededEventDetails: NotRequired[ExecutionSucceededEventDetails]

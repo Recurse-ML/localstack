@@ -1,7 +1,6 @@
 # LocalStack Resource Provider Scaffolding v2
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Optional, TypedDict
 
@@ -75,40 +74,44 @@ class SNSTopicProvider(ResourceProvider[SNSTopicProperties]):
         """
         model = request.desired_state
         sns = request.aws_client_factory.sns
+        # TODO: validations and iam checks
 
-        attributes = {
-            k: v
-            for k, v in model.items()
-            if v is not None
-            if k not in ["TopicName", "Subscription", "Tags"]
-        }
+        attributes = {k: v for k, v in model.items() if v is not None if k != "TopicName"}
+
+        # following attributes need to be str instead of bool for boto to work
         if (fifo_topic := attributes.get("FifoTopic")) is not None:
             attributes["FifoTopic"] = canonicalize_bool_to_str(fifo_topic)
-
-        if archive_policy := attributes.get("ArchivePolicy"):
-            archive_policy["MessageRetentionPeriod"] = str(archive_policy["MessageRetentionPeriod"])
-            attributes["ArchivePolicy"] = json.dumps(archive_policy)
 
         if (content_based_dedup := attributes.get("ContentBasedDeduplication")) is not None:
             attributes["ContentBasedDeduplication"] = canonicalize_bool_to_str(content_based_dedup)
 
-        # Default name
+        subscriptions = []
+        if attributes.get("Subscription") is not None:
+            subscriptions = attributes["Subscription"]
+            del attributes["Subscription"]
+
+        tags = []
+        if attributes.get("Tags") is not None:
+            tags = attributes["Tags"]
+            del attributes["Tags"]
+
+        # in case cloudformation didn't provide topic name
         if model.get("TopicName") is None:
-            model["TopicName"] = (
-                f"topic-{short_uid()}.fifo" if fifo_topic else f"topic-{short_uid()}"
-            )
+            name = f"topic-{short_uid()}" if not fifo_topic else f"topic-{short_uid()}.fifo"
+            model["TopicName"] = name
 
         create_sns_response = sns.create_topic(Name=model["TopicName"], Attributes=attributes)
+        request.custom_context[REPEATED_INVOCATION] = True
         model["TopicArn"] = create_sns_response["TopicArn"]
 
         # now we add subscriptions if they exists
-        for subscription in model.get("Subscription", []):
+        for subscription in subscriptions:
             sns.subscribe(
                 TopicArn=model["TopicArn"],
                 Protocol=subscription["Protocol"],
                 Endpoint=subscription["Endpoint"],
             )
-        if tags := model.get("Tags"):
+        if tags:
             sns.tag_resource(ResourceArn=model["TopicArn"], Tags=tags)
 
         return ProgressEvent(
@@ -130,13 +133,7 @@ class SNSTopicProvider(ResourceProvider[SNSTopicProperties]):
           - sns:ListSubscriptionsByTopic
           - sns:GetDataProtectionPolicy
         """
-        model = request.desired_state
-        topic_arn = model["TopicArn"]
-
-        describe_res = request.aws_client_factory.sns.get_topic_attributes(TopicArn=topic_arn)[
-            "Attributes"
-        ]
-        return ProgressEvent(status=OperationStatus.SUCCESS, resource_model=describe_res)
+        raise NotImplementedError
 
     def delete(
         self,
@@ -173,15 +170,3 @@ class SNSTopicProvider(ResourceProvider[SNSTopicProperties]):
           - sns:PutDataProtectionPolicy
         """
         raise NotImplementedError
-
-    def list(
-        self,
-        request: ResourceRequest[SNSTopicProperties],
-    ) -> ProgressEvent[SNSTopicProperties]:
-        resources = request.aws_client_factory.sns.list_topics()
-        return ProgressEvent(
-            status=OperationStatus.SUCCESS,
-            resource_models=[
-                SNSTopicProperties(TopicArn=topic["TopicArn"]) for topic in resources["Topics"]
-            ],
-        )

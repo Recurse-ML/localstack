@@ -7,7 +7,7 @@ from localstack.packages.core import ArchiveDownloadAndExtractInstaller
 from localstack.utils.files import chmod_r
 from localstack.utils.platform import get_arch
 
-TERRAFORM_VERSION = os.getenv("TERRAFORM_VERSION", "1.5.7")
+TERRAFORM_VERSION = "1.1.3"
 TERRAFORM_URL_TEMPLATE = (
     "https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{os}_{arch}.zip"
 )
@@ -15,10 +15,10 @@ TERRAFORM_URL_TEMPLATE = (
 
 class TerraformPackage(Package):
     def __init__(self):
-        super().__init__("Terraform", TERRAFORM_VERSION)
+        super().__init__("Terraform", "1.1.3")
 
     def get_versions(self) -> List[str]:
-        return [TERRAFORM_VERSION]
+        return ["1.1.3"]
 
     def _get_installer(self, version: str) -> PackageInstaller:
         return TerraformPackageInstaller("terraform", version)

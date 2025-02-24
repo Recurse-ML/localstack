@@ -281,7 +281,7 @@ class TestStateMachine:
     @markers.aws.needs_fixing
     def test_create_choice_state_machine(self, aws_client, account_id, region_name):
         state_machines_before = aws_client.stepfunctions.list_state_machines()["stateMachines"]
-        role_arn = arns.iam_role_arn("sfn_role", account_id, region_name)
+        role_arn = arns.iam_role_arn("sfn_role", account_id)
 
         definition = clone(STATE_MACHINE_CHOICE)
         lambda_arn_4 = arns.lambda_function_arn(TEST_LAMBDA_NAME_4, account_id, region_name)
@@ -323,7 +323,7 @@ class TestStateMachine:
         test_output = [{"Hello": name} for name in names]
         state_machines_before = aws_client.stepfunctions.list_state_machines()["stateMachines"]
 
-        role_arn = arns.iam_role_arn("sfn_role", account_id, region_name)
+        role_arn = arns.iam_role_arn("sfn_role", account_id)
         definition = clone(STATE_MACHINE_MAP)
         lambda_arn_3 = arns.lambda_function_arn(TEST_LAMBDA_NAME_3, account_id, region_name)
         definition["States"]["ExampleMapState"]["ItemProcessor"]["States"]["CallLambda"][
@@ -361,7 +361,7 @@ class TestStateMachine:
         state_machines_before = aws_client.stepfunctions.list_state_machines()["stateMachines"]
 
         # create state machine
-        role_arn = arns.iam_role_arn("sfn_role", account_id, region_name)
+        role_arn = arns.iam_role_arn("sfn_role", account_id)
         definition = clone(STATE_MACHINE_BASIC)
         lambda_arn_1 = arns.lambda_function_arn(TEST_LAMBDA_NAME_1, account_id, region_name)
         lambda_arn_2 = arns.lambda_function_arn(TEST_LAMBDA_NAME_2, account_id, region_name)
@@ -397,7 +397,7 @@ class TestStateMachine:
         state_machines_before = aws_client.stepfunctions.list_state_machines()["stateMachines"]
 
         # create state machine
-        role_arn = arns.iam_role_arn("sfn_role", account_id, region_name)
+        role_arn = arns.iam_role_arn("sfn_role", account_id)
         definition = clone(STATE_MACHINE_CATCH)
         lambda_arn_1 = arns.lambda_function_arn(TEST_LAMBDA_NAME_1, account_id, region_name)
         lambda_arn_2 = arns.lambda_function_arn(TEST_LAMBDA_NAME_2, account_id, region_name)
@@ -431,7 +431,7 @@ class TestStateMachine:
         state_machines_before = aws_client.stepfunctions.list_state_machines()["stateMachines"]
 
         # create state machine
-        role_arn = arns.iam_role_arn("sfn_role", account_id, region_name)
+        role_arn = arns.iam_role_arn("sfn_role", account_id)
         definition = clone(STATE_MACHINE_INTRINSIC_FUNCS)
         lambda_arn_1 = arns.lambda_function_arn(TEST_LAMBDA_NAME_5, account_id, region_name)
         lambda_arn_2 = arns.lambda_function_arn(TEST_LAMBDA_NAME_5, account_id, region_name)
@@ -469,7 +469,7 @@ class TestStateMachine:
         condition=not is_aws_cloud(), reason="Accurate events reporting not yet supported."
     )
     @markers.aws.needs_fixing
-    def test_events_state_machine(self, aws_client, account_id, region_name):
+    def test_events_state_machine(self, aws_client, account_id):
         events = aws_client.events
         state_machines_before = aws_client.stepfunctions.list_state_machines()["stateMachines"]
 
@@ -482,7 +482,7 @@ class TestStateMachine:
         definition["States"]["step1"]["Parameters"]["Entries"][0]["EventBusName"] = bus_name
         definition = json.dumps(definition)
         sm_name = f"events-{short_uid()}"
-        role_arn = arns.iam_role_arn("sfn_role", account_id, region_name)
+        role_arn = arns.iam_role_arn("sfn_role", account_id)
         aws_client.stepfunctions.create_state_machine(
             name=sm_name, definition=definition, roleArn=role_arn
         )
@@ -519,7 +519,7 @@ class TestStateMachine:
         CreateStateMachine operation: Invalid State Machine Definition: ''DUPLICATE_STATE_NAME: Duplicate State name:
         MissingValue at /States/MissingValue', 'DUPLICATE_STATE_NAME: Duplicate State name: Add at /States/Add''
         """
-        role_arn = arns.iam_role_arn("sfn_role", account_id, region_name)
+        role_arn = arns.iam_role_arn("sfn_role", account_id)
         definition = clone(STATE_MACHINE_CHOICE)
         lambda_arn_4 = arns.lambda_function_arn(TEST_LAMBDA_NAME_4, account_id, region_name)
         definition["States"]["Add"]["Resource"] = lambda_arn_4
@@ -612,7 +612,7 @@ def test_multiregion_nested(aws_client_factory, account_id, region_name, statema
     )
     # create state machine
     child_machine_name = f"sf-child-{short_uid()}"
-    role = arns.iam_role_arn("sfn_role", account_id, region_name)
+    role = arns.iam_role_arn("sfn_role", account_id)
     child_machine_result = client1.create_state_machine(
         name=child_machine_name, definition=json.dumps(TEST_STATE_MACHINE), roleArn=role
     )
@@ -620,7 +620,7 @@ def test_multiregion_nested(aws_client_factory, account_id, region_name, statema
 
     # create parent state machine
     name = f"sf-parent-{short_uid()}"
-    role = arns.iam_role_arn("sfn_role", account_id, region_name)
+    role = arns.iam_role_arn("sfn_role", account_id)
     result = client1.create_state_machine(
         name=name,
         definition=json.dumps(statemachine_definition).replace(
@@ -672,9 +672,7 @@ def test_default_logging_configuration(create_state_machine, aws_client):
         definition = json.dumps(definition)
 
         sm_name = f"sts-logging-{short_uid()}"
-        result = create_state_machine(
-            aws_client, name=sm_name, definition=definition, roleArn=role_arn
-        )
+        result = create_state_machine(name=sm_name, definition=definition, roleArn=role_arn)
 
         assert result["ResponseMetadata"]["HTTPStatusCode"] == 200
         result = aws_client.stepfunctions.describe_state_machine(
@@ -749,7 +747,7 @@ def test_aws_sdk_task(aws_client):
             # AWS initially straight up fails until the permissions seem to take effect
             # so we wait until the statemachine is at least running
             result = aws_client.stepfunctions.start_execution(
-                stateMachineArn=machine_arn, input=f'{{"Name": "{topic_name}"}}'
+                stateMachineArn=machine_arn, input='{"Name": "' f"{topic_name}" '"}'
             )
             assert wait_until(assert_execution_success(result["executionArn"]))
             describe_result = aws_client.stepfunctions.describe_execution(
@@ -780,11 +778,11 @@ def test_aws_sdk_task(aws_client):
 
 
 @markers.aws.needs_fixing
-def test_run_aws_sdk_secrets_manager(aws_client, account_id, region_name):
+def test_run_aws_sdk_secrets_manager(aws_client, account_id):
     state_machines_before = aws_client.stepfunctions.list_state_machines()["stateMachines"]
 
     # create state machine
-    role_arn = arns.iam_role_arn("sfn_role", account_id, region_name)
+    role_arn = arns.iam_role_arn("sfn_role", account_id)
     definition = {
         "StartAt": "StateCreateSecret",
         "States": {

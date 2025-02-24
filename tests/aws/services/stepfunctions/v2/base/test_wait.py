@@ -13,12 +13,13 @@ from tests.aws.services.stepfunctions.templates.base.base_templates import BaseT
 
 # TODO: add tests for seconds, secondspath, timestamp
 # TODO: add tests that actually validate waiting time (e.g. x minutes) BUT mark them accordingly and skip them by default!
+@markers.snapshot.skip_snapshot_verify(paths=["$..tracingConfiguration"])
 class TestSfnWait:
     @pytest.mark.skipif(condition=not is_aws_cloud(), reason="not implemented")
     @markers.aws.validated
     @pytest.mark.parametrize("days", [24855, 24856])
     def test_timestamp_too_far_in_future_boundary(
-        self, aws_client, create_state_machine_iam_role, create_state_machine, sfn_snapshot, days
+        self, aws_client, create_iam_role_for_sfn, create_state_machine, sfn_snapshot, days
     ):
         """
         seems this seems to correlate with "2147483648" as the maximum integer value for the seconds stepfunctions internally uses to represent dates
@@ -40,8 +41,8 @@ class TestSfnWait:
         sfn_snapshot.add_transformer(sfn_snapshot.transform.regex(full_timestamp, "<timestamp>"))
         exec_input = json.dumps({"start_at": full_timestamp})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -64,7 +65,7 @@ class TestSfnWait:
     def test_wait_timestamppath(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_snapshot,
         timestamp_suffix,
@@ -84,8 +85,8 @@ class TestSfnWait:
         sfn_snapshot.add_transformer(sfn_snapshot.transform.regex(full_timestamp, "<timestamp>"))
         exec_input = json.dumps({"start_at": full_timestamp})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -96,7 +97,7 @@ class TestSfnWait:
     @pytest.mark.parametrize("seconds_value", [-1, -1.5, 0, 1, 1.5])
     def test_base_wait_seconds_path(
         self,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         aws_client,
         sfn_snapshot,
@@ -106,8 +107,8 @@ class TestSfnWait:
         definition = json.dumps(template)
         execution_input = json.dumps({"input": {"waitSeconds": seconds_value}})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,

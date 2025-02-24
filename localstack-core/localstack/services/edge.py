@@ -12,7 +12,6 @@ from localstack.constants import (
 )
 from localstack.http import Router
 from localstack.http.dispatcher import Handler, handler_dispatcher
-from localstack.http.router import GreedyPathConverter
 from localstack.utils.collections import split_list_by
 from localstack.utils.net import get_free_tcp_port
 from localstack.utils.run import is_root, run
@@ -24,9 +23,7 @@ T = TypeVar("T")
 LOG = logging.getLogger(__name__)
 
 
-ROUTER: Router[Handler] = Router(
-    dispatcher=handler_dispatcher(), converters={"greedy_path": GreedyPathConverter}
-)
+ROUTER: Router[Handler] = Router(dispatcher=handler_dispatcher())
 """This special Router is part of the edge proxy. Use the router to inject custom handlers that are handled before
 the actual AWS service call is made."""
 

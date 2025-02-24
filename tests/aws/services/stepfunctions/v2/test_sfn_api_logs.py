@@ -13,7 +13,7 @@ from localstack.aws.api.stepfunctions import (
     LogLevel,
 )
 from localstack.testing.pytest import markers
-from localstack.testing.pytest.stepfunctions.utils import create_state_machine_with_iam_role
+from localstack.testing.pytest.stepfunctions.utils import create
 from localstack.utils.strings import short_uid
 from localstack.utils.sync import poll_condition
 from tests.aws.services.stepfunctions.templates.base.base_templates import BaseTemplate
@@ -43,7 +43,7 @@ class TestSnfApiLogs:
     @pytest.mark.parametrize("logging_level,include_execution_data", _TEST_LOGGING_CONFIGURATIONS)
     def test_logging_configuration(
         self,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_create_log_group,
         sfn_snapshot,
@@ -65,7 +65,7 @@ class TestSnfApiLogs:
             ],
         )
 
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
         sfn_snapshot.add_transformer(RegexTransformer(snf_role_arn, "snf_role_arn"))
 
         definition = BaseTemplate.load_sfn_template(BaseTemplate.BASE_PASS_RESULT)
@@ -73,7 +73,6 @@ class TestSnfApiLogs:
 
         sm_name = f"statemachine_{short_uid()}"
         creation_resp = create_state_machine(
-            aws_client,
             name=sm_name,
             definition=definition_str,
             roleArn=snf_role_arn,
@@ -92,14 +91,14 @@ class TestSnfApiLogs:
     @pytest.mark.parametrize("logging_configuration", _TEST_INCOMPLETE_LOGGING_CONFIGURATIONS)
     def test_incomplete_logging_configuration(
         self,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_create_log_group,
         sfn_snapshot,
         aws_client,
         logging_configuration,
     ):
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
         sfn_snapshot.add_transformer(RegexTransformer(snf_role_arn, "snf_role_arn"))
 
         definition = BaseTemplate.load_sfn_template(BaseTemplate.BASE_PASS_RESULT)
@@ -107,7 +106,6 @@ class TestSnfApiLogs:
 
         sm_name = f"statemachine_{short_uid()}"
         creation_resp = create_state_machine(
-            aws_client,
             name=sm_name,
             definition=definition_str,
             roleArn=snf_role_arn,
@@ -126,7 +124,7 @@ class TestSnfApiLogs:
     @pytest.mark.parametrize("logging_configuration", _TEST_INVALID_LOGGING_CONFIGURATIONS)
     def test_invalid_logging_configuration(
         self,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_create_log_group,
         sfn_snapshot,
@@ -134,7 +132,7 @@ class TestSnfApiLogs:
         aws_client_factory,
         logging_configuration,
     ):
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
         sfn_snapshot.add_transformer(RegexTransformer(snf_role_arn, "snf_role_arn"))
 
         template = BaseTemplate.load_sfn_template(BaseTemplate.BASE_PASS_RESULT)
@@ -159,7 +157,7 @@ class TestSnfApiLogs:
     @markers.aws.validated
     def test_deleted_log_group(
         self,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_create_log_group,
         sfn_snapshot,
@@ -187,16 +185,15 @@ class TestSnfApiLogs:
 
         assert poll_condition(condition=_log_group_is_deleted)
 
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
         sfn_snapshot.add_transformer(RegexTransformer(snf_role_arn, "snf_role_arn"))
 
         template = BaseTemplate.load_sfn_template(BaseTemplate.BASE_PASS_RESULT)
         definition = json.dumps(template)
 
         with pytest.raises(ClientError) as exc:
-            create_state_machine_with_iam_role(
-                aws_client,
-                create_state_machine_iam_role,
+            create(
+                create_iam_role_for_sfn,
                 create_state_machine,
                 sfn_snapshot,
                 definition,
@@ -209,7 +206,7 @@ class TestSnfApiLogs:
     @markers.aws.validated
     def test_multiple_destinations(
         self,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_create_log_group,
         sfn_snapshot,
@@ -231,9 +228,8 @@ class TestSnfApiLogs:
         definition = json.dumps(template)
 
         with pytest.raises(ClientError) as exc:
-            create_state_machine_with_iam_role(
-                aws_client,
-                create_state_machine_iam_role,
+            create(
+                create_iam_role_for_sfn,
                 create_state_machine,
                 sfn_snapshot,
                 definition,
@@ -246,7 +242,7 @@ class TestSnfApiLogs:
     @markers.aws.validated
     def test_update_logging_configuration(
         self,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_create_log_group,
         sfn_snapshot,
@@ -271,7 +267,7 @@ class TestSnfApiLogs:
             ],
         )
 
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
         sfn_snapshot.add_transformer(RegexTransformer(snf_role_arn, "snf_role_arn"))
 
         definition = BaseTemplate.load_sfn_template(BaseTemplate.BASE_PASS_RESULT)
@@ -279,7 +275,6 @@ class TestSnfApiLogs:
 
         sm_name = f"statemachine_{short_uid()}"
         creation_resp = create_state_machine(
-            aws_client,
             name=sm_name,
             definition=definition_str,
             roleArn=snf_role_arn,

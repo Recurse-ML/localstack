@@ -1,7 +1,7 @@
 import functools
 import inspect
 import types
-from typing import Any, Callable, List, Type
+from typing import Any, Callable, List
 
 
 def get_defining_object(method):
@@ -89,25 +89,17 @@ class Patch:
         super().__init__()
         self.obj = obj
         self.name = name
-        try:
-            self.old = getattr(self.obj, name)
-        except AttributeError:
-            self.old = None
+        self.old = getattr(self.obj, name)
         self.new = new
         self.is_applied = False
 
     def apply(self):
-        if self.old and self.name == "__getattr__":
-            raise Exception("You can't patch class types implementing __getattr__")
-        if not self.old and self.name != "__getattr__":
-            raise AttributeError(f"`{self.obj.__name__}` object has no attribute `{self.name}`")
         setattr(self.obj, self.name, self.new)
         self.is_applied = True
         Patch.applied_patches.append(self)
 
     def undo(self):
-        # If we added a method to a class type, we don't have a self.old. We just delete __getattr__
-        setattr(self.obj, self.name, self.old) if self.old else delattr(self.obj, self.name)
+        setattr(self.obj, self.name, self.old)
         self.is_applied = False
         Patch.applied_patches.remove(self)
 
@@ -118,16 +110,6 @@ class Patch:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.undo()
         return self
-
-    @staticmethod
-    def extend_class(target: Type, fn: Callable):
-        def _getattr(obj, name):
-            if name != fn.__name__:
-                raise AttributeError(f"`{target.__name__}` object has no attribute `{name}`")
-
-            return functools.partial(fn, obj)
-
-        return Patch(target, "__getattr__", _getattr)
 
     @staticmethod
     def function(target: Callable, fn: Callable, pass_target: bool = True):
@@ -228,13 +210,6 @@ def patch(target, pass_target=True):
         def my_patch(self, *args):
             ...
 
-    This decorator can also patch a class type with a new method.
-
-    For example:
-        @patch(target=MyEchoer)
-        def new_echo(self, *args):
-            ...
-
     :param target: the function or method to patch
     :param pass_target: whether to pass the target to the patching function as first parameter
     :returns: the same function, but with a patch created
@@ -242,11 +217,7 @@ def patch(target, pass_target=True):
 
     @functools.wraps(target)
     def wrapper(fn):
-        fn.patch = (
-            Patch.extend_class(target, fn)
-            if inspect.isclass(target)
-            else Patch.function(target, fn, pass_target=pass_target)
-        )
+        fn.patch = Patch.function(target, fn, pass_target=pass_target)
         fn.patch.apply()
         return fn
 

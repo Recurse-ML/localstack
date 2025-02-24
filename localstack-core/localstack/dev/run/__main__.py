@@ -21,13 +21,14 @@ from localstack.utils.strings import short_uid
 
 from .configurators import (
     ConfigEnvironmentConfigurator,
+    CoverageRunScriptConfigurator,
     DependencyMountConfigurator,
     EntryPointMountConfigurator,
     ImageConfigurator,
     PortConfigurator,
     SourceVolumeMountConfigurator,
 )
-from .paths import HOST_PATH_MAPPINGS, HostPaths
+from .paths import HostPaths
 
 
 @click.command("run")
@@ -36,7 +37,7 @@ from .paths import HOST_PATH_MAPPINGS, HostPaths
     type=str,
     required=False,
     help="Overwrite the container image to be used (defaults to localstack/localstack or "
-    "localstack/localstack-pro).",
+    "localstack/localstack-pro.",
 )
 @click.option(
     "--volume-dir",
@@ -66,7 +67,7 @@ from .paths import HOST_PATH_MAPPINGS, HostPaths
     "--mount-source/--no-mount-source",
     is_flag=True,
     default=True,
-    help="Mount source files from localstack and localstack-ext. Use --local-packages for optional dependencies such as moto.",
+    help="Mount source files from localstack, localstack-ext, and moto into the container.",
 )
 @click.option(
     "--mount-dependencies/--no-mount-dependencies",
@@ -114,14 +115,6 @@ from .paths import HOST_PATH_MAPPINGS, HostPaths
     required=False,
     help="Docker network to start the container in",
 )
-@click.option(
-    "--local-packages",
-    "-l",
-    multiple=True,
-    required=False,
-    type=click.Choice(HOST_PATH_MAPPINGS.keys(), case_sensitive=False),
-    help="Mount specified packages into the container",
-)
 @click.argument("command", nargs=-1, required=False)
 def run(
     image: str = None,
@@ -138,7 +131,6 @@ def run(
     publish: Tuple = (),
     entrypoint: str = None,
     network: str = None,
-    local_packages: list[str] | None = None,
     command: str = None,
 ):
     """
@@ -148,7 +140,7 @@ def run(
 
     \b
         python -m localstack.dev.run
-        python -m localstack.dev.run -e DEBUG=1 -e LOCALSTACK_AUTH_TOKEN=test
+        python -m localstack.dev.run -e DEBUG=1 -e LOCALSTACK_API_KEY=test
         python -m localstack.dev.run -- bash -c 'echo "hello"'
 
     Explanations and more examples:
@@ -160,7 +152,7 @@ def run(
 
     If you start localstack-pro, you might also want to add the API KEY as environment variable::
 
-        python -m localstack.dev.run -e DEBUG=1 -e LOCALSTACK_AUTH_TOKEN=test
+        python -m localstack.dev.run -e DEBUG=1 -e LOCALSTACK_API_KEY=test
 
     If your local changes are making modifications to plux plugins (e.g., adding new providers or hooks),
     then you also want to mount the newly generated entry_point.txt files into the container::
@@ -198,21 +190,17 @@ def run(
         somedir                              <- your workspace directory
         ├── localstack                       <- execute script in here
         │   ├── ...
-        │   ├── localstack-core
-        │   │   ├── localstack               <- will be mounted into the container
-        │   │   └── localstack_core.egg-info
+        │   ├── localstack                   <- will be mounted into the container
+        │   ├── localstack_core.egg-info
         │   ├── pyproject.toml
         │   ├── tests
         │   └── ...
         ├── localstack-ext                   <- or execute script in here
         │   ├── ...
-        │   ├── localstack-pro-core
-        │   │   ├── localstack
-        │   │   │   └── pro
-        │   │   │       └── core             <- will be mounted into the container
-        │   │   ├── localstack_ext.egg-info
-        │   │   ├── pyproject.toml
-        │   │   └── tests
+        │   ├── localstack_ext               <- will be mounted into the container
+        │   ├── localstack_ext.egg-info
+        │   ├── pyproject.toml
+        │   ├── tests
         │   └── ...
         ├── moto
         │   ├── AUTHORS.md
@@ -223,16 +211,6 @@ def run(
         │   ├── tests
         │   └── ...
 
-    You can choose which local source repositories are mounted in. For example, if `moto` and `rolo` are
-    both present, only mount `rolo` into the container.
-
-    \b
-        python -m localstack.dev.run --local-packages rolo
-
-    If both `rolo` and `moto` are available and both should be mounted, use the flag twice.
-
-    \b
-        python -m localstack.dev.run --local-packages rolo --local-packages moto
     """
     with console.status("Configuring") as status:
         env_vars = parse_env_vars(env)
@@ -275,7 +253,7 @@ def run(
         # replicate pro startup
         if pro:
             try:
-                from localstack.pro.core.plugins import modify_gateway_listen_config
+                from localstack_ext.plugins import modify_gateway_listen_config
 
                 modify_gateway_listen_config(config)
             except ImportError:
@@ -287,6 +265,7 @@ def run(
             PortConfigurator(randomize),
             ConfigEnvironmentConfigurator(pro),
             ContainerConfigurators.mount_localstack_volume(host_paths.volume_dir),
+            CoverageRunScriptConfigurator(host_paths=host_paths),
             ContainerConfigurators.config_env_vars,
         ]
 
@@ -307,7 +286,6 @@ def run(
                 SourceVolumeMountConfigurator(
                     host_paths=host_paths,
                     pro=pro,
-                    chosen_packages=local_packages,
                 )
             )
         if mount_entrypoints:

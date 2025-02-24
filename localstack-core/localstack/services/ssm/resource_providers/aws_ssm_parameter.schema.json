@@ -4,118 +4,47 @@
   "additionalProperties": false,
   "properties": {
     "Type": {
-      "type": "string",
-      "description": "The type of the parameter.",
-      "enum": [
-        "String",
-        "StringList",
-        "SecureString"
-      ]
-    },
-    "Value": {
-      "type": "string",
-      "description": "The value associated with the parameter."
+      "type": "string"
     },
     "Description": {
-      "type": "string",
-      "description": "The information about the parameter."
+      "type": "string"
     },
     "Policies": {
-      "type": "string",
-      "description": "The policies attached to the parameter."
+      "type": "string"
     },
     "AllowedPattern": {
-      "type": "string",
-      "description": "The regular expression used to validate the parameter value."
+      "type": "string"
     },
     "Tier": {
-      "type": "string",
-      "description": "The corresponding tier of the parameter.",
-      "enum": [
-        "Standard",
-        "Advanced",
-        "Intelligent-Tiering"
-      ]
+      "type": "string"
     },
-    "Tags": {
-      "type": "object",
-      "description": "A key-value pair to associate with a resource.",
-      "patternProperties": {
-        "^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-@]*)$": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
+    "Value": {
+      "type": "string"
     },
     "DataType": {
-      "type": "string",
-      "description": "The corresponding DataType of the parameter.",
-      "enum": [
-        "text",
-        "aws:ec2:image"
-      ]
+      "type": "string"
+    },
+    "Id": {
+      "type": "string"
+    },
+    "Tags": {
+      "type": "object"
     },
     "Name": {
-      "type": "string",
-      "description": "The name of the parameter."
+      "type": "string"
     }
   },
   "required": [
-    "Value",
-    "Type"
+    "Type",
+    "Value"
   ],
-  "tagging": {
-    "taggable": true,
-    "tagOnCreate": true,
-    "tagUpdatable": true,
-    "cloudFormationSystemTags": true,
-    "tagProperty": "/properties/Tags"
-  },
   "createOnlyProperties": [
     "/properties/Name"
   ],
   "primaryIdentifier": [
-    "/properties/Name"
+    "/properties/Id"
   ],
-  "writeOnlyProperties": [
-    "/properties/Tags",
-    "/properties/Description",
-    "/properties/Tier",
-    "/properties/AllowedPattern",
-    "/properties/Policies"
-  ],
-  "handlers": {
-    "create": {
-      "permissions": [
-        "ssm:PutParameter",
-        "ssm:AddTagsToResource",
-        "ssm:GetParameters"
-      ],
-      "timeoutInMinutes": 5
-    },
-    "read": {
-      "permissions": [
-        "ssm:GetParameters"
-      ]
-    },
-    "update": {
-      "permissions": [
-        "ssm:PutParameter",
-        "ssm:AddTagsToResource",
-        "ssm:RemoveTagsFromResource",
-        "ssm:GetParameters"
-      ],
-      "timeoutInMinutes": 5
-    },
-    "delete": {
-      "permissions": [
-        "ssm:DeleteParameter"
-      ]
-    },
-    "list": {
-      "permissions": [
-        "ssm:DescribeParameters"
-      ]
-    }
-  }
+  "readOnlyProperties": [
+    "/properties/Id"
+  ]
 }

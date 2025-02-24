@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, ContextManager, Optional
 
 import aws_cdk as cdk
-from botocore.exceptions import ClientError, WaiterError
+from botocore.exceptions import WaiterError
 
 from localstack.config import is_env_true
 from localstack.testing.aws.util import is_aws_cloud
@@ -28,27 +28,25 @@ WAITER_CONFIG_AWS = {
     "Delay": 6,
     "MaxAttempts": 600,
 }  # total timeout ~1 hour (6 * 600 = 3_600 seconds)
-# total timeout ~10 minutes
-WAITER_CONFIG_LS = {"Delay": 1, "MaxAttempts": 600}
+WAITER_CONFIG_LS = {"Delay": 1, "MaxAttempts": 600}  # total timeout ~10 minutes
 CFN_MAX_TEMPLATE_SIZE = 51_200
 
 
 # TODO: move/unify with utils
 def cleanup_s3_bucket(s3_client: "S3Client", bucket_name: str, delete_bucket: bool = False):
-    LOG.debug("Cleaning provisioned S3 Bucket %s", bucket_name)
+    LOG.debug(f"Cleaning provisioned S3 Bucket {bucket_name=}")
     try:
         objs = s3_client.list_objects_v2(Bucket=bucket_name)
         objs_num = objs["KeyCount"]
         if objs_num > 0:
-            LOG.debug("Deleting %s objects from bucket_name=%s", objs_num, bucket_name)
+            LOG.debug(f"Deleting {objs_num} objects from {bucket_name=}")
             obj_keys = [{"Key": o["Key"]} for o in objs["Contents"]]
             s3_client.delete_objects(Bucket=bucket_name, Delete={"Objects": obj_keys})
         if delete_bucket:
             s3_client.delete_bucket(Bucket=bucket_name)
     except Exception:
         LOG.warning(
-            "Failed to clean provisioned S3 Bucket bucket_name=%s",
-            bucket_name,
+            f"Failed to clean provisioned S3 Bucket {bucket_name=}",
             exc_info=LOG.isEnabledFor(logging.DEBUG),
         )
 
@@ -245,8 +243,8 @@ class InfraProvisioner:
 
                 for s3_bucket in s3_buckets:
                     self.custom_cleanup_steps.append(
-                        lambda bucket=s3_bucket: cleanup_s3_bucket(
-                            self.aws_client.s3, bucket, delete_bucket=False
+                        lambda: cleanup_s3_bucket(
+                            self.aws_client.s3, s3_bucket, delete_bucket=False
                         )
                     )
 
@@ -321,8 +319,7 @@ class InfraProvisioner:
                 with open(template_path, "wt") as fd:
                     template_json = cdk.assertions.Template.from_stack(cdk_stack).to_json()
                     json.dump(template_json, fd, indent=2)
-                    # add trailing newline for linter and Git compliance
-                    fd.write("\n")
+                    fd.write("\n")  # add trailing newline for linter and Git compliance
 
             self.cloudformation_stacks[cdk_stack.stack_name] = {
                 "StackName": cdk_stack.stack_name,
@@ -404,12 +401,7 @@ class InfraProvisioner:
         return f"localstack-testing-assets-{account_id}-{region}"
 
     def _create_bucket_if_not_exists(self, template_bucket_name: str):
-        try:
-            self.aws_client.s3.head_bucket(Bucket=template_bucket_name)
-        except ClientError as exc:
-            if exc.response["Error"]["Code"] != "404":
-                raise
-            create_s3_bucket(template_bucket_name, s3_client=self.aws_client.s3)
+        create_s3_bucket(template_bucket_name, s3_client=self.aws_client.s3)
 
     def _synth(self):
         # TODO: this doesn't actually synth a CloudAssembly yet

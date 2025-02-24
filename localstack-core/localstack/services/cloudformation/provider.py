@@ -54,15 +54,12 @@ from localstack.aws.api.cloudformation import (
     ListStackSetsInput,
     ListStackSetsOutput,
     ListStacksOutput,
-    ListTypesInput,
-    ListTypesOutput,
     LogicalResourceId,
     NextToken,
     Parameter,
     PhysicalResourceId,
     RegisterTypeInput,
     RegisterTypeOutput,
-    RegistryType,
     RetainExceptOnCreate,
     RetainResources,
     RoleARN,
@@ -73,7 +70,6 @@ from localstack.aws.api.cloudformation import (
     StackStatusFilter,
     TemplateParameter,
     TemplateStage,
-    TypeSummary,
     UpdateStackInput,
     UpdateStackOutput,
     UpdateStackSetInput,
@@ -92,7 +88,7 @@ from localstack.services.cloudformation.engine.entities import (
     StackInstance,
     StackSet,
 )
-from localstack.services.cloudformation.engine.parameters import mask_no_echo, strip_parameter_type
+from localstack.services.cloudformation.engine.parameters import strip_parameter_type
 from localstack.services.cloudformation.engine.resource_ordering import (
     NoResourceInStack,
     order_resources,
@@ -107,10 +103,6 @@ from localstack.services.cloudformation.engine.transformers import (
 from localstack.services.cloudformation.engine.validations import (
     DEFAULT_TEMPLATE_VALIDATIONS,
     ValidationError,
-)
-from localstack.services.cloudformation.resource_provider import (
-    PRO_RESOURCE_PROVIDERS,
-    ResourceProvider,
 )
 from localstack.services.cloudformation.stores import (
     cloudformation_stores,
@@ -211,12 +203,16 @@ class CloudformationProvider(CloudformationApi):
         template_body = request.get("TemplateBody") or ""
         if len(template_body) > 51200:
             raise ValidationError(
-                f"1 validation error detected: Value '{request['TemplateBody']}' at 'templateBody' "
+                f'1 validation error detected: Value \'{request["TemplateBody"]}\' at \'templateBody\' '
                 "failed to satisfy constraint: Member must have length less than or equal to 51200"
             )
         api_utils.prepare_template_body(request)  # TODO: avoid mutating request directly
 
         template = template_preparer.parse_template(request["TemplateBody"])
+
+        # perform basic static analysis on the template
+        for validation_fn in DEFAULT_TEMPLATE_VALIDATIONS:
+            validation_fn(template)
 
         stack_name = template["StackName"] = request.get("StackName")
         if api_utils.validate_stack_name(stack_name) is False:
@@ -269,10 +265,6 @@ class CloudformationProvider(CloudformationApi):
             state.stacks[stack.stack_id] = stack
             return CreateStackOutput(StackId=stack.stack_id)
 
-        # perform basic static analysis on the template
-        for validation_fn in DEFAULT_TEMPLATE_VALIDATIONS:
-            validation_fn(template)
-
         stack = Stack(context.account_id, context.region, request, template)
 
         # resolve conditions
@@ -288,14 +280,16 @@ class CloudformationProvider(CloudformationApi):
         stack.set_resolved_stack_conditions(resolved_stack_conditions)
 
         stack.set_resolved_parameters(resolved_parameters)
-        stack.template_body = template_body
+        stack.template_body = json.dumps(template)
         state.stacks[stack.stack_id] = stack
         LOG.debug(
             'Creating stack "%s" with %s resources ...',
             stack.stack_name,
             len(stack.template_resources),
         )
-        deployer = template_deployer.TemplateDeployer(context.account_id, context.region, stack)
+        deployer = template_deployer.TemplateDeployerBase.factory(
+            context.account_id, context.region, stack
+        )
         try:
             deployer.deploy_stack()
         except Exception as e:
@@ -321,7 +315,9 @@ class CloudformationProvider(CloudformationApi):
         if not stack:
             # aws will silently ignore invalid stack names - we should do the same
             return
-        deployer = template_deployer.TemplateDeployer(context.account_id, context.region, stack)
+        deployer = template_deployer.TemplateDeployerBase.factory(
+            context.account_id, context.region, stack
+        )
         deployer.delete_stack()
 
     @handler("UpdateStack", expand=False)
@@ -337,6 +333,10 @@ class CloudformationProvider(CloudformationApi):
 
         api_utils.prepare_template_body(request)
         template = template_preparer.parse_template(request["TemplateBody"])
+
+        # perform basic static analysis on the template
+        for validation_fn in DEFAULT_TEMPLATE_VALIDATIONS:
+            validation_fn(template)
 
         if (
             "CAPABILITY_AUTO_EXPAND" not in request.get("Capabilities", [])
@@ -392,14 +392,12 @@ class CloudformationProvider(CloudformationApi):
             stack.set_stack_status("ROLLBACK_COMPLETE")
             return CreateStackOutput(StackId=stack.stack_id)
 
-        # perform basic static analysis on the template
-        for validation_fn in DEFAULT_TEMPLATE_VALIDATIONS:
-            validation_fn(template)
-
         # update the template
         stack.template_original = template
 
-        deployer = template_deployer.TemplateDeployer(context.account_id, context.region, stack)
+        deployer = template_deployer.TemplateDeployerBase.factory(
+            context.account_id, context.region, stack
+        )
         # TODO: there shouldn't be a "new" stack on update
         new_stack = Stack(
             context.account_id, context.region, request, template, request["TemplateBody"]
@@ -615,6 +613,10 @@ class CloudformationProvider(CloudformationApi):
             ]  # should then have been set by prepare_template_body
         template = template_preparer.parse_template(req_params["TemplateBody"])
 
+        # perform basic static analysis on the template
+        for validation_fn in DEFAULT_TEMPLATE_VALIDATIONS:
+            validation_fn(template)
+
         del req_params["TemplateBody"]  # TODO: stop mutating req_params
         template["StackName"] = stack_name
         # TODO: validate with AWS what this is actually doing?
@@ -667,8 +669,7 @@ class CloudformationProvider(CloudformationApi):
             case ChangeSetType.UPDATE:
                 # add changeset to existing stack
                 old_parameters = {
-                    k: mask_no_echo(strip_parameter_type(v))
-                    for k, v in stack.resolved_parameters.items()
+                    k: strip_parameter_type(v) for k, v in stack.resolved_parameters.items()
                 }
             case ChangeSetType.IMPORT:
                 raise NotImplementedError()  # TODO: implement importing resources
@@ -714,10 +715,6 @@ class CloudformationProvider(CloudformationApi):
             resolved_parameters=resolved_parameters,
         )
 
-        # perform basic static analysis on the template
-        for validation_fn in DEFAULT_TEMPLATE_VALIDATIONS:
-            validation_fn(template)
-
         # create change set for the stack and apply changes
         change_set = StackChangeSet(
             context.account_id, context.region, stack, req_params, transformed_template
@@ -748,7 +745,7 @@ class CloudformationProvider(CloudformationApi):
         except NoResourceInStack as e:
             raise ValidationError(str(e)) from e
 
-        deployer = template_deployer.TemplateDeployer(
+        deployer = template_deployer.TemplateDeployerBase.factory(
             context.account_id, context.region, change_set
         )
         changes = deployer.construct_changes(
@@ -813,9 +810,7 @@ class CloudformationProvider(CloudformationApi):
         ]
         result = remove_attributes(deepcopy(change_set.metadata), attrs)
         # TODO: replace this patch with a better solution
-        result["Parameters"] = [
-            mask_no_echo(strip_parameter_type(p)) for p in result.get("Parameters", [])
-        ]
+        result["Parameters"] = [strip_parameter_type(p) for p in result.get("Parameters", [])]
         return result
 
     @handler("DeleteChangeSet")
@@ -861,11 +856,7 @@ class CloudformationProvider(CloudformationApi):
         **kwargs,
     ) -> ExecuteChangeSetOutput:
         change_set = find_change_set(
-            context.account_id,
-            context.region,
-            change_set_name,
-            stack_name=stack_name,
-            active_only=True,
+            context.account_id, context.region, change_set_name, stack_name=stack_name
         )
         if not change_set:
             raise ChangeSetNotFoundException(f"ChangeSet [{change_set_name}] does not exist")
@@ -881,7 +872,7 @@ class CloudformationProvider(CloudformationApi):
             stack_name,
             len(change_set.template_resources),
         )
-        deployer = template_deployer.TemplateDeployer(
+        deployer = template_deployer.TemplateDeployerBase.factory(
             context.account_id, context.region, change_set.stack
         )
         try:
@@ -966,15 +957,7 @@ class CloudformationProvider(CloudformationApi):
         if not stack:
             return stack_not_found_error(stack_name)
 
-        try:
-            details = stack.resource_status(logical_resource_id)
-        except Exception as e:
-            if "Unable to find details" in str(e):
-                raise ValidationError(
-                    f"Resource {logical_resource_id} does not exist for stack {stack_name}"
-                )
-            raise
-
+        details = stack.resource_status(logical_resource_id)
         return DescribeStackResourceOutput(StackResourceDetail=details)
 
     @handler("DescribeStackResources")
@@ -1027,7 +1010,7 @@ class CloudformationProvider(CloudformationApi):
                 TemplateParameter(
                     ParameterKey=k,
                     DefaultValue=v.get("Default", ""),
-                    NoEcho=v.get("NoEcho", False),
+                    NoEcho=False,
                     Description=v.get("Description", ""),
                 )
                 for k, v in valid_template.get("Parameters", {}).items()
@@ -1154,7 +1137,7 @@ class CloudformationProvider(CloudformationApi):
         # TODO: add a check for remaining stack instances
 
         for instance in stack_set[0].stack_instances:
-            deployer = template_deployer.TemplateDeployer(
+            deployer = template_deployer.TemplateDeployerBase.factory(
                 context.account_id, context.region, instance.stack
             )
             deployer.delete_stack()
@@ -1293,42 +1276,3 @@ class CloudformationProvider(CloudformationApi):
         request: RegisterTypeInput,
     ) -> RegisterTypeOutput:
         return RegisterTypeOutput()
-
-    def list_types(
-        self, context: RequestContext, request: ListTypesInput, **kwargs
-    ) -> ListTypesOutput:
-        def is_list_overridden(child_class, parent_class):
-            if hasattr(child_class, "list"):
-                import inspect
-
-                child_method = child_class.list
-                parent_method = parent_class.list
-                return inspect.unwrap(child_method) is not inspect.unwrap(parent_method)
-            return False
-
-        def get_listable_types_summaries(plugin_manager):
-            plugins = plugin_manager.list_names()
-            type_summaries = []
-            for plugin in plugins:
-                type_summary = TypeSummary(
-                    Type=RegistryType.RESOURCE,
-                    TypeName=plugin,
-                )
-                provider = plugin_manager.load(plugin)
-                if is_list_overridden(provider.factory, ResourceProvider):
-                    type_summaries.append(type_summary)
-            return type_summaries
-
-        from localstack.services.cloudformation.resource_provider import (
-            plugin_manager,
-        )
-
-        type_summaries = get_listable_types_summaries(plugin_manager)
-        if PRO_RESOURCE_PROVIDERS:
-            from localstack.services.cloudformation.resource_provider import (
-                pro_plugin_manager,
-            )
-
-            type_summaries.extend(get_listable_types_summaries(pro_plugin_manager))
-
-        return ListTypesOutput(TypeSummaries=type_summaries)

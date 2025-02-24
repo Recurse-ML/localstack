@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -12,7 +11,6 @@ BounceStatusCode = str
 Charset = str
 Cidr = str
 ConfigurationSetName = str
-ConnectInstanceArn = str
 CustomRedirectDomain = str
 DefaultDimensionValue = str
 DiagnosticCode = str
@@ -30,7 +28,6 @@ FromAddress = str
 HeaderName = str
 HeaderValue = str
 HtmlPart = str
-IAMRoleARN = str
 Identity = str
 MailFromDomainName = str
 Max24HourSend = float
@@ -66,12 +63,12 @@ TextPart = str
 VerificationToken = str
 
 
-class BehaviorOnMXFailure(StrEnum):
+class BehaviorOnMXFailure(str):
     UseDefaultValue = "UseDefaultValue"
     RejectMessage = "RejectMessage"
 
 
-class BounceType(StrEnum):
+class BounceType(str):
     DoesNotExist = "DoesNotExist"
     MessageTooLarge = "MessageTooLarge"
     ExceededQuota = "ExceededQuota"
@@ -80,7 +77,7 @@ class BounceType(StrEnum):
     TemporaryFailure = "TemporaryFailure"
 
 
-class BulkEmailStatus(StrEnum):
+class BulkEmailStatus(str):
     Success = "Success"
     MessageRejected = "MessageRejected"
     MailFromDomainNotVerified = "MailFromDomainNotVerified"
@@ -97,27 +94,27 @@ class BulkEmailStatus(StrEnum):
     Failed = "Failed"
 
 
-class ConfigurationSetAttribute(StrEnum):
+class ConfigurationSetAttribute(str):
     eventDestinations = "eventDestinations"
     trackingOptions = "trackingOptions"
     deliveryOptions = "deliveryOptions"
     reputationOptions = "reputationOptions"
 
 
-class CustomMailFromStatus(StrEnum):
+class CustomMailFromStatus(str):
     Pending = "Pending"
     Success = "Success"
     Failed = "Failed"
     TemporaryFailure = "TemporaryFailure"
 
 
-class DimensionValueSource(StrEnum):
+class DimensionValueSource(str):
     messageTag = "messageTag"
     emailHeader = "emailHeader"
     linkTag = "linkTag"
 
 
-class DsnAction(StrEnum):
+class DsnAction(str):
     failed = "failed"
     delayed = "delayed"
     delivered = "delivered"
@@ -125,7 +122,7 @@ class DsnAction(StrEnum):
     expanded = "expanded"
 
 
-class EventType(StrEnum):
+class EventType(str):
     send = "send"
     reject = "reject"
     bounce = "bounce"
@@ -136,42 +133,42 @@ class EventType(StrEnum):
     renderingFailure = "renderingFailure"
 
 
-class IdentityType(StrEnum):
+class IdentityType(str):
     EmailAddress = "EmailAddress"
     Domain = "Domain"
 
 
-class InvocationType(StrEnum):
+class InvocationType(str):
     Event = "Event"
     RequestResponse = "RequestResponse"
 
 
-class NotificationType(StrEnum):
+class NotificationType(str):
     Bounce = "Bounce"
     Complaint = "Complaint"
     Delivery = "Delivery"
 
 
-class ReceiptFilterPolicy(StrEnum):
+class ReceiptFilterPolicy(str):
     Block = "Block"
     Allow = "Allow"
 
 
-class SNSActionEncoding(StrEnum):
+class SNSActionEncoding(str):
     UTF_8 = "UTF-8"
     Base64 = "Base64"
 
 
-class StopScope(StrEnum):
+class StopScope(str):
     RuleSet = "RuleSet"
 
 
-class TlsPolicy(StrEnum):
+class TlsPolicy(str):
     Require = "Require"
     Optional_ = "Optional"
 
 
-class VerificationStatus(StrEnum):
+class VerificationStatus(str):
     Pending = "Pending"
     Success = "Success"
     Failed = "Failed"
@@ -528,13 +525,6 @@ class ConfigurationSet(TypedDict, total=False):
 
 ConfigurationSetAttributeList = List[ConfigurationSetAttribute]
 ConfigurationSets = List[ConfigurationSet]
-
-
-class ConnectAction(TypedDict, total=False):
-    InstanceARN: ConnectInstanceArn
-    IAMRoleARN: IAMRoleARN
-
-
 Counter = int
 
 
@@ -642,7 +632,6 @@ class S3Action(TypedDict, total=False):
     BucketName: S3BucketName
     ObjectKeyPrefix: Optional[S3KeyPrefix]
     KmsKeyArn: Optional[AmazonResourceName]
-    IamRoleArn: Optional[IAMRoleARN]
 
 
 class ReceiptAction(TypedDict, total=False):
@@ -653,7 +642,6 @@ class ReceiptAction(TypedDict, total=False):
     StopAction: Optional[StopAction]
     AddHeaderAction: Optional[AddHeaderAction]
     SNSAction: Optional[SNSAction]
-    ConnectAction: Optional[ConnectAction]
 
 
 ReceiptActionsList = List[ReceiptAction]
@@ -1155,7 +1143,7 @@ class SendBulkTemplatedEmailRequest(ServiceRequest):
     DefaultTags: Optional[MessageTagList]
     Template: TemplateName
     TemplateArn: Optional[AmazonResourceName]
-    DefaultTemplateData: TemplateData
+    DefaultTemplateData: Optional[TemplateData]
     Destinations: BulkEmailDestinationList
 
 
@@ -1742,7 +1730,6 @@ class SesApi:
         context: RequestContext,
         source: Address,
         template: TemplateName,
-        default_template_data: TemplateData,
         destinations: BulkEmailDestinationList,
         source_arn: AmazonResourceName = None,
         reply_to_addresses: AddressList = None,
@@ -1751,6 +1738,7 @@ class SesApi:
         configuration_set_name: ConfigurationSetName = None,
         default_tags: MessageTagList = None,
         template_arn: AmazonResourceName = None,
+        default_template_data: TemplateData = None,
         **kwargs,
     ) -> SendBulkTemplatedEmailResponse:
         raise NotImplementedError

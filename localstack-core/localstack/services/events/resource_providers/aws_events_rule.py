@@ -167,17 +167,6 @@ class Target(TypedDict):
 
 REPEATED_INVOCATION = "repeated_invocation"
 
-MATCHING_OPERATIONS = [
-    "prefix",
-    "cidr",
-    "exists",
-    "suffix",
-    "anything-but",
-    "numeric",
-    "equals-ignore-case",
-    "wildcard",
-]
-
 
 def extract_rule_name(rule_id: str) -> str:
     return rule_id.rsplit("|", maxsplit=1)[-1]
@@ -240,7 +229,11 @@ class EventsRuleProvider(ResourceProvider[EventsRuleProperties]):
         def wrap_in_lists(o, **kwargs):
             if isinstance(o, dict):
                 for k, v in o.items():
-                    if not isinstance(v, (dict, list)) and k not in MATCHING_OPERATIONS:
+                    if not isinstance(v, (dict, list)) and k not in [
+                        "prefix",
+                        "cidr",
+                        "exists",
+                    ]:
                         o[k] = [v]
             return o
 
@@ -261,11 +254,6 @@ class EventsRuleProvider(ResourceProvider[EventsRuleProperties]):
             put_targets_kwargs = {"Rule": extract_rule_name(model["Id"]), "Targets": targets}
             if event_bus_name:
                 put_targets_kwargs["EventBusName"] = event_bus_name
-
-            put_targets_kwargs = util.convert_request_kwargs(
-                put_targets_kwargs,
-                events.meta.service_model.operation_model("PutTargets").input_shape,
-            )
 
             events.put_targets(**put_targets_kwargs)
 

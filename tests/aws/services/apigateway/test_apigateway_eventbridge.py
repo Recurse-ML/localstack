@@ -2,7 +2,6 @@ import json
 
 import requests
 
-from localstack.testing.aws.util import is_aws_cloud
 from localstack.testing.pytest import markers
 from localstack.utils.strings import short_uid
 from localstack.utils.sync import retry
@@ -103,8 +102,8 @@ def test_apigateway_to_eventbridge(
         path="/event",
     )
 
-    def invoke_api(url) -> dict:
-        resp = requests.post(
+    def invoke_api(url):
+        response = requests.post(
             url,
             headers={"Content-Type": "application/json", "Accept": "application/json"},
             data=json.dumps(
@@ -120,16 +119,10 @@ def test_apigateway_to_eventbridge(
             ),
             verify=False,
         )
-        assert resp.ok
+        assert 200 == response.status_code
+        return response
 
-        json_resp = resp.json()
-        assert "Entries" in json_resp
-        return json_resp
-
-    if is_aws_cloud():
-        # retry is necessary against AWS, probably IAM permission delay
-        response = retry(invoke_api, sleep=1, retries=10, url=invocation_url)
-    else:
-        response = invoke_api(invocation_url)
-
-    snapshot.match("eventbridge-put-events-response", response)
+    # retry is necessary against AWS, probably IAM permission delay
+    response = retry(invoke_api, sleep=1, retries=10, url=invocation_url)
+    assert response.ok
+    snapshot.match("eventbridge-put-events-response", response.json())

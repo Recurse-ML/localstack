@@ -2,9 +2,7 @@ import json
 
 from localstack_snapshot.snapshots.transformer import RegexTransformer
 
-from localstack.testing.pytest.stepfunctions.utils import (
-    await_execution_terminated,
-)
+from localstack.testing.pytest.stepfunctions.utils import await_execution_success
 from localstack.utils.strings import short_uid
 from tests.aws.services.stepfunctions.templates.intrinsicfunctions.intrinsic_functions_templates import (
     IntrinsicFunctionTemplate as IFT,
@@ -12,15 +10,14 @@ from tests.aws.services.stepfunctions.templates.intrinsicfunctions.intrinsic_fun
 
 
 def create_and_test_on_inputs(
-    target_aws_client,
-    create_state_machine_iam_role,
+    stepfunctions_client,
+    create_iam_role_for_sfn,
     create_state_machine,
     sfn_snapshot,
     ift_template,
     input_values,
 ):
-    stepfunctions_client = target_aws_client.stepfunctions
-    snf_role_arn = create_state_machine_iam_role(target_aws_client)
+    snf_role_arn = create_iam_role_for_sfn()
     sfn_snapshot.add_transformer(RegexTransformer(snf_role_arn, "snf_role_arn"))
 
     sm_name: str = f"statemachine_{short_uid()}"
@@ -28,7 +25,7 @@ def create_and_test_on_inputs(
     definition_str = json.dumps(definition)
 
     creation_resp = create_state_machine(
-        target_aws_client, name=sm_name, definition=definition_str, roleArn=snf_role_arn
+        name=sm_name, definition=definition_str, roleArn=snf_role_arn
     )
     sfn_snapshot.add_transformer(sfn_snapshot.transform.sfn_sm_create_arn(creation_resp, 0))
     state_machine_arn = creation_resp["stateMachineArn"]
@@ -43,7 +40,7 @@ def create_and_test_on_inputs(
         sfn_snapshot.add_transformer(sfn_snapshot.transform.sfn_sm_exec_arn(exec_resp, i))
         execution_arn = exec_resp["executionArn"]
 
-        await_execution_terminated(
+        await_execution_success(
             stepfunctions_client=stepfunctions_client, execution_arn=execution_arn
         )
 

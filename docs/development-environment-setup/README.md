@@ -8,9 +8,7 @@ Once LocalStack runs in your Docker environment and you’ve played around with 
 
 You will need the following tools for the local development of LocalStack.
 
-* [Python](https://www.python.org/downloads/) and `pip`
-    * We recommend to use a Python version management tool like [`pyenv`](https://github.com/pyenv/pyenv/).
-    This way you will always use the correct Python version as defined in `.python-version`.
+* [Python 3.11+](https://www.python.org/downloads/) and `pip`
 * [Node.js & npm](https://nodejs.org/en/download/)
 * [Docker](https://docs.docker.com/desktop/)
 
@@ -33,9 +31,6 @@ The basic steps include:
 > [!NOTE]
 > This will install the required pip dependencies in a local Python 3 `venv` directory called `.venv` (your global Python packages will remain untouched).
 > Depending on your system, some `pip` modules may require additional native libs installed.
-
-> [!NOTE]
-> Consider running `make install-dev-types` to enable type hinting for efficient [integration tests](../testing/integration-tests/README.md) development.
 5. Start localstack in host mode using `make start`
 
 <div align="left">
@@ -46,7 +41,7 @@ The basic steps include:
 
 ### Building the Docker image for Development
 
-We generally recommend using this command to build the `localstack/localstack` Docker image locally (works on Linux/macOS):
+We generally recommend using this command to build the `localstack/localstack` Docker image locally (works on Linux/MacOS):
 
 ```bash
 IMAGE_NAME="localstack/localstack" ./bin/docker-helper.sh build
@@ -57,14 +52,6 @@ IMAGE_NAME="localstack/localstack" ./bin/docker-helper.sh build
 In host mode, additional dependencies (e.g., Java) are required for developing certain AWS-emulated services (e.g., DynamoDB).
 The required dependencies vary depending on the service, [Configuration](https://docs.localstack.cloud/references/configuration/), operating system, and system architecture (i.e., x86 vs ARM).
 Refer to our official [Dockerfile](https://github.com/localstack/localstack/blob/master/Dockerfile) and our [package installer LPM](Concepts/index.md#packages-and-installers) for more details.
-
-#### Root Permissions
-
-LocalStack runs its own [DNS server](https://docs.localstack.cloud/user-guide/tools/dns-server/) which listens for requests on port 53. This requires root permission. When LocalStack starts in host mode it runs the DNS server as sudo, so a prompt is triggered asking for the sudo password. This is annoying during local development, so to disable this functionality, use `DNS_ADDRESS=0`.
-
-> [!NOTE]
-> We don't recommend disabling the DNS server in general (e.g. in Docker) because the [DNS server](https://docs.localstack.cloud/user-guide/tools/dns-server/) enables seamless connectivity to LocalStack from different environments via the domain name `localhost.localstack.cloud`.
-
 
 #### Python Dependencies
 
@@ -87,6 +74,11 @@ LocalStack runs its own [DNS server](https://docs.localstack.cloud/user-guide/to
 #### Lambda
 
 * macOS users need to configure `LAMBDA_DEV_PORT_EXPOSE=1` such that the host can reach Lambda containers via IPv4 in bridge mode (see [#7367](https://github.com/localstack/localstack/pull/7367)).
+
+#### EVENT_RULE_ENGINE=java
+
+* Requires Java to execute to invoke the AWS [event-ruler](https://github.com/aws/event-ruler) using [JPype](https://github.com/jpype-project/jpype), a Python to Java bridge.
+* Set `JAVA_HOME` to a JDK installation. For example: `JAVA_HOME=/opt/homebrew/Cellar/openjdk/21.0.2`
 
 ### Changing our fork of moto
 
@@ -111,4 +103,3 @@ pip install -e ../moto
 * If `virtualenv` chooses system python installations before your pyenv installations, manually initialize `virtualenv` before running `make install`: `virtualenv -p ~/.pyenv/shims/python3.10 .venv` .
 * Terraform needs version <0.14 to work currently. Use [`tfenv`](https://github.com/tfutils/tfenv) to manage Terraform versions comfortable. Quick start: `tfenv install 0.13.7 && tfenv use 0.13.7`
 * Set env variable `LS_LOG='trace'` to print every `http` request sent to localstack and their responses. It is useful for debugging certain issues.
-* Catch linter or format errors early by installing Git pre-commit hooks via `pre-commit install`. [pre-commit](https://pre-commit.com/) installation: `pip install pre-commit` or `brew install pre-commit`.

@@ -66,10 +66,7 @@ def render_template(*, template: str, enriched_report: EnrichedReport) -> str:
 
 
 def create_test_entry(entry, *, code_owners: CodeOwners, commit_sha: str, github_repo: str):
-    base_dir = github_repo.split("/")[-1]
-
-    rel_path = entry["file_path"].split(base_dir)[-1].removeprefix("/")
-
+    rel_path = "".join(entry["file_path"].partition("tests/")[1:])
     return TestEntry(
         pytest_node_id=entry["node_id"],
         file_path=rel_path,
@@ -123,7 +120,6 @@ def main():
 
     code_owners = CodeOwners(load_file(codeowners_path))
     marker_report = json.loads(load_file(marker_report_path))
-
     enriched_report = enrich_with_codeowners(
         input_data=marker_report,
         github_repo=github_repo,

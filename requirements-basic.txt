@@ -4,55 +4,55 @@
 #
 #    pip-compile --output-file=requirements-basic.txt --strip-extras --unsafe-package=distribute --unsafe-package=localstack-core --unsafe-package=pip --unsafe-package=setuptools pyproject.toml
 #
-build==1.2.2.post1
+build==1.2.1
     # via localstack-core (pyproject.toml)
-cachetools==5.5.2
+cachetools==5.3.3
     # via localstack-core (pyproject.toml)
-certifi==2025.1.31
+certifi==2024.6.2
     # via requests
-cffi==1.17.1
+cffi==1.16.0
     # via cryptography
-charset-normalizer==3.4.1
+charset-normalizer==3.3.2
     # via requests
-click==8.1.8
+click==8.1.7
     # via localstack-core (pyproject.toml)
-cryptography==44.0.1
+cryptography==42.0.8
     # via localstack-core (pyproject.toml)
 dill==0.3.6
     # via localstack-core (pyproject.toml)
-dnslib==0.9.25
+dnslib==0.9.24
     # via localstack-core (pyproject.toml)
-dnspython==2.7.0
+dnspython==2.6.1
     # via localstack-core (pyproject.toml)
-idna==3.10
+idna==3.7
     # via requests
 markdown-it-py==3.0.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
-packaging==24.2
+packaging==24.1
     # via build
-plux==1.12.1
+plux==1.10.0
     # via localstack-core (pyproject.toml)
-psutil==7.0.0
+psutil==5.9.8
     # via localstack-core (pyproject.toml)
 pycparser==2.22
     # via cffi
-pygments==2.19.1
+pygments==2.18.0
     # via rich
-pyproject-hooks==1.2.0
+pyproject-hooks==1.1.0
     # via build
 python-dotenv==1.0.1
     # via localstack-core (pyproject.toml)
-pyyaml==6.0.2
+pyyaml==6.0.1
     # via localstack-core (pyproject.toml)
 requests==2.32.3
     # via localstack-core (pyproject.toml)
-rich==13.9.4
+rich==13.7.1
     # via localstack-core (pyproject.toml)
-semver==3.0.4
+semver==3.0.2
     # via localstack-core (pyproject.toml)
 tailer==0.4.1
     # via localstack-core (pyproject.toml)
-urllib3==2.3.0
+urllib3==2.2.1
     # via requests

@@ -73,7 +73,7 @@ def save_file(file, content, append=False, permissions=None):
     def _opener(path, flags):
         return os.open(path, flags, permissions)
 
-    # make sure that the parent dir exists
+    # make sure that the parent dir exsits
     mkdir(os.path.dirname(file))
     # store file contents
     with open(file, mode, opener=_opener if permissions else None) as f:
@@ -289,16 +289,16 @@ def cleanup_tmp_files():
     del TMP_FILES[:]
 
 
-def new_tmp_file(suffix: str = None, dir: str = None) -> str:
+def new_tmp_file(suffix: str = None) -> str:
     """Return a path to a new temporary file."""
-    tmp_file, tmp_path = tempfile.mkstemp(suffix=suffix, dir=dir)
+    tmp_file, tmp_path = tempfile.mkstemp(suffix=suffix)
     os.close(tmp_file)
     TMP_FILES.append(tmp_path)
     return tmp_path
 
 
-def new_tmp_dir(dir: str = None):
-    folder = new_tmp_file(dir=dir)
+def new_tmp_dir():
+    folder = new_tmp_file()
     rm_rf(folder)
     mkdir(folder)
     return folder

@@ -15,11 +15,9 @@ from localstack.utils.container_utils.container_client import (
     CancellableStream,
     ContainerClient,
     ContainerException,
-    DockerContainerStats,
     DockerContainerStatus,
     DockerNotAvailable,
     DockerPlatform,
-    LogConfig,
     NoSuchContainer,
     NoSuchImage,
     NoSuchNetwork,
@@ -55,35 +53,6 @@ class CancellableProcessStream(CancellableStream):
 
     def close(self):
         return self.process.terminate()
-
-
-def parse_size_string(size_str: str) -> int:
-    """Parse human-readable size strings from Docker CLI into bytes"""
-    size_str = size_str.strip().replace(" ", "").upper()
-    if size_str == "0B":
-        return 0
-
-    # Match value and unit using regex
-    match = re.match(r"^([\d.]+)([A-Za-z]+)$", size_str)
-    if not match:
-        return 0
-
-    value = float(match.group(1))
-    unit = match.group(2)
-
-    unit_factors = {
-        "B": 1,
-        "KB": 10**3,
-        "MB": 10**6,
-        "GB": 10**9,
-        "TB": 10**12,
-        "KIB": 2**10,
-        "MIB": 2**20,
-        "GIB": 2**30,
-        "TIB": 2**40,
-    }
-
-    return int(value * unit_factors.get(unit, 1))
 
 
 class CmdDockerClient(ContainerClient):
@@ -141,44 +110,6 @@ class CmdDockerClient(ContainerClient):
             return DockerContainerStatus.UP
         else:
             return DockerContainerStatus.DOWN
-
-    def get_container_stats(self, container_name: str) -> DockerContainerStats:
-        cmd = self._docker_cmd()
-        cmd += ["stats", "--no-stream", "--format", "{{json .}}", container_name]
-        cmd_result = run(cmd)
-        raw_stats = json.loads(cmd_result)
-
-        # BlockIO (read, write)
-        block_io_parts = raw_stats["BlockIO"].split("/")
-        block_read = parse_size_string(block_io_parts[0])
-        block_write = parse_size_string(block_io_parts[1])
-
-        # CPU percentage
-        cpu_percentage = float(raw_stats["CPUPerc"].strip("%"))
-
-        # Memory (usage, limit)
-        mem_parts = raw_stats["MemUsage"].split("/")
-        mem_used = parse_size_string(mem_parts[0])
-        mem_limit = parse_size_string(mem_parts[1])
-        mem_percentage = float(raw_stats["MemPerc"].strip("%"))
-
-        # Network (rx, tx)
-        net_parts = raw_stats["NetIO"].split("/")
-        net_rx = parse_size_string(net_parts[0])
-        net_tx = parse_size_string(net_parts[1])
-
-        return DockerContainerStats(
-            Container=raw_stats["ID"],
-            ID=raw_stats["ID"],
-            Name=raw_stats["Name"],
-            BlockIO=(block_read, block_write),
-            CPUPerc=round(cpu_percentage, 2),
-            MemPerc=round(mem_percentage, 2),
-            MemUsage=(mem_used, mem_limit),
-            NetIO=(net_rx, net_tx),
-            PIDs=int(raw_stats["PIDs"]),
-            SDKStats=None,
-        )
 
     def stop_container(self, container_name: str, timeout: int = 10) -> None:
         cmd = self._docker_cmd()
@@ -470,7 +401,7 @@ class CmdDockerClient(ContainerClient):
         self.inspect_container(container_name_or_id)  # guard to check whether container is there
 
         cmd = self._docker_cmd()
-        cmd += ["logs", "--follow", container_name_or_id]
+        cmd += ["logs", container_name_or_id, "--follow"]
 
         process: subprocess.Popen = run(
             cmd, asynchronous=True, outfile=subprocess.PIPE, stderr=subprocess.STDOUT
@@ -782,13 +713,13 @@ class CmdDockerClient(ContainerClient):
         image_name: str,
         *,
         name: Optional[str] = None,
-        entrypoint: Optional[Union[List[str], str]] = None,
+        entrypoint: Optional[str] = None,
         remove: bool = False,
         interactive: bool = False,
         tty: bool = False,
         detach: bool = False,
         command: Optional[Union[List[str], str]] = None,
-        volumes: Optional[List[SimpleVolumeBind]] = None,
+        mount_volumes: Optional[List[SimpleVolumeBind]] = None,
         ports: Optional[PortMappings] = None,
         exposed_ports: Optional[List[str]] = None,
         env_vars: Optional[Dict[str, str]] = None,
@@ -805,7 +736,6 @@ class CmdDockerClient(ContainerClient):
         platform: Optional[DockerPlatform] = None,
         ulimits: Optional[List[Ulimit]] = None,
         init: Optional[bool] = None,
-        log_config: Optional[LogConfig] = None,
     ) -> Tuple[List[str], str]:
         env_file = None
         cmd = self._docker_cmd() + [action]
@@ -814,15 +744,14 @@ class CmdDockerClient(ContainerClient):
         if name:
             cmd += ["--name", name]
         if entrypoint is not None:  # empty string entrypoint can be intentional
-            if isinstance(entrypoint, str):
-                cmd += ["--entrypoint", entrypoint]
-            else:
-                cmd += ["--entrypoint", shlex.join(entrypoint)]
+            cmd += ["--entrypoint", entrypoint]
         if privileged:
             cmd += ["--privileged"]
-        if volumes:
+        if mount_volumes:
             cmd += [
-                param for volume in volumes for param in ["-v", self._map_to_volume_param(volume)]
+                volume
+                for mount_volume in mount_volumes
+                for volume in ["-v", self._map_to_volume_param(mount_volume)]
             ]
         if interactive:
             cmd.append("--interactive")
@@ -865,10 +794,6 @@ class CmdDockerClient(ContainerClient):
             )
         if init:
             cmd += ["--init"]
-        if log_config:
-            cmd += ["--log-driver", log_config.type]
-            for key, value in log_config.config.items():
-                cmd += ["--log-opt", f"{key}={value}"]
 
         if additional_flags:
             cmd += shlex.split(additional_flags)
@@ -878,7 +803,7 @@ class CmdDockerClient(ContainerClient):
         return cmd, env_file
 
     @staticmethod
-    def _map_to_volume_param(volume: Union[SimpleVolumeBind, VolumeBind]) -> str:
+    def _map_to_volume_param(mount_volume: Union[SimpleVolumeBind, VolumeBind]) -> str:
         """
         Maps the mount volume, to a parameter for the -v docker cli argument.
 
@@ -886,13 +811,13 @@ class CmdDockerClient(ContainerClient):
         (host_path, container_path) -> host_path:container_path
         VolumeBind(host_dir=host_path, container_dir=container_path, read_only=True) -> host_path:container_path:ro
 
-        :param volume: Either a SimpleVolumeBind, in essence a tuple (host_dir, container_dir), or a VolumeBind object
+        :param mount_volume: Either a SimpleVolumeBind, in essence a tuple (host_dir, container_dir), or a VolumeBind object
         :return: String which is passable as parameter to the docker cli -v option
         """
-        if isinstance(volume, VolumeBind):
-            return volume.to_str()
+        if isinstance(mount_volume, VolumeBind):
+            return mount_volume.to_str()
         else:
-            return f"{volume[0]}:{volume[1]}"
+            return f"{mount_volume[0]}:{mount_volume[1]}"
 
     def _check_and_raise_no_such_container_error(
         self, container_name_or_id: str, error: subprocess.CalledProcessError

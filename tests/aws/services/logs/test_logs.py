@@ -13,7 +13,6 @@ from localstack.testing.config import TEST_AWS_REGION_NAME
 from localstack.testing.pytest import markers
 from localstack.utils import testutil
 from localstack.utils.aws import arns
-from localstack.utils.aws.arns import get_partition
 from localstack.utils.common import now_utc, poll_condition, retry, short_uid
 from tests.aws.services.lambda_.test_lambda import TEST_LAMBDA_PYTHON_ECHO
 
@@ -90,25 +89,6 @@ class TestCloudWatchLogs:
             lambda: len(log_groups_after) == len(log_groups_between) - 1, timeout=5.0, interval=0.5
         )
         assert len(log_groups_after) == len(log_groups_before)
-
-    @markers.aws.validated
-    def test_resource_does_not_exist(self, aws_client, snapshot, cleanups):
-        log_group_name = f"log-group-{short_uid()}"
-        log_stream_name = f"log-stream-{short_uid()}"
-        with pytest.raises(Exception) as ctx:
-            aws_client.logs.get_log_events(
-                logGroupName=log_group_name, logStreamName=log_stream_name
-            )
-        snapshot.match("error-log-group-does-not-exist", ctx.value.response)
-
-        aws_client.logs.create_log_group(logGroupName=log_group_name)
-        cleanups.append(lambda: aws_client.logs.delete_log_group(logGroupName=log_group_name))
-
-        with pytest.raises(Exception) as ctx:
-            aws_client.logs.get_log_events(
-                logGroupName=log_group_name, logStreamName=log_stream_name
-            )
-        snapshot.match("error-log-stream-does-not-exist", ctx.value.response)
 
     @markers.aws.validated
     def test_list_tags_log_group(self, snapshot, aws_client):
@@ -315,7 +295,7 @@ class TestCloudWatchLogs:
         func_arn = create_lambda_function(
             handler_file=TEST_LAMBDA_PYTHON_ECHO,
             func_name=test_lambda_name,
-            runtime=Runtime.python3_12,
+            runtime=Runtime.python3_9,
         )["CreateFunctionResponse"]["FunctionArn"]
         aws_client.lambda_.invoke(FunctionName=test_lambda_name, Payload=b"{}")
         # get account-id to set the correct policy
@@ -325,7 +305,7 @@ class TestCloudWatchLogs:
             StatementId=test_lambda_name,
             Principal=f"logs.{region_name}.amazonaws.com",
             Action="lambda:InvokeFunction",
-            SourceArn=f"arn:{get_partition(region_name)}:logs:{region_name}:{account_id}:log-group:{logs_log_group}:*",
+            SourceArn=f"arn:aws:logs:{region_name}:{account_id}:log-group:{logs_log_group}:*",
             SourceAccount=account_id,
         )
 

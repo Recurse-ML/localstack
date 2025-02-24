@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -38,12 +37,12 @@ VocabularyName = str
 Word = str
 
 
-class BaseModelName(StrEnum):
+class BaseModelName(str):
     NarrowBand = "NarrowBand"
     WideBand = "WideBand"
 
 
-class CLMLanguageCode(StrEnum):
+class CLMLanguageCode(str):
     en_US = "en-US"
     hi_IN = "hi-IN"
     es_US = "es-US"
@@ -53,28 +52,28 @@ class CLMLanguageCode(StrEnum):
     ja_JP = "ja-JP"
 
 
-class CallAnalyticsFeature(StrEnum):
+class CallAnalyticsFeature(str):
     GENERATIVE_SUMMARIZATION = "GENERATIVE_SUMMARIZATION"
 
 
-class CallAnalyticsJobStatus(StrEnum):
+class CallAnalyticsJobStatus(str):
     QUEUED = "QUEUED"
     IN_PROGRESS = "IN_PROGRESS"
     FAILED = "FAILED"
     COMPLETED = "COMPLETED"
 
 
-class CallAnalyticsSkippedReasonCode(StrEnum):
+class CallAnalyticsSkippedReasonCode(str):
     INSUFFICIENT_CONVERSATION_CONTENT = "INSUFFICIENT_CONVERSATION_CONTENT"
     FAILED_SAFETY_GUIDELINES = "FAILED_SAFETY_GUIDELINES"
 
 
-class InputType(StrEnum):
+class InputType(str):
     REAL_TIME = "REAL_TIME"
     POST_CALL = "POST_CALL"
 
 
-class LanguageCode(StrEnum):
+class LanguageCode(str):
     af_ZA = "af-ZA"
     ar_AE = "ar-AE"
     ar_SA = "ar-SA"
@@ -180,7 +179,7 @@ class LanguageCode(StrEnum):
     zu_ZA = "zu-ZA"
 
 
-class MediaFormat(StrEnum):
+class MediaFormat(str):
     mp3 = "mp3"
     mp4 = "mp4"
     wav = "wav"
@@ -191,48 +190,43 @@ class MediaFormat(StrEnum):
     m4a = "m4a"
 
 
-class MedicalContentIdentificationType(StrEnum):
+class MedicalContentIdentificationType(str):
     PHI = "PHI"
 
 
-class MedicalScribeJobStatus(StrEnum):
+class MedicalScribeJobStatus(str):
     QUEUED = "QUEUED"
     IN_PROGRESS = "IN_PROGRESS"
     FAILED = "FAILED"
     COMPLETED = "COMPLETED"
 
 
-class MedicalScribeLanguageCode(StrEnum):
+class MedicalScribeLanguageCode(str):
     en_US = "en-US"
 
 
-class MedicalScribeNoteTemplate(StrEnum):
-    HISTORY_AND_PHYSICAL = "HISTORY_AND_PHYSICAL"
-    GIRPP = "GIRPP"
-
-
-class MedicalScribeParticipantRole(StrEnum):
+class MedicalScribeParticipantRole(str):
     PATIENT = "PATIENT"
     CLINICIAN = "CLINICIAN"
 
 
-class ModelStatus(StrEnum):
+class ModelStatus(str):
     IN_PROGRESS = "IN_PROGRESS"
     FAILED = "FAILED"
     COMPLETED = "COMPLETED"
 
 
-class OutputLocationType(StrEnum):
+class OutputLocationType(str):
     CUSTOMER_BUCKET = "CUSTOMER_BUCKET"
     SERVICE_BUCKET = "SERVICE_BUCKET"
 
 
-class ParticipantRole(StrEnum):
+class ParticipantRole(str):
     AGENT = "AGENT"
     CUSTOMER = "CUSTOMER"
 
 
-class PiiEntityType(StrEnum):
+class PiiEntityType(str):
     BANK_ACCOUNT_NUMBER = "BANK_ACCOUNT_NUMBER"
     BANK_ROUTING = "BANK_ROUTING"
     CREDIT_DEBIT_NUMBER = "CREDIT_DEBIT_NUMBER"
@@ -247,58 +241,58 @@ class PiiEntityType(StrEnum):
     ALL = "ALL"
 
 
-class RedactionOutput(StrEnum):
+class RedactionOutput(str):
     redacted = "redacted"
     redacted_and_unredacted = "redacted_and_unredacted"
 
 
-class RedactionType(StrEnum):
+class RedactionType(str):
     PII = "PII"
 
 
-class SentimentValue(StrEnum):
+class SentimentValue(str):
     POSITIVE = "POSITIVE"
     NEGATIVE = "NEGATIVE"
     NEUTRAL = "NEUTRAL"
     MIXED = "MIXED"
 
 
-class Specialty(StrEnum):
+class Specialty(str):
     PRIMARYCARE = "PRIMARYCARE"
 
 
-class SubtitleFormat(StrEnum):
+class SubtitleFormat(str):
     vtt = "vtt"
     srt = "srt"
 
 
-class ToxicityCategory(StrEnum):
+class ToxicityCategory(str):
     ALL = "ALL"
 
 
-class TranscriptFilterType(StrEnum):
+class TranscriptFilterType(str):
     EXACT = "EXACT"
 
 
-class TranscriptionJobStatus(StrEnum):
+class TranscriptionJobStatus(str):
     QUEUED = "QUEUED"
     IN_PROGRESS = "IN_PROGRESS"
     FAILED = "FAILED"
     COMPLETED = "COMPLETED"
 
 
-class Type(StrEnum):
+class Type(str):
     CONVERSATION = "CONVERSATION"
     DICTATION = "DICTATION"
 
 
-class VocabularyFilterMethod(StrEnum):
+class VocabularyFilterMethod(str):
     remove = "remove"
     mask = "mask"
     tag = "tag"
 
 
-class VocabularyState(StrEnum):
+class VocabularyState(str):
     PENDING = "PENDING"
     READY = "READY"
     FAILED = "FAILED"
@@ -342,14 +336,6 @@ class AbsoluteTimeRange(TypedDict, total=False):
     EndTime: Optional[TimestampMilliseconds]
     First: Optional[TimestampMilliseconds]
     Last: Optional[TimestampMilliseconds]
-
-
-class Tag(TypedDict, total=False):
-    Key: TagKey
-    Value: TagValue
-
-
-TagList = List[Tag]
 
 
 class ChannelDefinition(TypedDict, total=False):
@@ -435,7 +421,6 @@ class CallAnalyticsJob(TypedDict, total=False):
     IdentifiedLanguageScore: Optional[IdentifiedLanguageScore]
     Settings: Optional[CallAnalyticsJobSettings]
     ChannelDefinitions: Optional[ChannelDefinitions]
-    Tags: Optional[TagList]
 
 
 class CallAnalyticsJobSummary(TypedDict, total=False):
@@ -512,26 +497,28 @@ class CategoryProperties(TypedDict, total=False):
     Rules: Optional[RuleList]
     CreateTime: Optional[DateTime]
     LastUpdateTime: Optional[DateTime]
-    Tags: Optional[TagList]
     InputType: Optional[InputType]
 
 
 CategoryPropertiesList = List[CategoryProperties]
 
 
-class ClinicalNoteGenerationSettings(TypedDict, total=False):
-    NoteTemplate: Optional[MedicalScribeNoteTemplate]
-
-
 class CreateCallAnalyticsCategoryRequest(ServiceRequest):
     CategoryName: CategoryName
     Rules: RuleList
-    Tags: Optional[TagList]
     InputType: Optional[InputType]
 
 
 class CreateCallAnalyticsCategoryResponse(TypedDict, total=False):
     CategoryProperties: Optional[CategoryProperties]
+
+
+class Tag(TypedDict, total=False):
+    Key: TagKey
+    Value: TagValue
+
+
+TagList = List[Tag]
 
 
 class InputDataConfig(TypedDict, total=False):
@@ -708,7 +695,6 @@ class MedicalScribeSettings(TypedDict, total=False):
     VocabularyName: Optional[VocabularyName]
     VocabularyFilterName: Optional[VocabularyFilterName]
     VocabularyFilterMethod: Optional[VocabularyFilterMethod]
-    ClinicalNoteGenerationSettings: Optional[ClinicalNoteGenerationSettings]
 
 
 class MedicalScribeOutput(TypedDict, total=False):
@@ -1097,7 +1083,6 @@ class StartCallAnalyticsJobRequest(ServiceRequest):
     OutputEncryptionKMSKeyId: Optional[KMSKeyId]
     DataAccessRoleArn: Optional[DataAccessRoleArn]
     Settings: Optional[CallAnalyticsJobSettings]
-    Tags: Optional[TagList]
     ChannelDefinitions: Optional[ChannelDefinitions]
 
 
@@ -1256,7 +1241,6 @@ class TranscribeApi:
         context: RequestContext,
         category_name: CategoryName,
         rules: RuleList,
-        tags: TagList = None,
         input_type: InputType = None,
         **kwargs,
     ) -> CreateCallAnalyticsCategoryResponse:
@@ -1550,7 +1534,6 @@ class TranscribeApi:
         output_encryption_kms_key_id: KMSKeyId = None,
         data_access_role_arn: DataAccessRoleArn = None,
         settings: CallAnalyticsJobSettings = None,
-        tags: TagList = None,
         channel_definitions: ChannelDefinitions = None,
         **kwargs,
     ) -> StartCallAnalyticsJobResponse:

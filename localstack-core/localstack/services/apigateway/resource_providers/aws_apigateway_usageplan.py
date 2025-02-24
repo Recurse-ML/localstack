@@ -12,7 +12,6 @@ from localstack.services.cloudformation.resource_provider import (
     ResourceProvider,
     ResourceRequest,
 )
-from localstack.utils.aws.arns import get_partition
 from localstack.utils.objects import keys_to_lower
 from localstack.utils.strings import first_char_to_lower
 
@@ -165,7 +164,11 @@ class ApiGatewayUsagePlanProvider(ResourceProvider[ApiGatewayUsagePlanProperties
         ]
         update_config_props = util.select_attributes(model, parameters_to_select)
 
-        updated_tags = update_config_props.pop("Tags", [])
+        if "Tags" in update_config_props:
+            tags_dict = {}
+            for tag in update_config_props:
+                tags_dict.update({tag["Key"]: tag["Value"]})
+            update_config_props["Tags"] = tags_dict
 
         usage_plan_id = request.previous_state["Id"]
 
@@ -179,7 +182,7 @@ class ApiGatewayUsagePlanProvider(ResourceProvider[ApiGatewayUsagePlanProperties
                         {
                             "op": "replace",
                             "path": f"/{first_char_to_lower(parameter)}",
-                            "value": f"{stage['ApiId']}:{stage['Stage']}",
+                            "value": f'{stage["ApiId"]}:{stage["Stage"]}',
                         }
                     )
 
@@ -187,7 +190,7 @@ class ApiGatewayUsagePlanProvider(ResourceProvider[ApiGatewayUsagePlanProperties
                         patch_operations.append(
                             {
                                 "op": "replace",
-                                "path": f"/{first_char_to_lower(parameter)}/{stage['ApiId']}:{stage['Stage']}",
+                                "path": f'/{first_char_to_lower(parameter)}/{stage["ApiId"]}:{stage["Stage"]}',
                                 "value": json.dumps(stage["Throttle"]),
                             }
                         )
@@ -203,13 +206,8 @@ class ApiGatewayUsagePlanProvider(ResourceProvider[ApiGatewayUsagePlanProperties
                 )
         apigw.update_usage_plan(usagePlanId=usage_plan_id, patchOperations=patch_operations)
 
-        if updated_tags:
-            tags = {tag["Key"]: tag["Value"] for tag in updated_tags}
-            usage_plan_arn = f"arn:{get_partition(request.region_name)}:apigateway:{request.region_name}::/usageplans/{usage_plan_id}"
-            apigw.tag_resource(resourceArn=usage_plan_arn, tags=tags)
-
         return ProgressEvent(
             status=OperationStatus.SUCCESS,
-            resource_model={**request.previous_state, **request.desired_state},
+            resource_model=model,
             custom_context=request.custom_context,
         )

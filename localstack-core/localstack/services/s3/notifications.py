@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import json
 import logging
-import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, TypedDict, Union
@@ -23,6 +22,7 @@ from localstack.aws.api.s3 import (
     EventList,
     LambdaFunctionArn,
     LambdaFunctionConfiguration,
+    NoSuchKey,
     NotificationConfiguration,
     NotificationConfigurationFilter,
     NotificationId,
@@ -34,14 +34,24 @@ from localstack.aws.api.s3 import (
     TopicConfiguration,
 )
 from localstack.aws.connect import connect_to
-from localstack.services.s3.models import S3Bucket, S3DeleteMarker, S3Object
+from localstack.config import LEGACY_V2_S3_PROVIDER
 from localstack.services.s3.utils import _create_invalid_argument_exc
+from localstack.services.s3.v3.models import S3Bucket, S3DeleteMarker, S3Object
 from localstack.utils.aws import arns
-from localstack.utils.aws.arns import ARN_PARTITION_REGEX, get_partition, parse_arn, s3_bucket_arn
+from localstack.utils.aws.arns import parse_arn, s3_bucket_arn
 from localstack.utils.aws.client_types import ServicePrincipal
 from localstack.utils.bootstrap import is_api_enabled
 from localstack.utils.strings import short_uid
 from localstack.utils.time import parse_timestamp, timestamp_millis
+
+if LEGACY_V2_S3_PROVIDER:
+    from moto.s3.models import FakeBucket, FakeDeleteMarker, FakeKey
+
+    from localstack.services.s3.models import get_moto_s3_backend
+    from localstack.services.s3.utils_moto import (
+        get_bucket_from_moto,
+        get_key_from_moto_bucket,
+    )
 
 LOG = logging.getLogger(__name__)
 
@@ -104,6 +114,73 @@ class S3EventNotificationContext:
     key_storage_class: Optional[StorageClass]
 
     @classmethod
+    def from_request_context(
+        cls,
+        request_context: RequestContext,
+        key_name: str = None,
+        version_id: str = None,
+        allow_non_existing_key=False,
+    ) -> "S3EventNotificationContext":
+        """
+        Create an S3EventNotificationContext from a RequestContext.
+        The key is not always present in the request context depending on the event type. In that case, we can use
+        a provided one.
+        :param request_context: RequestContext
+        :param key_name: Optional, in case it's not provided in the RequestContext
+        :param version_id: Optional, can be given to get the key version in case of deletion
+        :param allow_non_existing_key: Optional, indicates that a dummy Key should be created, if it does not exist (required for delete_objects)
+        :return: S3EventNotificationContext
+        """
+        bucket_name = request_context.service_request["Bucket"]
+        moto_backend = get_moto_s3_backend(request_context)
+        bucket: FakeBucket = get_bucket_from_moto(moto_backend, bucket=bucket_name)
+        try:
+            key: FakeKey = get_key_from_moto_bucket(
+                moto_bucket=bucket,
+                key=key_name or request_context.service_request["Key"],
+                version_id=version_id,
+            )
+        except NoSuchKey as ex:
+            if allow_non_existing_key:
+                key: FakeKey = FakeKey(
+                    key_name, "", request_context.account_id, request_context.region
+                )
+            else:
+                raise ex
+
+        # TODO: test notification format when the concerned key is FakeDeleteMarker
+        # it might not send notification, or s3:ObjectRemoved:DeleteMarkerCreated which we don't support
+        if isinstance(key, FakeDeleteMarker):
+            etag = ""
+            key_size = 0
+            key_expiry = None
+            storage_class = ""
+        else:
+            etag = key.etag.strip('"')
+            key_size = key.contentsize
+            key_expiry = key._expiry
+            storage_class = key.storage_class
+
+        return cls(
+            request_id=request_context.request_id,
+            event_type=EVENT_OPERATION_MAP.get(request_context.operation.wire_name, ""),
+            event_time=datetime.datetime.now(),
+            account_id=request_context.account_id,
+            region=request_context.region,
+            caller=request_context.account_id,  # TODO: use it for `userIdentity`
+            bucket_name=bucket_name,
+            bucket_location=bucket.location,
+            bucket_account_id=bucket.account_id,  # TODO: use it for bucket owner identity
+            key_name=quote(key.name),
+            key_etag=etag,
+            key_size=key_size,
+            key_expiry=key_expiry,
+            key_storage_class=storage_class,
+            key_version_id=key.version_id if bucket.is_versioned else None,  # todo: check this?
+            xray=request_context.request.headers.get(HEADER_AMZN_XRAY),
+        )
+
+    @classmethod
     def from_request_context_native(
         cls,
         request_context: RequestContext,
@@ -120,11 +197,11 @@ class S3EventNotificationContext:
         :return: S3EventNotificationContext
         """
         bucket_name = request_context.service_request["Bucket"]
-        event_type = EVENT_OPERATION_MAP.get(request_context.operation.wire_name, "")
 
+        # TODO: test notification format when the concerned key is FakeDeleteMarker
+        # it might not send notification, or s3:ObjectRemoved:DeleteMarkerCreated which we don't support yet
         if isinstance(s3_object, S3DeleteMarker):
-            # AWS sets the etag of a DeleteMarker to the etag of an empty object
-            etag = "d41d8cd98f00b204e9800998ecf8427e"
+            etag = ""
             key_size = 0
             key_expiry = None
             storage_class = ""
@@ -136,7 +213,7 @@ class S3EventNotificationContext:
 
         return cls(
             request_id=request_context.request_id,
-            event_type=event_type,
+            event_type=EVENT_OPERATION_MAP.get(request_context.operation.wire_name, ""),
             event_time=datetime.datetime.now(),
             account_id=request_context.account_id,
             region=request_context.region,
@@ -164,7 +241,6 @@ class BucketVerificationContext:
 
     request_id: str
     bucket_name: str
-    region: str
     configuration: Dict
     skip_destination_validation: bool
 
@@ -180,7 +256,7 @@ def _matching_event(events: EventList, event_name: str) -> bool:
     """
     if event_name in events:
         return True
-    wildcard_pattern = f"{event_name[0 : event_name.rindex(':')]}:*"
+    wildcard_pattern = f"{event_name[0:event_name.rindex(':')]}:*"
     return wildcard_pattern in events
 
 
@@ -244,7 +320,6 @@ class BaseNotifier:
                 BucketVerificationContext(
                     configuration=configuration,
                     bucket_name=bucket_name,
-                    region=context.region,
                     request_id=context.request_id,
                     skip_destination_validation=skip_destination_validation,
                 )
@@ -271,7 +346,7 @@ class BaseNotifier:
 
         arn, argument_name = self._get_arn_value_and_name(configuration)
 
-        if not re.match(f"{ARN_PARTITION_REGEX}:{self.service_name}:", arn):
+        if not arn.startswith(f"arn:aws:{self.service_name}:"):
             raise _create_invalid_argument_exc(
                 "The ARN could not be parsed", name=argument_name, value=arn
             )
@@ -310,7 +385,6 @@ class BaseNotifier:
         # Based on: http://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html
         # TODO: think about caching or generating the payload only once, because only the config_id changes
         #  except if it is EventBridge. Check that.
-        partition = get_partition(ctx.region)
         record = EventRecord(
             eventVersion="2.1",
             eventSource="aws:s3",
@@ -334,7 +408,7 @@ class BaseNotifier:
                     "ownerIdentity": {
                         "principalId": "A3NL1KOZZKExample"
                     },  # TODO: use proper principal?
-                    "arn": f"arn:{partition}:s3:::{ctx.bucket_name}",
+                    "arn": f"arn:aws:s3:::{ctx.bucket_name}",
                 },
                 object={
                     "key": ctx.key_name,
@@ -343,17 +417,14 @@ class BaseNotifier:
             ),
         )
 
-        if ctx.key_version_id and ctx.key_version_id != "null":
+        if ctx.key_version_id:
             # object version if bucket is versioning-enabled, otherwise null
             record["s3"]["object"]["versionId"] = ctx.key_version_id
 
         event_type = ctx.event_type.lower()
         if any(e in event_type for e in ("created", "restore")):
+            record["s3"]["object"]["size"] = ctx.key_size
             record["s3"]["object"]["eTag"] = ctx.key_etag
-            # if we created a DeleteMarker, AWS does not set the `size` field
-            if "deletemarker" not in event_type:
-                record["s3"]["object"]["size"] = ctx.key_size
-
         if "ObjectTagging" in ctx.event_type or "ObjectAcl" in ctx.event_type:
             record["eventVersion"] = "2.3"
             record["s3"]["object"]["eTag"] = ctx.key_etag
@@ -412,7 +483,7 @@ class SqsNotifier(BaseNotifier):
         # send test event with the request metadata for permissions
         # https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-how-to-event-types-and-destinations.html#supported-notification-event-types
         sqs_client = connect_to(region_name=arn_data["region"]).sqs.request_metadata(
-            source_arn=s3_bucket_arn(verification_ctx.bucket_name, region=verification_ctx.region),
+            source_arn=s3_bucket_arn(verification_ctx.bucket_name),
             service_principal=ServicePrincipal.s3,
         )
         test_payload = self._get_test_payload(verification_ctx)
@@ -437,8 +508,7 @@ class SqsNotifier(BaseNotifier):
 
         parsed_arn = parse_arn(queue_arn)
         sqs_client = connect_to(region_name=parsed_arn["region"]).sqs.request_metadata(
-            source_arn=s3_bucket_arn(ctx.bucket_name, region=ctx.region),
-            service_principal=ServicePrincipal.s3,
+            source_arn=s3_bucket_arn(ctx.bucket_name), service_principal=ServicePrincipal.s3
         )
         try:
             queue_url = arns.sqs_queue_url_for_arn(queue_arn)
@@ -490,7 +560,7 @@ class SnsNotifier(BaseNotifier):
             )
 
         sns_client = connect_to(region_name=arn_data["region"]).sns.request_metadata(
-            source_arn=s3_bucket_arn(verification_ctx.bucket_name, region=verification_ctx.region),
+            source_arn=s3_bucket_arn(verification_ctx.bucket_name),
             service_principal=ServicePrincipal.s3,
         )
         test_payload = self._get_test_payload(verification_ctx)
@@ -526,8 +596,7 @@ class SnsNotifier(BaseNotifier):
 
         arn_data = parse_arn(topic_arn)
         sns_client = connect_to(region_name=arn_data["region"]).sns.request_metadata(
-            source_arn=s3_bucket_arn(ctx.bucket_name, region=ctx.region),
-            service_principal=ServicePrincipal.s3,
+            source_arn=s3_bucket_arn(ctx.bucket_name), service_principal=ServicePrincipal.s3
         )
         try:
             sns_client.publish(
@@ -573,7 +642,7 @@ class LambdaNotifier(BaseNotifier):
                 value="The destination Lambda does not exist",
             )
         lambda_client = connect_to(region_name=arn_data["region"]).lambda_.request_metadata(
-            source_arn=s3_bucket_arn(verification_ctx.bucket_name, region=verification_ctx.region),
+            source_arn=s3_bucket_arn(verification_ctx.bucket_name),
             service_principal=ServicePrincipal.s3,
         )
         try:
@@ -593,8 +662,7 @@ class LambdaNotifier(BaseNotifier):
         arn_data = parse_arn(lambda_arn)
 
         lambda_client = connect_to(region_name=arn_data["region"]).lambda_.request_metadata(
-            source_arn=s3_bucket_arn(ctx.bucket_name, region=ctx.region),
-            service_principal=ServicePrincipal.s3,
+            source_arn=s3_bucket_arn(ctx.bucket_name), service_principal=ServicePrincipal.s3
         )
 
         try:
@@ -620,10 +688,9 @@ class EventBridgeNotifier(BaseNotifier):
     ) -> PutEventsRequestEntry:
         # see https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventBridge.html
         # see also https://docs.aws.amazon.com/AmazonS3/latest/userguide/ev-events.html
-        partition = get_partition(ctx.region)
         entry: PutEventsRequestEntry = {
             "Source": "aws.s3",
-            "Resources": [f"arn:{partition}:s3:::{ctx.bucket_name}"],
+            "Resources": [f"arn:aws:s3:::{ctx.bucket_name}"],
             "Time": ctx.event_time,
         }
 
@@ -644,8 +711,6 @@ class EventBridgeNotifier(BaseNotifier):
             "source-ip-address": "127.0.0.1",
             # TODO previously headers.get("X-Forwarded-For", "127.0.0.1").split(",")[0]
         }
-        if ctx.key_version_id and ctx.key_version_id != "null":
-            event_details["object"]["version-id"] = ctx.key_version_id
 
         if "ObjectCreated" in ctx.event_type:
             entry["DetailType"] = "Object Created"
@@ -659,13 +724,10 @@ class EventBridgeNotifier(BaseNotifier):
         elif "ObjectRemoved" in ctx.event_type:
             entry["DetailType"] = "Object Deleted"
             event_details["reason"] = "DeleteObject"
-            if "DeleteMarkerCreated" in ctx.event_type:
-                delete_type = "Delete Marker Created"
-            else:
-                delete_type = "Permanently Deleted"
-                event_details["object"].pop("etag")
-
-            event_details["deletion-type"] = delete_type
+            event_details["deletion-type"] = (
+                "Permanently Deleted"  # TODO: check with versioned bucket?
+            )
+            event_details["object"].pop("etag")
             event_details["object"].pop("size")
 
         elif "ObjectTagging" in ctx.event_type:
@@ -767,11 +829,7 @@ class NotificationDispatcher:
             for config in configurations:
                 if notifier.should_notify(ctx, config):  # we check before sending it to the thread
                     LOG.debug("Submitting task to the executor for notifier %s", notifier)
-                    self._submit_notification(notifier, ctx, config)
-
-    def _submit_notification(self, notifier, ctx, config):
-        "Required for patching submit with local thread context for EventStudio"
-        self.executor.submit(notifier.notify, ctx, config)
+                    self.executor.submit(notifier.notify, ctx, config)
 
     def verify_configuration(
         self,

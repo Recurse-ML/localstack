@@ -13,9 +13,6 @@ from localstack.services.stepfunctions.asl.component.state.state_execution.state
 from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.service.state_task_service_aws_sdk import (
     StateTaskServiceAwsSdk,
 )
-from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.service.state_task_service_batch import (
-    StateTaskServiceBatch,
-)
 from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.service.state_task_service_dynamodb import (
     StateTaskServiceDynamoDB,
 )
@@ -46,6 +43,7 @@ from localstack.services.stepfunctions.asl.component.state.state_execution.state
 
 _UNSUPPORTED_SERVICE_NAMES: Final[set[str]] = {
     "athena",
+    "batch",
     "bedrock",
     "codebuild",
     "eks",
@@ -81,8 +79,6 @@ def state_task_service_for(service_name: str) -> StateTaskService:
             return StateTaskServiceEcs()
         case "glue":
             return StateTaskServiceGlue()
-        case "batch":
-            return StateTaskServiceBatch()
         case _ if service_name in _UNSUPPORTED_SERVICE_NAMES:
             return StateTaskServiceUnsupported()
         case unknown:

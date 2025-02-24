@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -61,7 +60,6 @@ PartiQLStatement = str
 PolicyRevisionId = str
 PositiveIntegerObject = int
 ProjectionExpression = str
-RecoveryPeriodInDays = int
 RegionName = str
 ReplicaStatusDescription = str
 ReplicaStatusPercentProgress = str
@@ -89,37 +87,37 @@ TimeToLiveEnabled = bool
 UpdateExpression = str
 
 
-class ApproximateCreationDateTimePrecision(StrEnum):
+class ApproximateCreationDateTimePrecision(str):
     MILLISECOND = "MILLISECOND"
     MICROSECOND = "MICROSECOND"
 
 
-class AttributeAction(StrEnum):
+class AttributeAction(str):
     ADD = "ADD"
     PUT = "PUT"
     DELETE = "DELETE"
 
 
-class BackupStatus(StrEnum):
+class BackupStatus(str):
     CREATING = "CREATING"
     DELETED = "DELETED"
     AVAILABLE = "AVAILABLE"
 
 
-class BackupType(StrEnum):
+class BackupType(str):
     USER = "USER"
     SYSTEM = "SYSTEM"
     AWS_BACKUP = "AWS_BACKUP"
 
 
-class BackupTypeFilter(StrEnum):
+class BackupTypeFilter(str):
     USER = "USER"
     SYSTEM = "SYSTEM"
     AWS_BACKUP = "AWS_BACKUP"
     ALL = "ALL"
 
 
-class BatchStatementErrorCodeEnum(StrEnum):
+class BatchStatementErrorCodeEnum(str):
     ConditionalCheckFailed = "ConditionalCheckFailed"
     ItemCollectionSizeLimitExceeded = "ItemCollectionSizeLimitExceeded"
     RequestLimitExceeded = "RequestLimitExceeded"
@@ -133,12 +131,12 @@ class BatchStatementErrorCodeEnum(StrEnum):
     DuplicateItem = "DuplicateItem"
 
 
-class BillingMode(StrEnum):
+class BillingMode(str):
     PROVISIONED = "PROVISIONED"
     PAY_PER_REQUEST = "PAY_PER_REQUEST"
 
 
-class ComparisonOperator(StrEnum):
+class ComparisonOperator(str):
     EQ = "EQ"
     NE = "NE"
     IN = "IN"
@@ -154,22 +152,22 @@ class ComparisonOperator(StrEnum):
     BEGINS_WITH = "BEGINS_WITH"
 
 
-class ConditionalOperator(StrEnum):
+class ConditionalOperator(str):
     AND = "AND"
     OR = "OR"
 
 
-class ContinuousBackupsStatus(StrEnum):
+class ContinuousBackupsStatus(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
 
 
-class ContributorInsightsAction(StrEnum):
+class ContributorInsightsAction(str):
     ENABLE = "ENABLE"
     DISABLE = "DISABLE"
 
 
-class ContributorInsightsStatus(StrEnum):
+class ContributorInsightsStatus(str):
     ENABLING = "ENABLING"
     ENABLED = "ENABLED"
     DISABLING = "DISABLING"
@@ -177,7 +175,7 @@ class ContributorInsightsStatus(StrEnum):
     FAILED = "FAILED"
 
 
-class DestinationStatus(StrEnum):
+class DestinationStatus(str):
     ENABLING = "ENABLING"
     ACTIVE = "ACTIVE"
     DISABLING = "DISABLING"
@@ -186,35 +184,35 @@ class DestinationStatus(StrEnum):
     UPDATING = "UPDATING"
 
 
-class ExportFormat(StrEnum):
+class ExportFormat(str):
     DYNAMODB_JSON = "DYNAMODB_JSON"
     ION = "ION"
 
 
-class ExportStatus(StrEnum):
+class ExportStatus(str):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
 
-class ExportType(StrEnum):
+class ExportType(str):
     FULL_EXPORT = "FULL_EXPORT"
     INCREMENTAL_EXPORT = "INCREMENTAL_EXPORT"
 
 
-class ExportViewType(StrEnum):
+class ExportViewType(str):
     NEW_IMAGE = "NEW_IMAGE"
     NEW_AND_OLD_IMAGES = "NEW_AND_OLD_IMAGES"
 
 
-class GlobalTableStatus(StrEnum):
+class GlobalTableStatus(str):
     CREATING = "CREATING"
     ACTIVE = "ACTIVE"
     DELETING = "DELETING"
     UPDATING = "UPDATING"
 
 
-class ImportStatus(StrEnum):
+class ImportStatus(str):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     CANCELLING = "CANCELLING"
@@ -222,47 +220,42 @@ class ImportStatus(StrEnum):
     FAILED = "FAILED"
 
 
-class IndexStatus(StrEnum):
+class IndexStatus(str):
     CREATING = "CREATING"
     UPDATING = "UPDATING"
     DELETING = "DELETING"
     ACTIVE = "ACTIVE"
 
 
-class InputCompressionType(StrEnum):
+class InputCompressionType(str):
     GZIP = "GZIP"
     ZSTD = "ZSTD"
     NONE = "NONE"
 
 
-class InputFormat(StrEnum):
+class InputFormat(str):
     DYNAMODB_JSON = "DYNAMODB_JSON"
     ION = "ION"
     CSV = "CSV"
 
 
-class KeyType(StrEnum):
+class KeyType(str):
     HASH = "HASH"
     RANGE = "RANGE"
 
 
-class MultiRegionConsistency(StrEnum):
-    EVENTUAL = "EVENTUAL"
-    STRONG = "STRONG"
-
-
-class PointInTimeRecoveryStatus(StrEnum):
+class PointInTimeRecoveryStatus(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
 
 
-class ProjectionType(StrEnum):
+class ProjectionType(str):
     ALL = "ALL"
     KEYS_ONLY = "KEYS_ONLY"
     INCLUDE = "INCLUDE"
 
 
-class ReplicaStatus(StrEnum):
+class ReplicaStatus(str):
     CREATING = "CREATING"
     CREATION_FAILED = "CREATION_FAILED"
     UPDATING = "UPDATING"
@@ -272,18 +265,18 @@ class ReplicaStatus(StrEnum):
     INACCESSIBLE_ENCRYPTION_CREDENTIALS = "INACCESSIBLE_ENCRYPTION_CREDENTIALS"
 
 
-class ReturnConsumedCapacity(StrEnum):
+class ReturnConsumedCapacity(str):
     INDEXES = "INDEXES"
     TOTAL = "TOTAL"
     NONE = "NONE"
 
 
-class ReturnItemCollectionMetrics(StrEnum):
+class ReturnItemCollectionMetrics(str):
     SIZE = "SIZE"
     NONE = "NONE"
 
 
-class ReturnValue(StrEnum):
+class ReturnValue(str):
     NONE = "NONE"
     ALL_OLD = "ALL_OLD"
     UPDATED_OLD = "UPDATED_OLD"
@@ -291,17 +284,17 @@ class ReturnValue(StrEnum):
     UPDATED_NEW = "UPDATED_NEW"
 
 
-class ReturnValuesOnConditionCheckFailure(StrEnum):
+class ReturnValuesOnConditionCheckFailure(str):
     ALL_OLD = "ALL_OLD"
     NONE = "NONE"
 
 
-class S3SseAlgorithm(StrEnum):
+class S3SseAlgorithm(str):
     AES256 = "AES256"
     KMS = "KMS"
 
 
-class SSEStatus(StrEnum):
+class SSEStatus(str):
     ENABLING = "ENABLING"
     ENABLED = "ENABLED"
     DISABLING = "DISABLING"
@@ -309,37 +302,37 @@ class SSEStatus(StrEnum):
     UPDATING = "UPDATING"
 
 
-class SSEType(StrEnum):
+class SSEType(str):
     AES256 = "AES256"
     KMS = "KMS"
 
 
-class ScalarAttributeType(StrEnum):
+class ScalarAttributeType(str):
     S = "S"
     N = "N"
     B = "B"
 
 
-class Select(StrEnum):
+class Select(str):
     ALL_ATTRIBUTES = "ALL_ATTRIBUTES"
     ALL_PROJECTED_ATTRIBUTES = "ALL_PROJECTED_ATTRIBUTES"
     SPECIFIC_ATTRIBUTES = "SPECIFIC_ATTRIBUTES"
     COUNT = "COUNT"
 
 
-class StreamViewType(StrEnum):
+class StreamViewType(str):
     NEW_IMAGE = "NEW_IMAGE"
     OLD_IMAGE = "OLD_IMAGE"
     NEW_AND_OLD_IMAGES = "NEW_AND_OLD_IMAGES"
     KEYS_ONLY = "KEYS_ONLY"
 
 
-class TableClass(StrEnum):
+class TableClass(str):
     STANDARD = "STANDARD"
     STANDARD_INFREQUENT_ACCESS = "STANDARD_INFREQUENT_ACCESS"
 
 
-class TableStatus(StrEnum):
+class TableStatus(str):
     CREATING = "CREATING"
     UPDATING = "UPDATING"
     DELETING = "DELETING"
@@ -349,7 +342,7 @@ class TableStatus(StrEnum):
     ARCHIVED = "ARCHIVED"
 
 
-class TimeToLiveStatus(StrEnum):
+class TimeToLiveStatus(str):
     ENABLING = "ENABLING"
     DISABLING = "DISABLING"
     ENABLED = "ENABLED"
@@ -513,12 +506,6 @@ class ReplicaAlreadyExistsException(ServiceException):
 
 class ReplicaNotFoundException(ServiceException):
     code: str = "ReplicaNotFoundException"
-    sender_fault: bool = False
-    status_code: int = 400
-
-
-class ReplicatedWriteConflictException(ServiceException):
-    code: str = "ReplicatedWriteConflictException"
     sender_fault: bool = False
     status_code: int = 400
 
@@ -954,7 +941,6 @@ class ConditionCheck(TypedDict, total=False):
 
 class PointInTimeRecoveryDescription(TypedDict, total=False):
     PointInTimeRecoveryStatus: Optional[PointInTimeRecoveryStatus]
-    RecoveryPeriodInDays: Optional[RecoveryPeriodInDays]
     EarliestRestorableDateTime: Optional[Date]
     LatestRestorableDateTime: Optional[Date]
 
@@ -985,18 +971,12 @@ class CreateBackupOutput(TypedDict, total=False):
     BackupDetails: Optional[BackupDetails]
 
 
-class WarmThroughput(TypedDict, total=False):
-    ReadUnitsPerSecond: Optional[LongObject]
-    WriteUnitsPerSecond: Optional[LongObject]
-
-
 class CreateGlobalSecondaryIndexAction(TypedDict, total=False):
     IndexName: IndexName
     KeySchema: KeySchema
     Projection: Projection
     ProvisionedThroughput: Optional[ProvisionedThroughput]
     OnDemandThroughput: Optional[OnDemandThroughput]
-    WarmThroughput: Optional[WarmThroughput]
 
 
 class Replica(TypedDict, total=False):
@@ -1016,12 +996,6 @@ class TableClassSummary(TypedDict, total=False):
     LastUpdateDateTime: Optional[Date]
 
 
-class GlobalSecondaryIndexWarmThroughputDescription(TypedDict, total=False):
-    ReadUnitsPerSecond: Optional[PositiveLongObject]
-    WriteUnitsPerSecond: Optional[PositiveLongObject]
-    Status: Optional[IndexStatus]
-
-
 class OnDemandThroughputOverride(TypedDict, total=False):
     MaxReadRequestUnits: Optional[LongObject]
 
@@ -1034,16 +1008,9 @@ class ReplicaGlobalSecondaryIndexDescription(TypedDict, total=False):
     IndexName: Optional[IndexName]
     ProvisionedThroughputOverride: Optional[ProvisionedThroughputOverride]
     OnDemandThroughputOverride: Optional[OnDemandThroughputOverride]
-    WarmThroughput: Optional[GlobalSecondaryIndexWarmThroughputDescription]
 
 
 ReplicaGlobalSecondaryIndexDescriptionList = List[ReplicaGlobalSecondaryIndexDescription]
-
-
-class TableWarmThroughputDescription(TypedDict, total=False):
-    ReadUnitsPerSecond: Optional[PositiveLongObject]
-    WriteUnitsPerSecond: Optional[PositiveLongObject]
-    Status: Optional[TableStatus]
 
 
 class ReplicaDescription(TypedDict, total=False):
@@ -1054,7 +1021,6 @@ class ReplicaDescription(TypedDict, total=False):
     KMSMasterKeyId: Optional[KMSMasterKeyId]
     ProvisionedThroughputOverride: Optional[ProvisionedThroughputOverride]
     OnDemandThroughputOverride: Optional[OnDemandThroughputOverride]
-    WarmThroughput: Optional[TableWarmThroughputDescription]
     GlobalSecondaryIndexes: Optional[ReplicaGlobalSecondaryIndexDescriptionList]
     ReplicaInaccessibleDateTime: Optional[Date]
     ReplicaTableClassSummary: Optional[TableClassSummary]
@@ -1117,7 +1083,6 @@ class GlobalSecondaryIndex(TypedDict, total=False):
     Projection: Projection
     ProvisionedThroughput: Optional[ProvisionedThroughput]
     OnDemandThroughput: Optional[OnDemandThroughput]
-    WarmThroughput: Optional[WarmThroughput]
 
 
 GlobalSecondaryIndexList = List[GlobalSecondaryIndex]
@@ -1145,7 +1110,6 @@ class CreateTableInput(ServiceRequest):
     Tags: Optional[TagList]
     TableClass: Optional[TableClass]
     DeletionProtectionEnabled: Optional[DeletionProtectionEnabled]
-    WarmThroughput: Optional[WarmThroughput]
     ResourcePolicy: Optional[ResourcePolicy]
     OnDemandThroughput: Optional[OnDemandThroughput]
 
@@ -1179,7 +1143,6 @@ class GlobalSecondaryIndexDescription(TypedDict, total=False):
     ItemCount: Optional[LongObject]
     IndexArn: Optional[String]
     OnDemandThroughput: Optional[OnDemandThroughput]
-    WarmThroughput: Optional[GlobalSecondaryIndexWarmThroughputDescription]
 
 
 GlobalSecondaryIndexDescriptionList = List[GlobalSecondaryIndexDescription]
@@ -1222,8 +1185,6 @@ class TableDescription(TypedDict, total=False):
     TableClassSummary: Optional[TableClassSummary]
     DeletionProtectionEnabled: Optional[DeletionProtectionEnabled]
     OnDemandThroughput: Optional[OnDemandThroughput]
-    WarmThroughput: Optional[TableWarmThroughputDescription]
-    MultiRegionConsistency: Optional[MultiRegionConsistency]
 
 
 class CreateTableOutput(TypedDict, total=False):
@@ -1730,7 +1691,6 @@ class UpdateGlobalSecondaryIndexAction(TypedDict, total=False):
     IndexName: IndexName
     ProvisionedThroughput: Optional[ProvisionedThroughput]
     OnDemandThroughput: Optional[OnDemandThroughput]
-    WarmThroughput: Optional[WarmThroughput]
 
 
 class GlobalSecondaryIndexUpdate(TypedDict, total=False):
@@ -1889,7 +1849,6 @@ class ListTagsOfResourceOutput(TypedDict, total=False):
 
 class PointInTimeRecoverySpecification(TypedDict, total=False):
     PointInTimeRecoveryEnabled: BooleanObject
-    RecoveryPeriodInDays: Optional[RecoveryPeriodInDays]
 
 
 class Put(TypedDict, total=False):
@@ -2252,9 +2211,7 @@ class UpdateTableInput(ServiceRequest):
     ReplicaUpdates: Optional[ReplicationGroupUpdateList]
     TableClass: Optional[TableClass]
     DeletionProtectionEnabled: Optional[DeletionProtectionEnabled]
-    MultiRegionConsistency: Optional[MultiRegionConsistency]
     OnDemandThroughput: Optional[OnDemandThroughput]
-    WarmThroughput: Optional[WarmThroughput]
 
 
 class UpdateTableOutput(TypedDict, total=False):
@@ -2348,7 +2305,6 @@ class DynamodbApi:
         tags: TagList = None,
         table_class: TableClass = None,
         deletion_protection_enabled: DeletionProtectionEnabled = None,
-        warm_throughput: WarmThroughput = None,
         resource_policy: ResourcePolicy = None,
         on_demand_throughput: OnDemandThroughput = None,
         **kwargs,
@@ -2894,9 +2850,7 @@ class DynamodbApi:
         replica_updates: ReplicationGroupUpdateList = None,
         table_class: TableClass = None,
         deletion_protection_enabled: DeletionProtectionEnabled = None,
-        multi_region_consistency: MultiRegionConsistency = None,
         on_demand_throughput: OnDemandThroughput = None,
-        warm_throughput: WarmThroughput = None,
         **kwargs,
     ) -> UpdateTableOutput:
         raise NotImplementedError

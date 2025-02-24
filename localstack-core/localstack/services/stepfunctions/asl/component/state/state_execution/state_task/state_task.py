@@ -13,13 +13,9 @@ from localstack.services.stepfunctions.asl.component.common.error_name.states_er
 from localstack.services.stepfunctions.asl.component.common.error_name.states_error_name_type import (
     StatesErrorNameType,
 )
-from localstack.services.stepfunctions.asl.component.common.parargs import Parargs
+from localstack.services.stepfunctions.asl.component.common.parameters import Parameters
 from localstack.services.stepfunctions.asl.component.state.state_execution.execute_state import (
     ExecutionState,
-)
-from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.credentials import (
-    Credentials,
-    StateCredentials,
 )
 from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.service.resource import (
     Resource,
@@ -31,20 +27,22 @@ from localstack.services.stepfunctions.asl.eval.event.event_detail import EventD
 
 class StateTask(ExecutionState, abc.ABC):
     resource: Resource
-    parargs: Optional[Parargs]
-    credentials: Optional[Credentials]
+    parameters: Optional[Parameters]
 
     def __init__(self):
         super(StateTask, self).__init__(
             state_entered_event_type=HistoryEventType.TaskStateEntered,
             state_exited_event_type=HistoryEventType.TaskStateExited,
         )
+        # Parameters (Optional)
+        # Used to state_pass information to the API actions of connected resources. The parameters can use a mix of static
+        # JSON and JsonPath.
+        self.parameters = None
 
     def from_state_props(self, state_props: StateProps) -> None:
         super(StateTask, self).from_state_props(state_props)
+        self.parameters = state_props.get(Parameters)
         self.resource = state_props.get(Resource)
-        self.parargs = state_props.get(Parargs)
-        self.credentials = state_props.get(Credentials)
 
     def _get_supported_parameters(self) -> Optional[set[str]]:  # noqa
         return None
@@ -52,8 +50,8 @@ class StateTask(ExecutionState, abc.ABC):
     def _eval_parameters(self, env: Environment) -> dict:
         # Eval raw parameters.
         parameters = dict()
-        if self.parargs is not None:
-            self.parargs.eval(env=env)
+        if self.parameters:
+            self.parameters.eval(env=env)
             parameters = env.stack.pop()
 
         # Handle supported parameters.
@@ -68,14 +66,6 @@ class StateTask(ExecutionState, abc.ABC):
                 parameters.pop(unsupported_parameter, None)
 
         return parameters
-
-    def _eval_state_credentials(self, env: Environment) -> StateCredentials:
-        if not self.credentials:
-            state_credentials = StateCredentials(role_arn=env.aws_execution_details.role_arn)
-        else:
-            self.credentials.eval(env=env)
-            state_credentials = env.stack.pop()
-        return state_credentials
 
     def _get_timed_out_failure_event(self, env: Environment) -> FailureEvent:
         return FailureEvent(

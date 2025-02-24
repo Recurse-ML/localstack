@@ -3,7 +3,7 @@ from typing import Any, Final
 
 from localstack_snapshot.snapshots.transformer import RegexTransformer
 
-from localstack.services.stepfunctions.asl.utils.json_path import extract_json
+from localstack.services.stepfunctions.asl.utils.json_path import JSONPathUtils
 from localstack.testing.pytest.stepfunctions.utils import await_execution_success
 from localstack.utils.strings import short_uid
 from tests.aws.services.stepfunctions.templates.choiceoperators.choice_operators_templates import (
@@ -51,16 +51,15 @@ TYPE_COMPARISONS: Final[list[tuple[Any, bool]]] = [
 
 
 def create_and_test_comparison_function(
-    target_aws_client,
-    create_state_machine_iam_role,
+    stepfunctions_client,
+    create_iam_role_for_sfn,
     create_state_machine,
     sfn_snapshot,
     comparison_func_name: str,
     comparisons: list[tuple[Any, Any]],
     add_literal_value: bool = True,
 ):
-    stepfunctions_client = target_aws_client.stepfunctions
-    snf_role_arn = create_state_machine_iam_role(target_aws_client)
+    snf_role_arn = create_iam_role_for_sfn()
     sfn_snapshot.add_transformer(RegexTransformer(snf_role_arn, "snf_role_arn"))
 
     base_sm_name: str = f"statemachine_{short_uid()}"
@@ -81,10 +80,7 @@ def create_and_test_comparison_function(
             new_definition_str = definition_str
 
         creation_resp = create_state_machine(
-            target_aws_client,
-            name=f"{base_sm_name}_{i}",
-            definition=new_definition_str,
-            roleArn=snf_role_arn,
+            name=f"{base_sm_name}_{i}", definition=new_definition_str, roleArn=snf_role_arn
         )
         state_machine_arn = creation_resp["stateMachineArn"]
 
@@ -98,6 +94,8 @@ def create_and_test_comparison_function(
         )
 
         exec_hist_resp = stepfunctions_client.get_execution_history(executionArn=execution_arn)
-        output = extract_json("$.events[*].executionSucceededEventDetails.output", exec_hist_resp)
+        output = JSONPathUtils.extract_json(
+            "$.events[*].executionSucceededEventDetails.output", exec_hist_resp
+        )
         input_output_cases.append({"input": exec_input, "output": output})
     sfn_snapshot.match("cases", input_output_cases)

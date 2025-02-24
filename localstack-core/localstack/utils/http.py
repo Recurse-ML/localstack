@@ -2,6 +2,7 @@ import logging
 import math
 import os
 import re
+import traceback
 from typing import Dict, Optional, Union
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
 
@@ -180,12 +181,8 @@ def download(
     verify_ssl: bool = True,
     timeout: float = None,
     request_headers: Optional[dict] = None,
-    quiet: bool = False,
-) -> None:
-    """Downloads file at url to the given path. Raises TimeoutError if the optional timeout (in secs) is reached.
-
-    If `quiet` is passed, do not log any status messages. Error messages are still logged.
-    """
+):
+    """Downloads file at url to the given path. Raises TimeoutError if the optional timeout (in secs) is reached."""
 
     # make sure we're creating a new session here to enable parallel file downloads
     s = requests.Session()
@@ -211,8 +208,7 @@ def download(
         total_downloaded = 0
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
-        if not quiet:
-            LOG.debug("Starting download from %s to %s", url, path)
+        LOG.debug("Starting download from %s to %s", url, path)
         with open(path, "wb") as f:
             iter_length = 0
             percentage_limit = next_percentage_record = 10  # print a log line for every 10%
@@ -227,7 +223,7 @@ def download(
                 total_downloaded = new_total_downloaded
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
-                elif not quiet:
+                else:
                     LOG.debug(
                         "Empty chunk %s (total %dK of %dK) from %s",
                         chunk,
@@ -246,24 +242,22 @@ def download(
                         math.floor(current_percent / percentage_limit) * percentage_limit
                         + percentage_limit
                     )
-                    if not quiet:
-                        LOG.debug(
-                            "Downloaded %d%% (total %dK of %dK) to %s",
-                            current_percent,
-                            total_downloaded / 1024,
-                            total_size / 1024,
-                            path,
-                        )
+                    LOG.debug(
+                        "Downloaded %d%% (total %dK of %dK) to %s",
+                        current_percent,
+                        total_downloaded / 1024,
+                        total_size / 1024,
+                        path,
+                    )
                     iter_length = 0
                 elif total_size <= 0 and iter_length >= iter_limit:
-                    if not quiet:
-                        # print log message every x K if the total size is not known
-                        LOG.debug(
-                            "Downloaded %dK (total %dK) to %s",
-                            iter_length / 1024,
-                            total_downloaded / 1024,
-                            path,
-                        )
+                    # print log message every x K if the total size is not known
+                    LOG.debug(
+                        "Downloaded %dK (total %dK) to %s",
+                        iter_length / 1024,
+                        total_downloaded / 1024,
+                        path,
+                    )
                     iter_length = 0
             f.flush()
             os.fsync(f)
@@ -271,13 +265,12 @@ def download(
             LOG.warning("Zero bytes downloaded from %s, retrying", url)
             download(url, path, verify_ssl)
             return
-        if not quiet:
-            LOG.debug(
-                "Done downloading %s, response code %s, total %dK",
-                url,
-                r.status_code,
-                total_downloaded / 1024,
-            )
+        LOG.debug(
+            "Done downloading %s, response code %s, total %dK",
+            url,
+            r.status_code,
+            total_downloaded / 1024,
+        )
     except requests.exceptions.ReadTimeout as e:
         raise TimeoutError(f"Timeout ({timeout}) reached on download: {url} - {e}")
     finally:
@@ -298,11 +291,9 @@ def download_github_artifact(url: str, target_file: str, timeout: int = None):
             return True
         except Exception as e:
             if print_error:
-                LOG.exception(
-                    "Unable to download Github artifact from %s to %s: %s %s",
-                    url,
-                    target_file,
-                    e,
+                LOG.info(
+                    "Unable to download Github artifact from %s to %s: %s %s"
+                    % (url, target_file, e, traceback.format_exc())
                 )
 
     # if a GitHub API token is set, use it to avoid rate limiting issues

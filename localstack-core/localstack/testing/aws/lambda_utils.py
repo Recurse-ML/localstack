@@ -276,14 +276,13 @@ lambda_role = {
         }
     ],
 }
-esm_lambda_permission = {
+s3_lambda_permission = {
     "Version": "2012-10-17",
     "Statement": [
         {
             "Effect": "Allow",
             "Action": [
                 "sqs:*",
-                "sns:*",
                 "dynamodb:DescribeStream",
                 "dynamodb:GetRecords",
                 "dynamodb:GetShardIterator",
@@ -298,8 +297,6 @@ esm_lambda_permission = {
                 "logs:CreateLogGroup",
                 "logs:CreateLogStream",
                 "logs:PutLogEvents",
-                "s3:ListBucket",
-                "s3:PutObject",
             ],
             "Resource": ["*"],
         }

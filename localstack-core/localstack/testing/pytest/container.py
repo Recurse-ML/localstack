@@ -23,10 +23,7 @@ from localstack.utils.sync import poll_condition
 LOG = logging.getLogger(__name__)
 
 ENV_TEST_CONTAINER_MOUNT_SOURCES = "TEST_CONTAINER_MOUNT_SOURCES"
-"""Environment variable used to indicate that we should mount LocalStack  source files into the container."""
-
-ENV_TEST_CONTAINER_MOUNT_DEPENDENCIES = "TEST_CONTAINER_MOUNT_DEPENDENCIES"
-"""Environment variable used to indicate that we should mount dependencies into the container."""
+"""Environment variable used to indicate that we should mount localstack source files into the container."""
 
 
 class ContainerFactory:
@@ -61,8 +58,8 @@ class ContainerFactory:
         # handle the convenience options
         if pro:
             container_configuration.env_vars["GATEWAY_LISTEN"] = "0.0.0.0:4566,0.0.0.0:443"
-            container_configuration.env_vars["LOCALSTACK_AUTH_TOKEN"] = os.environ.get(
-                "LOCALSTACK_AUTH_TOKEN", "test"
+            container_configuration.env_vars["LOCALSTACK_API_KEY"] = os.environ.get(
+                "LOCALSTACK_API_KEY", "test"
             )
 
         # override values from kwargs
@@ -93,8 +90,7 @@ class ContainerFactory:
         if failures:
             for container, ex in failures:
                 LOG.error(
-                    "Failed to remove container %s",
-                    container.running_container.id,
+                    f"Failed to remove container {container.running_container.id}",
                     exc_info=LOG.isEnabledFor(logging.DEBUG),
                 )
 

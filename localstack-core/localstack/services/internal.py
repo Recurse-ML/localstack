@@ -6,15 +6,15 @@ import re
 import time
 from collections import defaultdict
 from datetime import datetime
+from typing import List
 
-from plux import PluginManager
 from werkzeug.exceptions import NotFound
 
 from localstack import config, constants
 from localstack.deprecations import deprecated_endpoint
 from localstack.http import Request, Resource, Response, Router
 from localstack.http.dispatcher import handler_dispatcher
-from localstack.runtime.legacy import signal_supervisor_restart
+from localstack.services.infra import exit_infra, signal_supervisor_restart
 from localstack.utils.analytics.metadata import (
     get_client_metadata,
     get_localstack_edition,
@@ -71,9 +71,7 @@ class HealthResource:
         if data.get("action") == "restart":
             signal_supervisor_restart()
         elif data.get("action") == "kill":
-            from localstack.runtime import get_current_runtime
-
-            get_current_runtime().exit(0)
+            exit_infra(0)
 
         return Response("ok", 200)
 
@@ -135,7 +133,7 @@ class InfoResource:
 
         return {
             "version": client_metadata.version,
-            "edition": get_localstack_edition(),
+            "edition": get_localstack_edition() or "unknown",
             "is_license_activated": is_license_activated(),
             "session_id": client_metadata.session_id,
             "machine_id": client_metadata.machine_id,
@@ -182,52 +180,36 @@ class PluginsResource:
     Resource to list information about plux plugins.
     """
 
-    plugin_managers: list[PluginManager] = []
+    def on_get(self, request):
+        from plux import PluginManager
 
-    def __init__(self):
-        # defer imports here to lazy-load code
-        from localstack.runtime import hooks, init
+        from localstack.runtime import hooks
         from localstack.services.plugins import SERVICE_PLUGINS
 
-        # service providers
-        PluginsResource.plugin_managers.append(SERVICE_PLUGINS.plugin_manager)
-        # init script runners
-        PluginsResource.plugin_managers.append(init.init_script_manager().runner_manager)
-        # init hooks
-        PluginsResource.plugin_managers.append(hooks.configure_localstack_container.manager)
-        PluginsResource.plugin_managers.append(hooks.prepare_host.manager)
-        PluginsResource.plugin_managers.append(hooks.on_infra_ready.manager)
-        PluginsResource.plugin_managers.append(hooks.on_infra_start.manager)
-        PluginsResource.plugin_managers.append(hooks.on_infra_shutdown.manager)
+        plugin_managers: List[PluginManager] = [
+            SERVICE_PLUGINS.plugin_manager,
+            hooks.configure_localstack_container.manager,
+            hooks.prepare_host.manager,
+            hooks.on_infra_ready.manager,
+            hooks.on_infra_start.manager,
+            hooks.on_infra_shutdown.manager,
+        ]
 
-    def on_get(self, request):
+        def get_plugin_details(_manager: PluginManager, _name: str):
+            container = _manager.get_container(_name)
+
+            details = {
+                "name": _name,
+                "is_initialized": container.is_init,
+                "is_loaded": container.is_loaded,
+            }
+
+            return details
+
         return {
-            manager.namespace: [
-                self._get_plugin_details(manager, name) for name in manager.list_names()
-            ]
-            for manager in self.plugin_managers
+            manager.namespace: [get_plugin_details(manager, name) for name in manager.list_names()]
+            for manager in plugin_managers
         }
-
-    def _get_plugin_details(self, manager: PluginManager, plugin_name: str) -> dict:
-        container = manager.get_container(plugin_name)
-
-        details = {
-            "name": plugin_name,
-            "is_initialized": container.is_init,
-            "is_loaded": container.is_loaded,
-        }
-
-        # optionally add requires_license information if the plugin provides it
-        requires_license = None
-        if container.plugin:
-            try:
-                requires_license = container.plugin.requires_license
-            except AttributeError:
-                pass
-        if requires_license is not None:
-            details["requires_license"] = requires_license
-
-        return details
 
 
 class InitScriptsResource:

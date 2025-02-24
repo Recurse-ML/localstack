@@ -1,8 +1,8 @@
 import hashlib
 from typing import Final
 
-from localstack.services.stepfunctions.asl.component.intrinsic.argument.argument import (
-    ArgumentList,
+from localstack.services.stepfunctions.asl.component.intrinsic.argument.function_argument_list import (
+    FunctionArgumentList,
 )
 from localstack.services.stepfunctions.asl.component.intrinsic.function.statesfunction.hash_calculations.hash_algorithm import (
     HashAlgorithm,
@@ -22,14 +22,14 @@ from localstack.services.stepfunctions.asl.eval.environment import Environment
 class HashFunc(StatesFunction):
     MAX_INPUT_CHAR_LEN: Final[int] = 10_000
 
-    def __init__(self, argument_list: ArgumentList):
+    def __init__(self, arg_list: FunctionArgumentList):
         super().__init__(
             states_name=StatesFunctionName(function_type=StatesFunctionNameType.Hash),
-            argument_list=argument_list,
+            arg_list=arg_list,
         )
-        if argument_list.size != 2:
+        if arg_list.size != 2:
             raise ValueError(
-                f"Expected 2 arguments for function type '{type(self)}', but got: '{argument_list}'."
+                f"Expected 2 arguments for function type '{type(self)}', but got: '{arg_list}'."
             )
 
     @staticmethod
@@ -51,7 +51,7 @@ class HashFunc(StatesFunction):
         return hash_value
 
     def _eval_body(self, env: Environment) -> None:
-        self.argument_list.eval(env=env)
+        self.arg_list.eval(env=env)
         args = env.stack.pop()
 
         algorithm = args.pop()

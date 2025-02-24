@@ -4,9 +4,8 @@ import logging
 import re
 import traceback
 import uuid
+from abc import ABC, abstractmethod
 from typing import Optional
-
-from botocore.exceptions import ClientError
 
 from localstack import config
 from localstack.aws.connect import connect_to
@@ -32,7 +31,6 @@ from localstack.services.cloudformation.engine.template_utils import (
 from localstack.services.cloudformation.resource_provider import (
     Credentials,
     OperationStatus,
-    ProgressEvent,
     ResourceProviderExecutor,
     ResourceProviderPayload,
     get_resource_type,
@@ -40,8 +38,7 @@ from localstack.services.cloudformation.resource_provider import (
 from localstack.services.cloudformation.service_models import (
     DependencyNotYetSatisfied,
 )
-from localstack.services.cloudformation.stores import exports_map, find_stack
-from localstack.utils.aws.arns import get_partition
+from localstack.services.cloudformation.stores import exports_map
 from localstack.utils.functions import prevent_stack_overflow
 from localstack.utils.json import clone_safe
 from localstack.utils.strings import to_bytes, to_str
@@ -63,9 +60,6 @@ LOG = logging.getLogger(__name__)
 # list of static attribute references to be replaced in {'Fn::Sub': '...'} strings
 STATIC_REFS = ["AWS::Region", "AWS::Partition", "AWS::StackName", "AWS::AccountId"]
 
-# Mock value for unsupported type references
-MOCK_REFERENCE = "unknown"
-
 
 class NoStackUpdates(Exception):
     """Exception indicating that no actions are to be performed in a stack update (which is not allowed)"""
@@ -79,37 +73,20 @@ class NoStackUpdates(Exception):
 
 
 def get_attr_from_model_instance(
-    resource: dict,
-    attribute_name: str,
-    resource_type: str,
-    resource_id: str,
-    attribute_sub_name: Optional[str] = None,
+    resource: dict, attribute_name: str, resource_type: str, resource_id: str
 ) -> str:
-    if resource["PhysicalResourceId"] == MOCK_REFERENCE:
-        LOG.warning(
-            "Attribute '%s' requested from unsupported resource with id %s",
-            attribute_name,
-            resource_id,
-        )
-        return MOCK_REFERENCE
-
     properties = resource.get("Properties", {})
     # if there's no entry in VALID_GETATT_PROPERTIES for the resource type we still default to "open" and accept anything
     valid_atts = VALID_GETATT_PROPERTIES.get(resource_type)
     if valid_atts is not None and attribute_name not in valid_atts:
         LOG.warning(
-            "Invalid attribute in Fn::GetAtt for %s:  | %s.%s",
-            resource_type,
-            resource_id,
-            attribute_name,
+            f"Invalid attribute in Fn::GetAtt for {resource_type}:  | {resource_id}.{attribute_name}"
         )
         raise Exception(
             f"Resource type {resource_type} does not support attribute {{{attribute_name}}}"
         )  # TODO: check CFn behavior via snapshot
 
     attribute_candidate = properties.get(attribute_name)
-    if attribute_sub_name:
-        return attribute_candidate.get(attribute_sub_name)
     if "." in attribute_name:
         # was used for legacy, but keeping it since it might have to work for a custom resource as well
         if attribute_candidate:
@@ -160,14 +137,12 @@ def resolve_ref(
     if ref == "AWS::Region":
         return region_name
     if ref == "AWS::Partition":
-        return get_partition(region_name)
+        return "aws"
     if ref == "AWS::StackName":
         return stack_name
     if ref == "AWS::StackId":
-        stack = find_stack(account_id, region_name, stack_name)
-        if not stack:
-            raise ValueError(f"No stack {stack_name} found")
-        return stack.stack_id
+        # TODO return proper stack id!
+        return stack_name
     if ref == "AWS::AccountId":
         return account_id
     if ref == "AWS::NoValue":
@@ -183,7 +158,7 @@ def resolve_ref(
         parameter_type: str = parameter["ParameterType"]
         parameter_value = parameter.get("ResolvedValue") or parameter.get("ParameterValue")
 
-        if "CommaDelimitedList" in parameter_type or parameter_type.startswith("List<"):
+        if parameter_type in ["CommaDelimitedList"] or parameter_type.startswith("List<"):
             return [p.strip() for p in parameter_value.split(",")]
         else:
             return parameter_value
@@ -220,9 +195,7 @@ def resolve_refs_recursively(
     if isinstance(result, str):
         # we're trying to filter constructed API urls here (e.g. via Join in the template)
         api_match = REGEX_OUTPUT_APIGATEWAY.match(result)
-        if api_match and result in config.CFN_STRING_REPLACEMENT_DENY_LIST:
-            return result
-        elif api_match:
+        if api_match:
             prefix = api_match[1]
             host = api_match[2]
             path = api_match[3]
@@ -241,20 +214,12 @@ def resolve_refs_recursively(
             # only these 3 services are supported for dynamic references right now
             if service_name == "ssm":
                 ssm_client = connect_to(aws_access_key_id=account_id, region_name=region_name).ssm
-                try:
-                    return ssm_client.get_parameter(Name=reference_key)["Parameter"]["Value"]
-                except ClientError as e:
-                    LOG.error("client error accessing SSM parameter '%s': %s", reference_key, e)
-                    raise
+                return ssm_client.get_parameter(Name=reference_key)["Parameter"]["Value"]
             elif service_name == "ssm-secure":
                 ssm_client = connect_to(aws_access_key_id=account_id, region_name=region_name).ssm
-                try:
-                    return ssm_client.get_parameter(Name=reference_key, WithDecryption=True)[
-                        "Parameter"
-                    ]["Value"]
-                except ClientError as e:
-                    LOG.error("client error accessing SSM parameter '%s': %s", reference_key, e)
-                    raise
+                return ssm_client.get_parameter(Name=reference_key, WithDecryption=True)[
+                    "Parameter"
+                ]["Value"]
             elif service_name == "secretsmanager":
                 # reference key needs to be parsed further
                 # because {{resolve:secretsmanager:secret-id:secret-string:json-key:version-stage:version-id}}
@@ -280,14 +245,9 @@ def resolve_refs_recursively(
                 secretsmanager_client = connect_to(
                     aws_access_key_id=account_id, region_name=region_name
                 ).secretsmanager
-                try:
-                    secret_value = secretsmanager_client.get_secret_value(
-                        SecretId=secret_id, **kwargs
-                    )["SecretString"]
-                except ClientError:
-                    LOG.error("client error while trying to access key '%s': %s", secret_id)
-                    raise
-
+                secret_value = secretsmanager_client.get_secret_value(SecretId=secret_id, **kwargs)[
+                    "SecretString"
+                ]
                 if json_key:
                     json_secret = json.loads(secret_value)
                     if json_key not in json_secret:
@@ -299,9 +259,7 @@ def resolve_refs_recursively(
                 else:
                     return secret_value
             else:
-                LOG.warning(
-                    "Unsupported service for dynamic parameter: service_name=%s", service_name
-                )
+                LOG.warning(f"Unsupported service for dynamic parameter: {service_name=}")
 
     return result
 
@@ -329,9 +287,7 @@ def _resolve_refs_recursively(
             if ref is None:
                 msg = 'Unable to resolve Ref for resource "%s" (yet)' % value["Ref"]
                 LOG.debug("%s - %s", msg, resources.get(value["Ref"]) or set(resources.keys()))
-
                 raise DependencyNotYetSatisfied(resource_ids=value["Ref"], message=msg)
-
             ref = resolve_refs_recursively(
                 account_id,
                 region_name,
@@ -349,7 +305,6 @@ def _resolve_refs_recursively(
             attr_ref = attr_ref.split(".") if isinstance(attr_ref, str) else attr_ref
             resource_logical_id = attr_ref[0]
             attribute_name = attr_ref[1]
-            attribute_sub_name = attr_ref[2] if len(attr_ref) > 2 else None
 
             # the attribute name can be a Ref
             attribute_name = resolve_refs_recursively(
@@ -364,22 +319,15 @@ def _resolve_refs_recursively(
             )
             resource = resources.get(resource_logical_id)
 
-            resource_type = get_resource_type(resource)
             resolved_getatt = get_attr_from_model_instance(
-                resource,
-                attribute_name,
-                resource_type,
-                resource_logical_id,
-                attribute_sub_name,
+                resource, attribute_name, get_resource_type(resource), resource_logical_id
             )
-
             # TODO: we should check the deployment state and not try to GetAtt from a resource that is still IN_PROGRESS or hasn't started yet.
             if resolved_getatt is None:
                 raise DependencyNotYetSatisfied(
                     resource_ids=resource_logical_id,
                     message=f"Could not resolve attribute '{attribute_name}' on resource '{resource_logical_id}'",
                 )
-
             return resolved_getatt
 
         if stripped_fn_lower == "join":
@@ -414,15 +362,10 @@ def _resolve_refs_recursively(
 
             none_values = [v for v in join_values if v is None]
             if none_values:
-                LOG.warning(
-                    "Cannot resolve Fn::Join '%s' due to null values: '%s'", value, join_values
-                )
                 raise Exception(
                     f"Cannot resolve CF Fn::Join {value} due to null values: {join_values}"
                 )
-            return value[keys_list[0]][0].join(
-                [str(v) for v in join_values if v != "__aws_no_value__"]
-            )
+            return value[keys_list[0]][0].join([str(v) for v in join_values])
 
         if stripped_fn_lower == "sub":
             item_to_sub = value[keys_list[0]]
@@ -444,14 +387,13 @@ def _resolve_refs_recursively(
                     parameters,
                     val,
                 )
-
-                if isinstance(resolved_val, (list, dict, tuple)):
+                if not isinstance(resolved_val, str):
                     # We don't have access to the resource that's a dependency in this case,
                     # so do the best we can with the resource ids
                     raise DependencyNotYetSatisfied(
                         resource_ids=key, message=f"Could not resolve {val} to terminal value type"
                     )
-                result = result.replace("${%s}" % key, str(resolved_val))
+                result = result.replace("${%s}" % key, resolved_val)
 
             # resolve placeholders
             result = resolve_placeholders_in_string(
@@ -495,12 +437,6 @@ def _resolve_refs_recursively(
                 first_level_attribute,
             )
 
-            if first_level_attribute not in selected_map:
-                raise Exception(
-                    f"Cannot find map key '{first_level_attribute}' in mapping '{mapping_id}'"
-                )
-            first_level_mapping = selected_map[first_level_attribute]
-
             second_level_attribute = value[keys_list[0]][2]
             if not isinstance(second_level_attribute, str):
                 second_level_attribute = resolve_refs_recursively(
@@ -513,12 +449,8 @@ def _resolve_refs_recursively(
                     parameters,
                     second_level_attribute,
                 )
-            if second_level_attribute not in first_level_mapping:
-                raise Exception(
-                    f"Cannot find map key '{second_level_attribute}' in mapping '{mapping_id}' under key '{first_level_attribute}'"
-                )
 
-            return first_level_mapping[second_level_attribute]
+            return selected_map.get(first_level_attribute).get(second_level_attribute)
 
         if stripped_fn_lower == "importvalue":
             import_value_key = resolve_refs_recursively(
@@ -545,17 +477,7 @@ def _resolve_refs_recursively(
 
         if stripped_fn_lower == "if":
             condition, option1, option2 = value[keys_list[0]]
-            condition = conditions.get(condition)
-            if condition is None:
-                LOG.warning(
-                    "Cannot find condition '%s' in conditions mapping: '%s'",
-                    condition,
-                    conditions.keys(),
-                )
-                raise KeyError(
-                    f"Cannot find condition '{condition}' in conditions mapping: '{conditions.keys()}'"
-                )
-
+            condition = conditions[condition]
             result = resolve_refs_recursively(
                 account_id,
                 region_name,
@@ -571,12 +493,7 @@ def _resolve_refs_recursively(
         if stripped_fn_lower == "condition":
             # FIXME: this should only allow strings, no evaluation should be performed here
             #   see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-condition.html
-            key = value[keys_list[0]]
-            result = conditions.get(key)
-            if result is None:
-                LOG.warning("Cannot find key '%s' in conditions: '%s'", key, conditions.keys())
-                raise KeyError(f"Cannot find key '{key}' in conditions: '{conditions.keys()}'")
-            return result
+            return conditions[value[keys_list[0]]]
 
         if stripped_fn_lower == "not":
             condition = value[keys_list[0]][0]
@@ -701,15 +618,9 @@ def _resolve_refs_recursively(
                 or region_name
             )
 
-            ec2_client = connect_to(aws_access_key_id=account_id, region_name=region).ec2
-            try:
-                get_availability_zones = ec2_client.describe_availability_zones()[
-                    "AvailabilityZones"
-                ]
-            except ClientError:
-                LOG.error("client error describing availability zones")
-                raise
-
+            get_availability_zones = connect_to(
+                aws_access_key_id=account_id, region_name=region
+            ).ec2.describe_availability_zones()["AvailabilityZones"]
             azs = [az["ZoneName"] for az in get_availability_zones]
 
             return azs
@@ -787,20 +698,6 @@ def resolve_placeholders_in_string(
     Variables can be template parameter names, resource logical IDs, resource attributes, or a variable in a key-value map
     """
 
-    def _validate_result_type(value: str):
-        is_another_account_id = value.isdigit() and len(value) == len(account_id)
-        if value == account_id or is_another_account_id:
-            return value
-
-        if value.isdigit():
-            return int(value)
-        else:
-            try:
-                res = float(value)
-                return res
-            except ValueError:
-                return value
-
     def _replace(match):
         ref_expression = match.group(1)
         parts = ref_expression.split(".")
@@ -856,8 +753,6 @@ def resolve_placeholders_in_string(
 
                 if parameter_type in ["CommaDelimitedList"] or parameter_type.startswith("List<"):
                     return [p.strip() for p in parameter_value.split(",")]
-                elif parameter_type == "Number":
-                    return str(parameter_value)
                 else:
                     return parameter_value
             else:
@@ -870,7 +765,7 @@ def resolve_placeholders_in_string(
 
     regex = r"\$\{([^\}]+)\}"
     result = re.sub(regex, _replace, result)
-    return _validate_result_type(result)
+    return result
 
 
 def evaluate_resource_condition(conditions: dict[str, bool], resource: dict) -> bool:
@@ -884,7 +779,7 @@ def evaluate_resource_condition(conditions: dict[str, bool], resource: dict) -> 
 # -----------------------
 
 
-class TemplateDeployer:
+class TemplateDeployerBase(ABC):
     def __init__(self, account_id: str, region_name: str, stack):
         self.stack = stack
         self.account_id = account_id
@@ -1293,34 +1188,7 @@ class TemplateDeployer:
             action, logical_resource_id=resource_id
         )
 
-        resource_provider = executor.try_load_resource_provider(get_resource_type(resource))
-        if resource_provider is not None:
-            # add in-progress event
-            resource_status = f"{get_action_name_for_resource_change(action)}_IN_PROGRESS"
-            physical_resource_id = None
-            if action in ("Modify", "Remove"):
-                previous_state = self.resources[resource_id].get("_last_deployed_state")
-                if not previous_state:
-                    # TODO: can this happen?
-                    previous_state = self.resources[resource_id]["Properties"]
-                physical_resource_id = executor.extract_physical_resource_id_from_model_with_schema(
-                    resource_model=previous_state,
-                    resource_type=resource["Type"],
-                    resource_type_schema=resource_provider.SCHEMA,
-                )
-            stack.add_stack_event(
-                resource_id=resource_id,
-                physical_res_id=physical_resource_id,
-                status=resource_status,
-            )
-
-            # perform the deploy
-            progress_event = executor.deploy_loop(
-                resource_provider, resource, resource_provider_payload
-            )
-        else:
-            resource["PhysicalResourceId"] = MOCK_REFERENCE
-            progress_event = ProgressEvent(OperationStatus.SUCCESS, resource_model={})
+        progress_event = executor.deploy_loop(resource, resource_provider_payload)  # noqa
 
         # TODO: clean up the surrounding loop (do_apply_changes_in_loop) so that the responsibilities are clearer
         stack_action = get_action_name_for_resource_change(action)
@@ -1392,6 +1260,23 @@ class TemplateDeployer:
         }
         return resource_provider_payload
 
+    @abstractmethod
+    def delete_stack(self):
+        pass
+
+    @abstractmethod
+    def do_apply_changes_in_loop(self, changes: list[ChangeConfig], stack: Stack) -> list:
+        pass
+
+    @classmethod
+    def factory(cls, *args, **kwargs):
+        if config.CFN_LEGACY_TEMPLATE_DEPLOYER:
+            return TemplateDeployerLegacy(*args, **kwargs)
+        else:
+            return TemplateDeployerV2(*args, **kwargs)
+
+
+class TemplateDeployerV2(TemplateDeployerBase):
     def delete_stack(self):
         if not self.stack:
             return
@@ -1413,7 +1298,7 @@ class TemplateDeployer:
                 return self.stack.resource_status(r_id).get("ResourceStatus") == "DELETE_COMPLETE"
             except Exception:
                 if config.CFN_VERBOSE_ERRORS:
-                    LOG.exception("failed to lookup if resource %s is deleted", r_id)
+                    LOG.exception(f"failed to lookup if resource {r_id} is deleted")
                 return True  # just an assumption
 
         ordered_resource_ids = list(
@@ -1445,13 +1330,7 @@ class TemplateDeployer:
                     len(resources),
                     resource["ResourceType"],
                 )
-                resource_provider = executor.try_load_resource_provider(get_resource_type(resource))
-                if resource_provider is not None:
-                    event = executor.deploy_loop(
-                        resource_provider, resource, resource_provider_payload
-                    )
-                else:
-                    event = ProgressEvent(OperationStatus.SUCCESS, resource_model={})
+                event = executor.deploy_loop(resource, resource_provider_payload)
                 match event.status:
                     case OperationStatus.SUCCESS:
                         self.stack.set_resource_status(resource_id, "DELETE_COMPLETE")
@@ -1554,8 +1433,220 @@ class TemplateDeployer:
                     status_reason=str(e),
                 )
                 if config.CFN_VERBOSE_ERRORS:
-                    LOG.exception("Failed to deploy resource %s, stack deploy failed", resource_id)
+                    LOG.exception(f"Failed to deploy resource {resource_id}, stack deploy failed")
                 raise
+
+        # clean up references to deleted resources in stack
+        deletes = [c for c in changes_done if c["ResourceChange"]["Action"] == "Remove"]
+        for delete in deletes:
+            stack.template["Resources"].pop(delete["ResourceChange"]["LogicalResourceId"], None)
+
+        # resolve outputs
+        stack.resolved_outputs = resolve_outputs(self.account_id, self.region_name, stack)
+
+        return changes_done
+
+
+class TemplateDeployerLegacy(TemplateDeployerBase):
+    def delete_stack(self):
+        if not self.stack:
+            return
+        self.stack.set_stack_status("DELETE_IN_PROGRESS")
+        stack_resources = list(self.stack.resources.values())
+        resources = {r["LogicalResourceId"]: clone_safe(r) for r in stack_resources}
+
+        # TODO: what is this doing?
+        for key, resource in resources.items():
+            resource["Properties"] = resource.get(
+                "Properties", clone_safe(resource)
+            )  # TODO: why is there a fallback?
+            resource["ResourceType"] = get_resource_type(resource)
+
+        def _safe_lookup_is_deleted(r_id):
+            """handles the case where self.stack.resource_status(..) fails for whatever reason"""
+            try:
+                return self.stack.resource_status(r_id).get("ResourceStatus") == "DELETE_COMPLETE"
+            except Exception:
+                if config.CFN_VERBOSE_ERRORS:
+                    LOG.exception(f"failed to lookup if resource {r_id} is deleted")
+                return True  # just an assumption
+
+        # a bit of a workaround until we have a proper dependency graph
+        max_cycle = 10  # 10 cycles should be a safe choice for now
+        for iteration_cycle in range(1, max_cycle + 1):
+            resources = {
+                r_id: r for r_id, r in resources.items() if not _safe_lookup_is_deleted(r_id)
+            }
+            if len(resources) == 0:
+                break
+            for i, (resource_id, resource) in enumerate(resources.items()):
+                try:
+                    # TODO: cache condition value in resource details on deployment and use cached value here
+                    if evaluate_resource_condition(
+                        self.stack.resolved_conditions,
+                        resource,
+                    ):
+                        executor = self.create_resource_provider_executor()
+                        resource_provider_payload = self.create_resource_provider_payload(
+                            "Remove", logical_resource_id=resource_id
+                        )
+                        # TODO: check actual return value
+                        LOG.debug(
+                            'Handling "Remove" for resource "%s" (%s/%s) type "%s" in loop iteration %s',
+                            resource_id,
+                            i + 1,
+                            len(resources),
+                            resource["ResourceType"],
+                            iteration_cycle,
+                        )
+                        event = executor.deploy_loop(resource, resource_provider_payload)
+                        match event.status:
+                            case OperationStatus.SUCCESS:
+                                self.stack.set_resource_status(resource_id, "DELETE_COMPLETE")
+                            case OperationStatus.PENDING:
+                                # the resource is still being deleted, specifically the provider has
+                                # signalled that the deployment loop should skip this resource this
+                                # time and come back to it later, likely due to unmet child
+                                # resources still existing because we don't delete things in the
+                                # correct order yet.
+                                continue
+                            case OperationStatus.FAILED:
+                                if iteration_cycle == max_cycle:
+                                    LOG.exception(
+                                        "Last cycle failed to delete resource with id %s. Reason: %s",
+                                        resource_id,
+                                        event.message or "unknown",
+                                    )
+                                else:
+                                    # the resource failed to delete this time, but we have more
+                                    # iterations left to complete the process
+                                    continue
+                            case OperationStatus.IN_PROGRESS:
+                                # the resource provider executor should not return this state, so
+                                # this state is a programming error
+                                raise Exception(
+                                    "Programming error: ResourceProviderExecutor cannot return IN_PROGRESS"
+                                )
+                            case other_status:
+                                raise Exception(f"Use of unsupported status found: {other_status}")
+
+                except Exception as e:
+                    if iteration_cycle == max_cycle:
+                        LOG.exception(
+                            "Last cycle failed to delete resource with id %s. Final exception: %s",
+                            resource_id,
+                            e,
+                        )
+                    else:
+                        log_method = LOG.warning
+                        if config.CFN_VERBOSE_ERRORS:
+                            log_method = LOG.exception
+                        log_method(
+                            "Failed delete of resource with id %s in iteration cycle %d. Retrying in next cycle.",
+                            resource_id,
+                            iteration_cycle,
+                        )
+
+        # update status
+        self.stack.set_stack_status("DELETE_COMPLETE")
+        self.stack.set_time_attribute("DeletionTime")
+
+    def do_apply_changes_in_loop(self, changes: list[ChangeConfig], stack: Stack) -> list:
+        # apply changes in a retry loop, to resolve resource dependencies and converge to the target state
+        changes_done = []
+        max_iters = 30
+        new_resources = stack.resources
+
+        # start deployment loop
+        for i in range(max_iters):
+            j = 0
+            updated = False
+            while j < len(changes):
+                change = changes[j]
+                res_change = change["ResourceChange"]
+                action = res_change["Action"]
+                is_add_or_modify = action in ["Add", "Modify"]
+                resource_id = res_change["LogicalResourceId"]
+
+                # TODO: do resolve_refs_recursively once here
+                try:
+                    if is_add_or_modify:
+                        resource = new_resources[resource_id]
+                        should_deploy = self.prepare_should_deploy_change(
+                            resource_id, change, stack, new_resources
+                        )
+                        LOG.debug(
+                            'Handling "%s" for resource "%s" (%s/%s) type "%s" in loop iteration %s (should_deploy=%s)',
+                            action,
+                            resource_id,
+                            j + 1,
+                            len(changes),
+                            res_change["ResourceType"],
+                            i + 1,
+                            should_deploy,
+                        )
+                        if not should_deploy:
+                            del changes[j]
+                            stack_action = get_action_name_for_resource_change(action)
+                            stack.set_resource_status(resource_id, f"{stack_action}_COMPLETE")
+                            continue
+                        if not self.all_resource_dependencies_satisfied(resource):
+                            j += 1
+                            continue
+                    elif action == "Remove":
+                        should_remove = self.prepare_should_deploy_change(
+                            resource_id, change, stack, new_resources
+                        )
+                        if not should_remove:
+                            del changes[j]
+                            continue
+                        LOG.debug(
+                            'Handling "%s" for resource "%s" (%s/%s) type "%s" in loop iteration %s',
+                            action,
+                            resource_id,
+                            j + 1,
+                            len(changes),
+                            res_change["ResourceType"],
+                            i + 1,
+                        )
+                    self.apply_change(change, stack=stack)
+                    changes_done.append(change)
+                    del changes[j]
+                    updated = True
+                except DependencyNotYetSatisfied as e:
+                    log_method = LOG.debug
+                    if config.CFN_VERBOSE_ERRORS:
+                        log_method = LOG.exception
+                    log_method(
+                        'Dependencies for "%s" not yet satisfied, retrying in next loop: %s',
+                        resource_id,
+                        e,
+                    )
+                    j += 1
+                except Exception as e:
+                    status_action = {
+                        "Add": "CREATE",
+                        "Modify": "UPDATE",
+                        "Dynamic": "UPDATE",
+                        "Remove": "DELETE",
+                    }[action]
+                    stack.add_stack_event(
+                        resource_id=resource_id,
+                        physical_res_id=new_resources[resource_id].get("PhysicalResourceId"),
+                        status=f"{status_action}_FAILED",
+                        status_reason=str(e),
+                    )
+                    if config.CFN_VERBOSE_ERRORS:
+                        LOG.exception(
+                            f"Failed to deploy resource {resource_id}, stack deploy failed"
+                        )
+                    raise
+            if not changes:
+                break
+            if not updated:
+                raise Exception(
+                    f"Resource deployment loop completed, pending resource changes: {changes}"
+                )
 
         # clean up references to deleted resources in stack
         deletes = [c for c in changes_done if c["ResourceChange"]["Action"] == "Remove"]

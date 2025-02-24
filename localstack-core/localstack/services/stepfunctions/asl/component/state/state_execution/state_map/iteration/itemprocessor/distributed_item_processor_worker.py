@@ -4,7 +4,7 @@ from typing import Final, Optional
 from localstack.services.stepfunctions.asl.component.common.error_name.failure_event import (
     FailureEventException,
 )
-from localstack.services.stepfunctions.asl.component.common.parargs import Parameters
+from localstack.services.stepfunctions.asl.component.common.parameters import Parameters
 from localstack.services.stepfunctions.asl.component.common.timeouts.timeout import EvalTimeoutError
 from localstack.services.stepfunctions.asl.component.state.state_execution.state_map.item_reader.item_reader_decl import (
     ItemReader,
@@ -22,13 +22,13 @@ from localstack.services.stepfunctions.asl.component.state.state_execution.state
     Job,
     JobPool,
 )
+from localstack.services.stepfunctions.asl.eval.contextobject.contex_object import Item, Map
 from localstack.services.stepfunctions.asl.eval.environment import Environment
 from localstack.services.stepfunctions.asl.eval.program_state import (
     ProgramError,
     ProgramState,
     ProgramStopped,
 )
-from localstack.services.stepfunctions.asl.eval.states import ItemData, MapData
 from localstack.services.stepfunctions.asl.utils.encoding import to_json_str
 
 LOG = logging.getLogger(__name__)
@@ -67,12 +67,12 @@ class DistributedItemProcessorWorker(InlineItemProcessorWorker):
 
         job_output = None
         try:
-            env.states.context_object.context_object_data["Map"] = MapData(
-                Item=ItemData(Index=job.job_index, Value=job.job_input)
+            env.context_object_manager.context_object["Map"] = Map(
+                Item=Item(Index=job.job_index, Value=job.job_input)
             )
 
-            env.states.reset(job.job_input)
-            env.stack.append(env.states.get_input())
+            env.inp = job.job_input
+            env.stack.append(env.inp)
             self._eval_input(env_frame=env)
 
             job.job_program.eval(env)
@@ -94,29 +94,23 @@ class DistributedItemProcessorWorker(InlineItemProcessorWorker):
                 self._map_run_record.execution_counter.results_written.count()
                 self._map_run_record.execution_counter.running.offset(-1)
 
-                job_output = env.states.get_input()
+                job_output = env.inp
 
         except EvalTimeoutError as timeout_error:
             LOG.debug(
-                "MapRun worker Timeout Error '%s' for input '%s'.",
-                timeout_error,
-                to_json_str(job.job_input),
+                f"MapRun worker Timeout Error '{timeout_error}' for input '{to_json_str(job.job_input)}'."
             )
             self._map_run_record.item_counter.timed_out.count()
 
         except FailureEventException as failure_event_ex:
             LOG.debug(
-                "MapRun worker Event Exception '%s' for input '%s'.",
-                to_json_str(failure_event_ex.failure_event),
-                to_json_str(job.job_input),
+                f"MapRun worker Event Exception '{to_json_str(failure_event_ex.failure_event)}' for input '{to_json_str(job.job_input)}'."
             )
             self._map_run_record.item_counter.failed.count()
 
         except Exception as exception:
             LOG.debug(
-                "MapRun worker Error '%s' for input '%s'.",
-                exception,
-                to_json_str(job.job_input),
+                f"MapRun worker Error '{exception}' for input '{to_json_str(job.job_input)}'."
             )
             self._map_run_record.item_counter.failed.count()
 
@@ -130,7 +124,7 @@ class DistributedItemProcessorWorker(InlineItemProcessorWorker):
             return
 
         # Evaluate the job.
-        job_frame = worker_frame.open_inner_frame()
+        job_frame = worker_frame.open_frame()
         self._eval_job(env=job_frame, job=job)
         worker_frame.delete_frame(job_frame)
 

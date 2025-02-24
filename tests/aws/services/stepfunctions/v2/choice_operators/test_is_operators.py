@@ -10,14 +10,15 @@ from tests.aws.services.stepfunctions.v2.choice_operators.utils import (
 # TODO: test for validation errors, and boundary testing.
 
 
+@markers.snapshot.skip_snapshot_verify(paths=["$..tracingConfiguration"])
 class TestIsOperators:
     @markers.aws.validated
     def test_is_boolean(
-        self, create_state_machine_iam_role, create_state_machine, sfn_snapshot, aws_client
+        self, create_iam_role_for_sfn, create_state_machine, sfn_snapshot, aws_client
     ):
         create_and_test_comparison_function(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             "IsBoolean",
@@ -25,12 +26,10 @@ class TestIsOperators:
         )
 
     @markers.aws.validated
-    def test_is_null(
-        self, create_state_machine_iam_role, create_state_machine, sfn_snapshot, aws_client
-    ):
+    def test_is_null(self, create_iam_role_for_sfn, create_state_machine, sfn_snapshot, aws_client):
         create_and_test_comparison_function(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             "IsNull",
@@ -39,11 +38,11 @@ class TestIsOperators:
 
     @markers.aws.validated
     def test_is_numeric(
-        self, create_state_machine_iam_role, create_state_machine, sfn_snapshot, aws_client
+        self, create_iam_role_for_sfn, create_state_machine, sfn_snapshot, aws_client
     ):
         create_and_test_comparison_function(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             "IsNumeric",
@@ -52,11 +51,11 @@ class TestIsOperators:
 
     @markers.aws.validated
     def test_is_present(
-        self, create_state_machine_iam_role, create_state_machine, sfn_snapshot, aws_client
+        self, create_iam_role_for_sfn, create_state_machine, sfn_snapshot, aws_client
     ):
         create_and_test_comparison_function(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             "IsPresent",
@@ -65,11 +64,11 @@ class TestIsOperators:
 
     @markers.aws.validated
     def test_is_string(
-        self, create_state_machine_iam_role, create_state_machine, sfn_snapshot, aws_client
+        self, create_iam_role_for_sfn, create_state_machine, sfn_snapshot, aws_client
     ):
         create_and_test_comparison_function(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             "IsString",
@@ -81,11 +80,11 @@ class TestIsOperators:
     )
     @markers.aws.needs_fixing
     def test_is_timestamp(
-        self, create_state_machine_iam_role, create_state_machine, sfn_snapshot, aws_client
+        self, create_iam_role_for_sfn, create_state_machine, sfn_snapshot, aws_client
     ):
         create_and_test_comparison_function(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             "IsTimestamp",

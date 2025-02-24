@@ -1,5 +1,5 @@
 """Lambda models for internal use and persistence.
-The LambdaProviderPro in localstack-pro imports this model and configures persistence.
+The LambdaProviderPro in localstack-ext imports this model and configures persistence.
 The actual function code is stored in S3 (see S3Code).
 """
 
@@ -31,7 +31,6 @@ from localstack.aws.api.lambda_ import (
     LoggingConfig,
     PackageType,
     ProvisionedConcurrencyStatusEnum,
-    RecursiveLoop,
     Runtime,
     RuntimeVersionConfig,
     SnapStartResponse,
@@ -60,12 +59,11 @@ class VersionState:
 class Invocation:
     payload: bytes
     invoked_arn: str
-    client_context: str | None
+    client_context: Optional[str]
     invocation_type: InvocationType
     invoke_time: datetime
     # = invocation_id
     request_id: str
-    trace_context: dict
 
 
 InitializationType = Literal["on-demand", "provisioned-concurrency"]
@@ -347,7 +345,7 @@ class FunctionUrlConfig:
     function_arn: str  # fully qualified ARN
     function_name: str  # resolved name
     cors: Cors
-    url_id: str  # Custom URL (via tag), or generated unique subdomain id  e.g. pfn5bdb2dl5mzkbn6eb2oi3xfe0nthdn
+    url_id: str  # generated unique subdomain id  e.g. pfn5bdb2dl5mzkbn6eb2oi3xfe0nthdn
     url: str  # full URL (e.g. "https://pfn5bdb2dl5mzkbn6eb2oi3xfe0nthdn.lambda-url.eu-west-3.on.aws/")
     auth_type: FunctionUrlAuthType
     creation_time: str  # time
@@ -592,10 +590,10 @@ class Function:
         default_factory=dict
     )  # key is $LATEST(?), version or alias
     reserved_concurrent_executions: Optional[int] = None
-    recursive_loop: RecursiveLoop = RecursiveLoop.Terminate
     provisioned_concurrency_configs: dict[str, ProvisionedConcurrencyConfiguration] = (
         dataclasses.field(default_factory=dict)
     )
+    tags: dict[str, str] | None = None
 
     lock: threading.RLock = dataclasses.field(default_factory=threading.RLock)
     next_version: int = 1

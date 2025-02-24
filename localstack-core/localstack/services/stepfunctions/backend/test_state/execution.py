@@ -8,12 +8,10 @@ from localstack.aws.api.stepfunctions import (
     Arn,
     ExecutionStatus,
     InspectionLevel,
-    StateMachineType,
     TestExecutionStatus,
     TestStateOutput,
     Timestamp,
 )
-from localstack.services.stepfunctions.asl.eval.evaluation_details import EvaluationDetails
 from localstack.services.stepfunctions.asl.eval.program_state import (
     ProgramEnded,
     ProgramError,
@@ -47,7 +45,7 @@ class TestStateExecution(Execution):
             exit_program_state: ProgramState = self.execution.exec_worker.env.program_state()
             if isinstance(exit_program_state, ProgramChoiceSelected):
                 self.execution.exec_status = ExecutionStatus.SUCCEEDED
-                self.execution.output = self.execution.exec_worker.env.states.get_input()
+                self.execution.output = self.execution.exec_worker.env.inp
                 self.execution.next_state = exit_program_state.next_state_name
             else:
                 self._reflect_execution_status()
@@ -66,7 +64,6 @@ class TestStateExecution(Execution):
     ):
         super().__init__(
             name=name,
-            sm_type=StateMachineType.STANDARD,
             role_arn=role_arn,
             exec_arn=exec_arn,
             account_id=account_id,
@@ -86,13 +83,12 @@ class TestStateExecution(Execution):
 
     def _get_start_execution_worker(self) -> TestStateExecutionWorker:
         return TestStateExecutionWorker(
-            evaluation_details=EvaluationDetails(
-                aws_execution_details=self._get_start_aws_execution_details(),
-                execution_details=self.get_start_execution_details(),
-                state_machine_details=self.get_start_state_machine_details(),
-            ),
+            definition=self.state_machine.definition,
+            input_data=self.input_data,
             exec_comm=self._get_start_execution_worker_comm(),
-            cloud_watch_logging_session=self._cloud_watch_logging_session,
+            context_object_init=self._get_start_context_object_init_data(),
+            aws_execution_details=self._get_start_aws_execution_details(),
+            cloud_watch_logging_session=None,
             activity_store=self._activity_store,
         )
 
@@ -121,8 +117,7 @@ class TestStateExecution(Execution):
         else:
             # TODO: handle other statuses
             LOG.warning(
-                "Unsupported StateMachine exit type for TestState '%s'",
-                type(exit_program_state),
+                f"Unsupported StateMachine exit type for TestState '{type(exit_program_state)}'"
             )
             output_str = to_json_str(self.output)
             test_state_output = TestStateOutput(

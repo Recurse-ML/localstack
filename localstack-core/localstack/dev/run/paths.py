@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Optional, Union
 
 
 class HostPaths:
@@ -11,7 +11,7 @@ class HostPaths:
     ``~/workspace/ls/localstack-ext``, ..."""
 
     localstack_project_dir: Path
-    localstack_pro_project_dir: Path
+    localstack_ext_project_dir: Path
     moto_project_dir: Path
     postgresql_proxy: Path
     rolo_dir: Path
@@ -26,7 +26,7 @@ class HostPaths:
     ):
         self.workspace_dir = Path(workspace_dir or os.path.abspath(os.path.join(os.getcwd(), "..")))
         self.localstack_project_dir = self.workspace_dir / "localstack"
-        self.localstack_pro_project_dir = self.workspace_dir / "localstack-ext"
+        self.localstack_ext_project_dir = self.workspace_dir / "localstack-ext"
         self.moto_project_dir = self.workspace_dir / "moto"
         self.postgresql_proxy = self.workspace_dir / "postgresql-proxy"
         self.rolo_dir = self.workspace_dir / "rolo"
@@ -38,31 +38,6 @@ class HostPaths:
             or os.path.join(os.getcwd(), ".venv")
         )
 
-    @property
-    def aws_community_package_dir(self) -> Path:
-        return self.localstack_project_dir / "localstack-core" / "localstack"
-
-    @property
-    def aws_pro_package_dir(self) -> Path:
-        return (
-            self.localstack_pro_project_dir / "localstack-pro-core" / "localstack" / "pro" / "core"
-        )
-
-
-# Type representing how to extract a specific path from a common root path, typically a lambda function
-PathMappingExtractor = Callable[[HostPaths], Path]
-
-# Declaration of which local packages can be mounted into the container, and their locations on the host
-HOST_PATH_MAPPINGS: dict[
-    str,
-    PathMappingExtractor,
-] = {
-    "moto": lambda paths: paths.moto_project_dir / "moto",
-    "postgresql_proxy": lambda paths: paths.postgresql_proxy / "postgresql_proxy",
-    "rolo": lambda paths: paths.rolo_dir / "rolo",
-    "plux": lambda paths: paths.workspace_dir / "plux" / "plugin",
-}
-
 
 class ContainerPaths:
     """Important paths in the container"""
@@ -72,7 +47,7 @@ class ContainerPaths:
     docker_entrypoint: str = "/usr/local/bin/docker-entrypoint.sh"
     localstack_supervisor: str = "/usr/local/bin/localstack-supervisor"
     localstack_source_dir: str
-    localstack_pro_source_dir: Optional[str]
+    localstack_ext_source_dir: Optional[str]
 
     def dependency_source(self, name: str) -> str:
         """Returns path of the given source dependency in the site-packages directory."""
@@ -91,4 +66,4 @@ class ProContainerPaths(ContainerPaths):
 
     def __init__(self):
         self.localstack_source_dir = self.dependency_source("localstack")
-        self.localstack_pro_source_dir = self.dependency_source("localstack") + "/pro/core"
+        self.localstack_ext_source_dir = self.dependency_source("localstack_ext")

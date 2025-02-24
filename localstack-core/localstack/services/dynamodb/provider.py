@@ -7,6 +7,7 @@ import re
 import threading
 import time
 import traceback
+from binascii import crc32
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -138,7 +139,6 @@ from localstack.services.dynamodb.utils import (
     de_dynamize_record,
     extract_table_name_from_partiql_update,
     get_ddb_access_key,
-    modify_ddblocal_arns,
 )
 from localstack.services.dynamodbstreams import dynamodbstreams_api
 from localstack.services.dynamodbstreams.models import dynamodbstreams_stores
@@ -146,11 +146,7 @@ from localstack.services.edge import ROUTER
 from localstack.services.plugins import ServiceLifecycleHook
 from localstack.state import AssetDirectory, StateVisitor
 from localstack.utils.aws import arns
-from localstack.utils.aws.arns import (
-    extract_account_id_from_arn,
-    extract_region_from_arn,
-    get_partition,
-)
+from localstack.utils.aws.arns import extract_account_id_from_arn, extract_region_from_arn
 from localstack.utils.aws.aws_stack import get_valid_regions_for_service
 from localstack.utils.aws.request_context import (
     extract_account_id_from_headers,
@@ -208,22 +204,14 @@ class EventForwarder:
         self, account_id: str, region_name: str, records_map: RecordsMap, background: bool = True
     ) -> None:
         if background:
-            self._submit_records(
+            self.executor.submit(
+                self._forward,
                 account_id=account_id,
                 region_name=region_name,
                 records_map=records_map,
             )
         else:
             self._forward(account_id, region_name, records_map)
-
-    def _submit_records(self, account_id: str, region_name: str, records_map: RecordsMap):
-        """Required for patching submit with local thread context for EventStudio"""
-        self.executor.submit(
-            self._forward,
-            account_id,
-            region_name,
-            records_map,
-        )
 
     def _forward(self, account_id: str, region_name: str, records_map: RecordsMap) -> None:
         try:
@@ -439,9 +427,8 @@ def delete_expired_items() -> int:
                 try:
                     result = client.scan(
                         TableName=table_name,
-                        FilterExpression="#ttl <= :threshold",
+                        FilterExpression=f"{attribute_name} <= :threshold",
                         ExpressionAttributeValues={":threshold": {"N": str(current_time)}},
-                        ExpressionAttributeNames={"#ttl": attribute_name},
                     )
                     items_to_delete = result.get("Items", [])
                     no_expired_items += len(items_to_delete)
@@ -547,20 +534,21 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
 
     def on_before_state_load(self):
         self.server.stop_dynamodb()
+        self.server = self._new_dynamodb_server()
 
     def on_after_state_reset(self):
+        self.server = self._new_dynamodb_server()
         self.server.start_dynamodb()
 
-    @staticmethod
-    def _new_dynamodb_server() -> DynamodbServer:
-        return DynamodbServer.get()
+    def _new_dynamodb_server(self) -> DynamodbServer:
+        return DynamodbServer(config.DYNAMODB_LOCAL_PORT)
 
     def on_after_state_load(self):
         self.server.start_dynamodb()
 
     def on_after_init(self):
         # add response processor specific to ddblocal
-        handlers.modify_service_response.append(self.service, modify_ddblocal_arns)
+        handlers.modify_service_response.append(self.service, self._modify_ddblocal_arns)
 
         # routes for the shell ui
         ROUTER.add(
@@ -572,6 +560,24 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
             path="/shell/<regex('.*'):req_path>",
             endpoint=self.handle_shell_ui_request,
         )
+
+    def _modify_ddblocal_arns(self, chain, context: RequestContext, response: Response):
+        """A service response handler that modifies the dynamodb backend response."""
+        if response_content := response.get_data(as_text=True):
+            # fix the table and latest stream ARNs (DynamoDBLocal hardcodes "ddblocal" as the region)
+            content_replaced = re.sub(
+                r'("TableArn"|"LatestStreamArn"|"StreamArn")\s*:\s*"arn:([a-z-]+):dynamodb:ddblocal:000000000000:([^"]+)"',
+                rf'\1: "arn:\2:dynamodb:{context.region}:{context.account_id}:\3"',
+                response_content,
+            )
+            if content_replaced != response_content:
+                response.data = content_replaced
+                context.service_response = (
+                    None  # make sure the service response is parsed again later
+                )
+
+        # update x-amz-crc32 header required by some clients
+        response.headers["x-amz-crc32"] = crc32(response.data) & 0xFFFFFFFF
 
     def _forward_request(
         self,
@@ -687,33 +693,6 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
             )
             table_description["TableClassSummary"] = {"TableClass": table_class}
 
-        if "GlobalSecondaryIndexes" in table_description:
-            gsis = copy.deepcopy(table_description["GlobalSecondaryIndexes"])
-            # update the different values, as DynamoDB-local v2 has a regression around GSI and does not return anything
-            # anymore
-            for gsi in gsis:
-                index_name = gsi.get("IndexName", "")
-                gsi.update(
-                    {
-                        "IndexArn": f"{table_arn}/index/{index_name}",
-                        "IndexSizeBytes": 0,
-                        "IndexStatus": "ACTIVE",
-                        "ItemCount": 0,
-                    }
-                )
-                gsi_provisioned_throughput = gsi.setdefault("ProvisionedThroughput", {})
-                gsi_provisioned_throughput["NumberOfDecreasesToday"] = 0
-
-                if billing_mode == BillingMode.PAY_PER_REQUEST:
-                    gsi_provisioned_throughput["ReadCapacityUnits"] = 0
-                    gsi_provisioned_throughput["WriteCapacityUnits"] = 0
-
-            table_description["GlobalSecondaryIndexes"] = gsis
-
-        if "ProvisionedThroughput" in table_description:
-            if "NumberOfDecreasesToday" not in table_description["ProvisionedThroughput"]:
-                table_description["ProvisionedThroughput"]["NumberOfDecreasesToday"] = 0
-
         tags = table_definitions.pop("Tags", [])
         if tags:
             get_store(context.account_id, context.region).TABLE_TAGS[table_arn] = {
@@ -779,8 +758,7 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
             if replica_region != context.region:
                 replica_description_list.append(replica_description)
 
-        if replica_description_list:
-            table_description.update({"Replicas": replica_description_list})
+        table_description.update({"Replicas": replica_description_list})
 
         # update only TableId and SSEDescription if present
         if table_definitions := store.table_definitions.get(table_name):
@@ -791,17 +769,6 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
                 table_description["TableClassSummary"] = {
                     "TableClass": table_definitions["TableClass"]
                 }
-
-        if "GlobalSecondaryIndexes" in table_description:
-            for gsi in table_description["GlobalSecondaryIndexes"]:
-                default_values = {
-                    "NumberOfDecreasesToday": 0,
-                    "ReadCapacityUnits": 0,
-                    "WriteCapacityUnits": 0,
-                }
-                # even if the billing mode is PAY_PER_REQUEST, AWS returns the Read and Write Capacity Units
-                # Terraform depends on this parity for update operations
-                gsi["ProvisionedThroughput"] = default_values | gsi.get("ProvisionedThroughput", {})
 
         return DescribeTableOutput(
             Table=select_from_typed_dict(TableDescription, table_description)
@@ -845,7 +812,7 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
 
                         match key:
                             case "Create":
-                                if target_region in replicas:
+                                if target_region in replicas.keys():
                                     raise ValidationException(
                                         f"Failed to create a the new replica of table with name: '{table_name}' because one or more replicas already existed as tables."
                                     )
@@ -890,10 +857,6 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
 
         SchemaExtractor.invalidate_table_schema(table_name, context.account_id, global_table_region)
 
-        schema = SchemaExtractor.get_table_schema(
-            table_name, context.account_id, global_table_region
-        )
-
         # TODO: DDB streams must also be created for replicas
         if update_table_input.get("StreamSpecification"):
             create_dynamodb_stream(
@@ -903,7 +866,7 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
                 result["TableDescription"].get("LatestStreamLabel"),
             )
 
-        return UpdateTableOutput(TableDescription=schema["Table"])
+        return result
 
     def list_tables(
         self,
@@ -1348,11 +1311,6 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
         #  find a way to make it better, same way as the other operations, by using returnvalues
         # see https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ql-reference.update.html
         statement = execute_statement_input["Statement"]
-        # We found out that 'Parameters' can be an empty list when the request comes from the AWS JS client.
-        if execute_statement_input.get("Parameters", None) == []:  # noqa
-            raise ValidationException(
-                "1 validation error detected: Value '[]' at 'parameters' failed to satisfy constraint: Member must have length greater than or equal to 1"
-            )
         table_name = extract_table_name_from_partiql_update(statement)
         existing_items = None
         stream_type = table_name and get_table_stream_type(
@@ -1796,11 +1754,8 @@ class DynamoDBProvider(DynamodbApi, ServiceLifecycleHook):
         """
         Set the correct account ID and region in ARNs returned by DynamoDB Local.
         """
-        partition = get_partition(region_name)
-        return (
-            arn.replace("arn:aws:", f"arn:{partition}:")
-            .replace(":ddblocal:", f":{region_name}:")
-            .replace(":000000000000:", f":{account_id}:")
+        return arn.replace(":ddblocal:", f":{region_name}:").replace(
+            ":000000000000:", f":{account_id}:"
         )
 
     def prepare_transact_write_item_records(

@@ -1,12 +1,9 @@
 import os
 from operator import itemgetter
 
-import pytest
-
 from localstack.testing.pytest import markers
 
 
-@pytest.mark.skip(reason="flaky")
 @markers.aws.validated
 @markers.snapshot.skip_snapshot_verify(
     paths=[

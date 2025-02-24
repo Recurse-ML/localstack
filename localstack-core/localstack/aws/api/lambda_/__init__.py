@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import IO, Dict, Iterable, Iterator, List, Optional, TypedDict, Union
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -23,11 +22,8 @@ Endpoint = str
 EnvironmentVariableName = str
 EnvironmentVariableValue = str
 EphemeralStorageSize = int
-EventSourceMappingArn = str
 EventSourceToken = str
 FileSystemArn = str
-FilterCriteriaErrorCode = str
-FilterCriteriaErrorMessage = str
 FunctionArn = str
 FunctionName = str
 FunctionUrl = str
@@ -56,13 +52,11 @@ MaxProvisionedConcurrencyConfigListItems = int
 MaximumBatchingWindowInSeconds = int
 MaximumConcurrency = int
 MaximumEventAgeInSeconds = int
-MaximumNumberOfPollers = int
 MaximumRecordAgeInSeconds = int
 MaximumRetryAttempts = int
 MaximumRetryAttemptsEventSourceMapping = int
 MemorySize = int
 Method = str
-MinimumNumberOfPollers = int
 NameSpacedFunctionArn = str
 NamespacedFunctionName = str
 NamespacedStatementId = str
@@ -93,15 +87,11 @@ String = str
 SubnetId = str
 TagKey = str
 TagValue = str
-TaggableResource = str
-TagsErrorCode = str
-TagsErrorMessage = str
 Timeout = int
 Timestamp = str
 Topic = str
 TumblingWindowInSeconds = int
 URI = str
-UnqualifiedFunctionName = str
 UnreservedConcurrentExecutions = int
 Version = str
 VpcId = str
@@ -109,7 +99,7 @@ Weight = float
 WorkingDirectory = str
 
 
-class ApplicationLogLevel(StrEnum):
+class ApplicationLogLevel(str):
     TRACE = "TRACE"
     DEBUG = "DEBUG"
     INFO = "INFO"
@@ -118,66 +108,62 @@ class ApplicationLogLevel(StrEnum):
     FATAL = "FATAL"
 
 
-class Architecture(StrEnum):
+class Architecture(str):
     x86_64 = "x86_64"
     arm64 = "arm64"
 
 
-class CodeSigningPolicy(StrEnum):
+class CodeSigningPolicy(str):
     Warn = "Warn"
     Enforce = "Enforce"
 
 
-class EndPointType(StrEnum):
+class EndPointType(str):
     KAFKA_BOOTSTRAP_SERVERS = "KAFKA_BOOTSTRAP_SERVERS"
 
 
-class EventSourceMappingMetric(StrEnum):
-    EventCount = "EventCount"
-
-
-class EventSourcePosition(StrEnum):
+class EventSourcePosition(str):
     TRIM_HORIZON = "TRIM_HORIZON"
     LATEST = "LATEST"
     AT_TIMESTAMP = "AT_TIMESTAMP"
 
 
-class FullDocument(StrEnum):
+class FullDocument(str):
     UpdateLookup = "UpdateLookup"
     Default = "Default"
 
 
-class FunctionResponseType(StrEnum):
+class FunctionResponseType(str):
     ReportBatchItemFailures = "ReportBatchItemFailures"
 
 
-class FunctionUrlAuthType(StrEnum):
+class FunctionUrlAuthType(str):
     NONE = "NONE"
     AWS_IAM = "AWS_IAM"
 
 
-class FunctionVersion(StrEnum):
+class FunctionVersion(str):
     ALL = "ALL"
 
 
-class InvocationType(StrEnum):
+class InvocationType(str):
     Event = "Event"
     RequestResponse = "RequestResponse"
     DryRun = "DryRun"
 
 
-class InvokeMode(StrEnum):
+class InvokeMode(str):
     BUFFERED = "BUFFERED"
     RESPONSE_STREAM = "RESPONSE_STREAM"
 
 
-class LastUpdateStatus(StrEnum):
+class LastUpdateStatus(str):
     Successful = "Successful"
     Failed = "Failed"
     InProgress = "InProgress"
 
 
-class LastUpdateStatusReasonCode(StrEnum):
+class LastUpdateStatusReasonCode(str):
     EniLimitExceeded = "EniLimitExceeded"
     InsufficientRolePermissions = "InsufficientRolePermissions"
     InvalidConfiguration = "InvalidConfiguration"
@@ -201,38 +187,33 @@ class LastUpdateStatusReasonCode(StrEnum):
     FunctionError = "FunctionError"
 
 
-class LogFormat(StrEnum):
+class LogFormat(str):
     JSON = "JSON"
     Text = "Text"
 
 
-class LogType(StrEnum):
+class LogType(str):
     None_ = "None"
     Tail = "Tail"
 
 
-class PackageType(StrEnum):
+class PackageType(str):
     Zip = "Zip"
     Image = "Image"
 
 
-class ProvisionedConcurrencyStatusEnum(StrEnum):
+class ProvisionedConcurrencyStatusEnum(str):
     IN_PROGRESS = "IN_PROGRESS"
     READY = "READY"
     FAILED = "FAILED"
 
 
-class RecursiveLoop(StrEnum):
-    Allow = "Allow"
-    Terminate = "Terminate"
-
-
-class ResponseStreamingInvocationType(StrEnum):
+class ResponseStreamingInvocationType(str):
     RequestResponse = "RequestResponse"
     DryRun = "DryRun"
 
 
-class Runtime(StrEnum):
+class Runtime(str):
     nodejs = "nodejs"
     nodejs4_3 = "nodejs4.3"
     nodejs6_10 = "nodejs6.10"
@@ -271,21 +252,19 @@ class Runtime(StrEnum):
     provided_al2023 = "provided.al2023"
     python3_12 = "python3.12"
     java21 = "java21"
-    python3_13 = "python3.13"
-    nodejs22_x = "nodejs22.x"
 
 
-class SnapStartApplyOn(StrEnum):
+class SnapStartApplyOn(str):
     PublishedVersions = "PublishedVersions"
     None_ = "None"
 
 
-class SnapStartOptimizationStatus(StrEnum):
+class SnapStartOptimizationStatus(str):
     On = "On"
     Off = "Off"
 
 
-class SourceAccessType(StrEnum):
+class SourceAccessType(str):
     BASIC_AUTH = "BASIC_AUTH"
     VPC_SUBNET = "VPC_SUBNET"
     VPC_SECURITY_GROUP = "VPC_SECURITY_GROUP"
@@ -296,14 +275,14 @@ class SourceAccessType(StrEnum):
     SERVER_ROOT_CA_CERTIFICATE = "SERVER_ROOT_CA_CERTIFICATE"
 
 
-class State(StrEnum):
+class State(str):
     Pending = "Pending"
     Active = "Active"
     Inactive = "Inactive"
     Failed = "Failed"
 
 
-class StateReasonCode(StrEnum):
+class StateReasonCode(str):
     Idle = "Idle"
     Creating = "Creating"
     Restoring = "Restoring"
@@ -330,13 +309,13 @@ class StateReasonCode(StrEnum):
     FunctionError = "FunctionError"
 
 
-class SystemLogLevel(StrEnum):
+class SystemLogLevel(str):
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARN = "WARN"
 
 
-class ThrottleReason(StrEnum):
+class ThrottleReason(str):
     ConcurrentInvocationLimitExceeded = "ConcurrentInvocationLimitExceeded"
     FunctionInvocationRateLimitExceeded = "FunctionInvocationRateLimitExceeded"
     ReservedFunctionConcurrentInvocationLimitExceeded = (
@@ -347,12 +326,12 @@ class ThrottleReason(StrEnum):
     ConcurrentSnapshotCreateLimitExceeded = "ConcurrentSnapshotCreateLimitExceeded"
 
 
-class TracingMode(StrEnum):
+class TracingMode(str):
     Active = "Active"
     PassThrough = "PassThrough"
 
 
-class UpdateRuntimeOn(StrEnum):
+class UpdateRuntimeOn(str):
     Auto = "Auto"
     Manual = "Manual"
     FunctionUpdate = "FunctionUpdate"
@@ -756,30 +735,14 @@ class CreateAliasRequest(ServiceRequest):
     RoutingConfig: Optional[AliasRoutingConfiguration]
 
 
-Tags = Dict[TagKey, TagValue]
-
-
 class CreateCodeSigningConfigRequest(ServiceRequest):
     Description: Optional[Description]
     AllowedPublishers: AllowedPublishers
     CodeSigningPolicies: Optional[CodeSigningPolicies]
-    Tags: Optional[Tags]
 
 
 class CreateCodeSigningConfigResponse(TypedDict, total=False):
     CodeSigningConfig: CodeSigningConfig
-
-
-class ProvisionedPollerConfig(TypedDict, total=False):
-    MinimumPollers: Optional[MinimumNumberOfPollers]
-    MaximumPollers: Optional[MaximumNumberOfPollers]
-
-
-EventSourceMappingMetricList = List[EventSourceMappingMetric]
-
-
-class EventSourceMappingMetricsConfig(TypedDict, total=False):
-    Metrics: Optional[EventSourceMappingMetricList]
 
 
 class DocumentDBEventSourceConfig(TypedDict, total=False):
@@ -856,7 +819,6 @@ class CreateEventSourceMappingRequest(ServiceRequest):
     MaximumRecordAgeInSeconds: Optional[MaximumRecordAgeInSeconds]
     BisectBatchOnFunctionError: Optional[BisectBatchOnFunctionError]
     MaximumRetryAttempts: Optional[MaximumRetryAttemptsEventSourceMapping]
-    Tags: Optional[Tags]
     TumblingWindowInSeconds: Optional[TumblingWindowInSeconds]
     Topics: Optional[Topics]
     Queues: Optional[Queues]
@@ -867,9 +829,6 @@ class CreateEventSourceMappingRequest(ServiceRequest):
     SelfManagedKafkaEventSourceConfig: Optional[SelfManagedKafkaEventSourceConfig]
     ScalingConfig: Optional[ScalingConfig]
     DocumentDBEventSourceConfig: Optional[DocumentDBEventSourceConfig]
-    KMSKeyArn: Optional[KMSKeyArn]
-    MetricsConfig: Optional[EventSourceMappingMetricsConfig]
-    ProvisionedPollerConfig: Optional[ProvisionedPollerConfig]
 
 
 class LoggingConfig(TypedDict, total=False):
@@ -903,6 +862,7 @@ class FileSystemConfig(TypedDict, total=False):
 
 FileSystemConfigList = List[FileSystemConfig]
 LayerList = List[LayerVersionArn]
+Tags = Dict[TagKey, TagValue]
 
 
 class TracingConfig(TypedDict, total=False):
@@ -936,7 +896,6 @@ class FunctionCode(TypedDict, total=False):
     S3Key: Optional[S3Key]
     S3ObjectVersion: Optional[S3ObjectVersion]
     ImageUri: Optional[String]
-    SourceKMSKeyArn: Optional[KMSKeyArn]
 
 
 class CreateFunctionRequest(ServiceRequest):
@@ -1043,11 +1002,6 @@ class EnvironmentResponse(TypedDict, total=False):
     Error: Optional[EnvironmentError]
 
 
-class FilterCriteriaError(TypedDict, total=False):
-    ErrorCode: Optional[FilterCriteriaErrorCode]
-    Message: Optional[FilterCriteriaErrorMessage]
-
-
 class EventSourceMappingConfiguration(TypedDict, total=False):
     UUID: Optional[String]
     StartingPosition: Optional[EventSourcePosition]
@@ -1076,11 +1030,6 @@ class EventSourceMappingConfiguration(TypedDict, total=False):
     SelfManagedKafkaEventSourceConfig: Optional[SelfManagedKafkaEventSourceConfig]
     ScalingConfig: Optional[ScalingConfig]
     DocumentDBEventSourceConfig: Optional[DocumentDBEventSourceConfig]
-    KMSKeyArn: Optional[KMSKeyArn]
-    FilterCriteriaError: Optional[FilterCriteriaError]
-    EventSourceMappingArn: Optional[EventSourceMappingArn]
-    MetricsConfig: Optional[EventSourceMappingMetricsConfig]
-    ProvisionedPollerConfig: Optional[ProvisionedPollerConfig]
 
 
 EventSourceMappingsList = List[EventSourceMappingConfiguration]
@@ -1092,7 +1041,6 @@ class FunctionCodeLocation(TypedDict, total=False):
     Location: Optional[String]
     ImageUri: Optional[String]
     ResolvedImageUri: Optional[String]
-    SourceKMSKeyArn: Optional[String]
 
 
 class RuntimeVersionError(TypedDict, total=False):
@@ -1258,29 +1206,15 @@ class GetFunctionEventInvokeConfigRequest(ServiceRequest):
     Qualifier: Optional[Qualifier]
 
 
-class GetFunctionRecursionConfigRequest(ServiceRequest):
-    FunctionName: UnqualifiedFunctionName
-
-
-class GetFunctionRecursionConfigResponse(TypedDict, total=False):
-    RecursiveLoop: Optional[RecursiveLoop]
-
-
 class GetFunctionRequest(ServiceRequest):
     FunctionName: NamespacedFunctionName
     Qualifier: Optional[Qualifier]
-
-
-class TagsError(TypedDict, total=False):
-    ErrorCode: TagsErrorCode
-    Message: TagsErrorMessage
 
 
 class GetFunctionResponse(TypedDict, total=False):
     Configuration: Optional[FunctionConfiguration]
     Code: Optional[FunctionCodeLocation]
     Tags: Optional[Tags]
-    TagsError: Optional[TagsError]
     Concurrency: Optional[Concurrency]
 
 
@@ -1588,7 +1522,7 @@ class ListProvisionedConcurrencyConfigsResponse(TypedDict, total=False):
 
 
 class ListTagsRequest(ServiceRequest):
-    Resource: TaggableResource
+    Resource: FunctionArn
 
 
 class ListTagsResponse(TypedDict, total=False):
@@ -1657,15 +1591,6 @@ class PutFunctionEventInvokeConfigRequest(ServiceRequest):
     DestinationConfig: Optional[DestinationConfig]
 
 
-class PutFunctionRecursionConfigRequest(ServiceRequest):
-    FunctionName: UnqualifiedFunctionName
-    RecursiveLoop: RecursiveLoop
-
-
-class PutFunctionRecursionConfigResponse(TypedDict, total=False):
-    RecursiveLoop: Optional[RecursiveLoop]
-
-
 class PutProvisionedConcurrencyConfigRequest(ServiceRequest):
     FunctionName: FunctionName
     Qualifier: Qualifier
@@ -1712,12 +1637,12 @@ TagKeyList = List[TagKey]
 
 
 class TagResourceRequest(ServiceRequest):
-    Resource: TaggableResource
+    Resource: FunctionArn
     Tags: Tags
 
 
 class UntagResourceRequest(ServiceRequest):
-    Resource: TaggableResource
+    Resource: FunctionArn
     TagKeys: TagKeyList
 
 
@@ -1758,9 +1683,6 @@ class UpdateEventSourceMappingRequest(ServiceRequest):
     FunctionResponseTypes: Optional[FunctionResponseTypeList]
     ScalingConfig: Optional[ScalingConfig]
     DocumentDBEventSourceConfig: Optional[DocumentDBEventSourceConfig]
-    KMSKeyArn: Optional[KMSKeyArn]
-    MetricsConfig: Optional[EventSourceMappingMetricsConfig]
-    ProvisionedPollerConfig: Optional[ProvisionedPollerConfig]
 
 
 class UpdateFunctionCodeRequest(ServiceRequest):
@@ -1774,7 +1696,6 @@ class UpdateFunctionCodeRequest(ServiceRequest):
     DryRun: Optional[Boolean]
     RevisionId: Optional[String]
     Architectures: Optional[ArchitecturesList]
-    SourceKMSKeyArn: Optional[KMSKeyArn]
 
 
 class UpdateFunctionConfigurationRequest(ServiceRequest):
@@ -1883,7 +1804,6 @@ class LambdaApi:
         allowed_publishers: AllowedPublishers,
         description: Description = None,
         code_signing_policies: CodeSigningPolicies = None,
-        tags: Tags = None,
         **kwargs,
     ) -> CreateCodeSigningConfigResponse:
         raise NotImplementedError
@@ -1905,7 +1825,6 @@ class LambdaApi:
         maximum_record_age_in_seconds: MaximumRecordAgeInSeconds = None,
         bisect_batch_on_function_error: BisectBatchOnFunctionError = None,
         maximum_retry_attempts: MaximumRetryAttemptsEventSourceMapping = None,
-        tags: Tags = None,
         tumbling_window_in_seconds: TumblingWindowInSeconds = None,
         topics: Topics = None,
         queues: Queues = None,
@@ -1916,9 +1835,6 @@ class LambdaApi:
         self_managed_kafka_event_source_config: SelfManagedKafkaEventSourceConfig = None,
         scaling_config: ScalingConfig = None,
         document_db_event_source_config: DocumentDBEventSourceConfig = None,
-        kms_key_arn: KMSKeyArn = None,
-        metrics_config: EventSourceMappingMetricsConfig = None,
-        provisioned_poller_config: ProvisionedPollerConfig = None,
         **kwargs,
     ) -> EventSourceMappingConfiguration:
         raise NotImplementedError
@@ -2106,12 +2022,6 @@ class LambdaApi:
         qualifier: Qualifier = None,
         **kwargs,
     ) -> FunctionEventInvokeConfig:
-        raise NotImplementedError
-
-    @handler("GetFunctionRecursionConfig")
-    def get_function_recursion_config(
-        self, context: RequestContext, function_name: UnqualifiedFunctionName, **kwargs
-    ) -> GetFunctionRecursionConfigResponse:
         raise NotImplementedError
 
     @handler("GetFunctionUrlConfig")
@@ -2331,7 +2241,7 @@ class LambdaApi:
 
     @handler("ListTags")
     def list_tags(
-        self, context: RequestContext, resource: TaggableResource, **kwargs
+        self, context: RequestContext, resource: FunctionArn, **kwargs
     ) -> ListTagsResponse:
         raise NotImplementedError
 
@@ -2405,16 +2315,6 @@ class LambdaApi:
     ) -> FunctionEventInvokeConfig:
         raise NotImplementedError
 
-    @handler("PutFunctionRecursionConfig")
-    def put_function_recursion_config(
-        self,
-        context: RequestContext,
-        function_name: UnqualifiedFunctionName,
-        recursive_loop: RecursiveLoop,
-        **kwargs,
-    ) -> PutFunctionRecursionConfigResponse:
-        raise NotImplementedError
-
     @handler("PutProvisionedConcurrencyConfig")
     def put_provisioned_concurrency_config(
         self,
@@ -2464,13 +2364,13 @@ class LambdaApi:
 
     @handler("TagResource")
     def tag_resource(
-        self, context: RequestContext, resource: TaggableResource, tags: Tags, **kwargs
+        self, context: RequestContext, resource: FunctionArn, tags: Tags, **kwargs
     ) -> None:
         raise NotImplementedError
 
     @handler("UntagResource")
     def untag_resource(
-        self, context: RequestContext, resource: TaggableResource, tag_keys: TagKeyList, **kwargs
+        self, context: RequestContext, resource: FunctionArn, tag_keys: TagKeyList, **kwargs
     ) -> None:
         raise NotImplementedError
 
@@ -2520,9 +2420,6 @@ class LambdaApi:
         function_response_types: FunctionResponseTypeList = None,
         scaling_config: ScalingConfig = None,
         document_db_event_source_config: DocumentDBEventSourceConfig = None,
-        kms_key_arn: KMSKeyArn = None,
-        metrics_config: EventSourceMappingMetricsConfig = None,
-        provisioned_poller_config: ProvisionedPollerConfig = None,
         **kwargs,
     ) -> EventSourceMappingConfiguration:
         raise NotImplementedError
@@ -2541,7 +2438,6 @@ class LambdaApi:
         dry_run: Boolean = None,
         revision_id: String = None,
         architectures: ArchitecturesList = None,
-        source_kms_key_arn: KMSKeyArn = None,
         **kwargs,
     ) -> FunctionConfiguration:
         raise NotImplementedError

@@ -11,8 +11,7 @@ from moto.apigateway.exceptions import (
 from moto.apigateway.responses import APIGatewayResponse
 from moto.core.utils import camelcase_to_underscores
 
-from localstack.constants import TAG_KEY_CUSTOM_ID
-from localstack.services.apigateway.helpers import apply_json_patch_safe
+from localstack.services.apigateway.helpers import TAG_KEY_CUSTOM_ID, apply_json_patch_safe
 from localstack.utils.common import str_to_bool
 from localstack.utils.patch import patch
 
@@ -145,7 +144,6 @@ def apply_patches():
 
         return result
 
-    # TODO remove this patch when the behavior is implemented in moto
     @patch(apigateway_models.APIGatewayBackend.create_rest_api)
     def create_rest_api(fn, self, *args, tags=None, **kwargs):
         """

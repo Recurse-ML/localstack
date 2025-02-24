@@ -1,8 +1,6 @@
 """Core concepts of the persistence API."""
 
 import io
-import os
-import pathlib
 from typing import IO, Any, Protocol, runtime_checkable
 
 
@@ -77,23 +75,20 @@ class AssetDirectory:
     """
 
     service_name: str
-    path: pathlib.Path
+    path: str
 
-    def __init__(self, service_name: str, path: str | os.PathLike):
+    def __init__(self, service_name: str, path: str):
         if not service_name:
             raise ValueError("service name must be set")
 
         if not path:
             raise ValueError("path must be set")
 
-        if not isinstance(path, os.PathLike):
-            path = pathlib.Path(path)
-
         self.service_name = service_name
         self.path = path
 
-    def __str__(self) -> str:
-        return str(self.path)
+    def __str__(self):
+        return self.path
 
 
 class Encoder:

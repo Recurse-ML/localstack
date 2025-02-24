@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -25,18 +24,18 @@ TagsPerPage = int
 TargetId = str
 
 
-class ErrorCode(StrEnum):
+class ErrorCode(str):
     InternalServiceException = "InternalServiceException"
     InvalidParameterException = "InvalidParameterException"
 
 
-class GroupByAttribute(StrEnum):
+class GroupByAttribute(str):
     TARGET_ID = "TARGET_ID"
     REGION = "REGION"
     RESOURCE_TYPE = "RESOURCE_TYPE"
 
 
-class TargetIdType(StrEnum):
+class TargetIdType(str):
     ACCOUNT = "ACCOUNT"
     OU = "OU"
     ROOT = "ROOT"

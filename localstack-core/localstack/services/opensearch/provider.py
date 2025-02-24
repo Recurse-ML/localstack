@@ -17,7 +17,6 @@ from localstack.aws.api.opensearch import (
     AdvancedSecurityOptions,
     AdvancedSecurityOptionsInput,
     AdvancedSecurityOptionsStatus,
-    AIMLOptionsInput,
     AutoTuneDesiredState,
     AutoTuneOptions,
     AutoTuneOptionsInput,
@@ -49,7 +48,6 @@ from localstack.aws.api.opensearch import (
     EncryptionAtRestOptionsStatus,
     EngineType,
     GetCompatibleVersionsResponse,
-    IdentityCenterOptionsInput,
     IPAddressType,
     ListDomainNamesResponse,
     ListTagsResponse,
@@ -436,7 +434,7 @@ class OpensearchProvider(OpensearchApi, ServiceLifecycleHook):
                     # cluster already restored in previous call to on_after_state_load
                     continue
 
-                LOG.info("Restoring domain %s in region %s.", domain_name, region)
+                LOG.info(f"Restoring domain {domain_name} in region {region}.")
                 try:
                     preferred_port = None
                     if config.OPENSEARCH_ENDPOINT_STRATEGY == "port":
@@ -458,11 +456,7 @@ class OpensearchProvider(OpensearchApi, ServiceLifecycleHook):
                         preferred_port=preferred_port,
                     )
                 except Exception:
-                    LOG.exception(
-                        "Could not restore domain %s in region %s.",
-                        domain_name,
-                        region,
-                    )
+                    LOG.exception(f"Could not restore domain {domain_name} in region {region}.")
 
     def on_before_state_reset(self):
         self._stop_clusters()
@@ -493,12 +487,10 @@ class OpensearchProvider(OpensearchApi, ServiceLifecycleHook):
         log_publishing_options: LogPublishingOptions = None,
         domain_endpoint_options: DomainEndpointOptions = None,
         advanced_security_options: AdvancedSecurityOptionsInput = None,
-        identity_center_options: IdentityCenterOptionsInput = None,
         tag_list: TagList = None,
         auto_tune_options: AutoTuneOptionsInput = None,
         off_peak_window_options: OffPeakWindowOptions = None,
         software_update_options: SoftwareUpdateOptions = None,
-        aiml_options: AIMLOptionsInput = None,
         **kwargs,
     ) -> CreateDomainResponse:
         store = self.get_store(context.account_id, context.region)

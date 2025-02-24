@@ -139,13 +139,13 @@ class SchemaProvider:
             ) from e
 
 
-LOCALSTACK_ROOT_DIR = Path(__file__).parent.joinpath("../../../../..").resolve()
-LOCALSTACK_PRO_ROOT_DIR = LOCALSTACK_ROOT_DIR.joinpath("../localstack-ext").resolve()
+LOCALSTACK_ROOT_DIR = Path(__file__).parent.joinpath("../../../..").resolve()
+LOCALSTACK_PRO_ROOT_DIR = LOCALSTACK_ROOT_DIR.joinpath("../../localstack-ext").resolve()
 TESTS_ROOT_DIR = LOCALSTACK_ROOT_DIR.joinpath(
-    "tests/aws/services/cloudformation/resource_providers"
+    "../tests/aws/services/cloudformation/resource_providers"
 )
 TESTS_PRO_ROOT_DIR = LOCALSTACK_PRO_ROOT_DIR.joinpath(
-    "localstack-pro-core/tests/aws/services/cloudformation/resource_providers"
+    "tests/aws/services/cloudformation/resource_providers"
 )
 
 assert LOCALSTACK_ROOT_DIR.is_dir(), f"{LOCALSTACK_ROOT_DIR} does not exist"
@@ -500,29 +500,23 @@ class FileWriter:
         self.overwrite = overwrite
         self.pro = pro
 
-        base_path = (
-            ["localstack-pro-core", "localstack", "pro", "core"]
-            if self.pro
-            else ["localstack-core", "localstack"]
-        )
-
         self.destination_files = {
             FileType.provider: root_dir(self.pro).joinpath(
-                *base_path,
+                "localstack_ext" if self.pro else "localstack",
                 "services",
                 self.resource_name.python_compatible_service_name.lower(),
                 "resource_providers",
                 f"{self.resource_name.namespace.lower()}_{self.resource_name.service.lower()}_{self.resource_name.resource.lower()}.py",
             ),
             FileType.plugin: root_dir(self.pro).joinpath(
-                *base_path,
+                "localstack_ext" if self.pro else "localstack",
                 "services",
                 self.resource_name.python_compatible_service_name.lower(),
                 "resource_providers",
                 f"{self.resource_name.namespace.lower()}_{self.resource_name.service.lower()}_{self.resource_name.resource.lower()}_plugin.py",
             ),
             FileType.schema: root_dir(self.pro).joinpath(
-                *base_path,
+                "localstack_ext" if self.pro else "localstack",
                 "services",
                 self.resource_name.python_compatible_service_name.lower(),
                 "resource_providers",

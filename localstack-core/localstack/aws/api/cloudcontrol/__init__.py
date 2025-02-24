@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -7,10 +6,6 @@ from localstack.aws.api import RequestContext, ServiceException, ServiceRequest,
 ClientToken = str
 ErrorMessage = str
 HandlerNextToken = str
-HookFailureMode = str
-HookInvocationPoint = str
-HookStatus = str
-HookTypeArn = str
 Identifier = str
 MaxResults = int
 NextToken = str
@@ -23,11 +18,10 @@ TypeName = str
 TypeVersionId = str
 
 
-class HandlerErrorCode(StrEnum):
+class HandlerErrorCode(str):
     NotUpdatable = "NotUpdatable"
     InvalidRequest = "InvalidRequest"
     AccessDenied = "AccessDenied"
-    UnauthorizedTaggingOperation = "UnauthorizedTaggingOperation"
     InvalidCredentials = "InvalidCredentials"
     AlreadyExists = "AlreadyExists"
     NotFound = "NotFound"
@@ -42,13 +36,13 @@ class HandlerErrorCode(StrEnum):
     InternalFailure = "InternalFailure"
 
 
-class Operation(StrEnum):
+class Operation(str):
     CREATE = "CREATE"
     DELETE = "DELETE"
     UPDATE = "UPDATE"
 
 
-class OperationStatus(StrEnum):
+class OperationStatus(str):
     PENDING = "PENDING"
     IN_PROGRESS = "IN_PROGRESS"
     SUCCESS = "SUCCESS"
@@ -194,7 +188,6 @@ class ProgressEvent(TypedDict, total=False):
     TypeName: Optional[TypeName]
     Identifier: Optional[Identifier]
     RequestToken: Optional[RequestToken]
-    HooksRequestToken: Optional[RequestToken]
     Operation: Optional[Operation]
     OperationStatus: Optional[OperationStatus]
     EventTime: Optional[Timestamp]
@@ -253,23 +246,8 @@ class GetResourceRequestStatusInput(ServiceRequest):
     RequestToken: RequestToken
 
 
-class HookProgressEvent(TypedDict, total=False):
-    HookTypeName: Optional[TypeName]
-    HookTypeVersionId: Optional[TypeVersionId]
-    HookTypeArn: Optional[HookTypeArn]
-    InvocationPoint: Optional[HookInvocationPoint]
-    HookStatus: Optional[HookStatus]
-    HookEventTime: Optional[Timestamp]
-    HookStatusMessage: Optional[StatusMessage]
-    FailureMode: Optional[HookFailureMode]
-
-
-HooksProgressEvent = List[HookProgressEvent]
-
-
 class GetResourceRequestStatusOutput(TypedDict, total=False):
     ProgressEvent: Optional[ProgressEvent]
-    HooksProgressEvent: Optional[HooksProgressEvent]
 
 
 OperationStatuses = List[OperationStatus]

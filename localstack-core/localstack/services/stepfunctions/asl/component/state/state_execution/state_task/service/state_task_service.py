@@ -3,7 +3,6 @@ from __future__ import annotations
 import abc
 import copy
 import json
-import logging
 from typing import Any, Final, Optional, Union
 
 from botocore.model import ListShape, OperationModel, Shape, StringShape, StructureShape
@@ -12,7 +11,6 @@ from botocore.response import StreamingBody
 from localstack.aws.api.stepfunctions import (
     HistoryEventExecutionDataDetails,
     HistoryEventType,
-    TaskCredentials,
     TaskFailedEventDetails,
     TaskScheduledEventDetails,
     TaskStartedEventDetails,
@@ -30,9 +28,6 @@ from localstack.services.stepfunctions.asl.component.common.error_name.states_er
 from localstack.services.stepfunctions.asl.component.common.error_name.states_error_name_type import (
     StatesErrorNameType,
 )
-from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.credentials import (
-    StateCredentials,
-)
 from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.service.resource import (
     ResourceRuntimePart,
     ServiceResource,
@@ -40,14 +35,11 @@ from localstack.services.stepfunctions.asl.component.state.state_execution.state
 from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.state_task import (
     StateTask,
 )
-from localstack.services.stepfunctions.asl.component.state.state_props import StateProps
 from localstack.services.stepfunctions.asl.eval.environment import Environment
 from localstack.services.stepfunctions.asl.eval.event.event_detail import EventDetails
 from localstack.services.stepfunctions.asl.utils.encoding import to_json_str
 from localstack.services.stepfunctions.quotas import is_within_size_quota
 from localstack.utils.strings import camel_to_snake_case, snake_to_camel_case, to_bytes, to_str
-
-LOG = logging.getLogger(__name__)
 
 
 class StateTaskService(StateTask, abc.ABC):
@@ -57,20 +49,6 @@ class StateTaskService(StateTask, abc.ABC):
         "sfn": "stepfunctions",
         "states": "stepfunctions",
     }
-
-    def from_state_props(self, state_props: StateProps) -> None:
-        super().from_state_props(state_props=state_props)
-        # Validate the service integration is supported on program creation.
-        self._validate_service_integration_is_supported()
-
-    def _validate_service_integration_is_supported(self):
-        # Validate the service integration is supported.
-        supported_parameters = self._get_supported_parameters()
-        if supported_parameters is None:
-            raise ValueError(
-                f"The resource provided {self.resource.resource_arn} not recognized. "
-                "The value is not a valid resource ARN, or the resource is not available in this region."
-            )
 
     def _get_sfn_resource(self) -> str:
         return self.resource.api_action
@@ -117,24 +95,15 @@ class StateTaskService(StateTask, abc.ABC):
         boto_request_value = request_value
         if isinstance(value_shape, StructureShape):
             self._to_boto_request(request_value, value_shape)
-        elif isinstance(value_shape, ListShape) and isinstance(request_value, list):
-            for request_list_value in request_value:
-                self._to_boto_request_value(request_list_value, value_shape.member)  # noqa
         elif isinstance(value_shape, StringShape) and not isinstance(request_value, str):
             boto_request_value = to_json_str(request_value)
         elif value_shape.type_name == "blob" and not isinstance(boto_request_value, bytes):
-            boto_request_value = to_json_str(request_value, separators=(",", ":"))
+            if not isinstance(boto_request_value, str):
+                boto_request_value = to_json_str(request_value, separators=(":", ","))
             boto_request_value = to_bytes(boto_request_value)
         return boto_request_value
 
     def _to_boto_request(self, parameters: dict, structure_shape: StructureShape) -> None:
-        if not isinstance(structure_shape, StructureShape):
-            LOG.warning(
-                "Step Functions could not normalise the request for integration '%s' due to the unexpected request template value of type '%s'",
-                self.resource.resource_arn,
-                type(structure_shape),
-            )
-            return
         shape_members = structure_shape.members
         norm_member_binds: dict[str, tuple[str, StructureShape]] = {
             camel_to_snake_case(member_key): (member_key, member_value)
@@ -171,14 +140,6 @@ class StateTaskService(StateTask, abc.ABC):
 
     def _from_boto_response(self, response: Any, structure_shape: StructureShape) -> None:
         if not isinstance(response, dict):
-            return
-
-        if not isinstance(structure_shape, StructureShape):
-            LOG.warning(
-                "Step Functions could not normalise the response of integration '%s' due to the unexpected request template value of type '%s'",
-                self.resource.resource_arn,
-                type(structure_shape),
-            )
             return
 
         shape_members = structure_shape.members
@@ -267,15 +228,10 @@ class StateTaskService(StateTask, abc.ABC):
         env: Environment,
         resource_runtime_part: ResourceRuntimePart,
         normalised_parameters: dict,
-        state_credentials: StateCredentials,
     ): ...
 
     def _before_eval_execution(
-        self,
-        env: Environment,
-        resource_runtime_part: ResourceRuntimePart,
-        raw_parameters: dict,
-        state_credentials: StateCredentials,
+        self, env: Environment, resource_runtime_part: ResourceRuntimePart, raw_parameters: dict
     ) -> None:
         parameters_str = to_json_str(raw_parameters)
 
@@ -293,10 +249,6 @@ class StateTaskService(StateTask, abc.ABC):
             self.heartbeat.eval(env=env)
             heartbeat_seconds = env.stack.pop()
             scheduled_event_details["heartbeatInSeconds"] = heartbeat_seconds
-        if self.credentials:
-            scheduled_event_details["taskCredentials"] = TaskCredentials(
-                roleArn=state_credentials.role_arn
-            )
         env.event_manager.add_event(
             context=env.event_history_context,
             event_type=HistoryEventType.TaskScheduled,
@@ -318,7 +270,6 @@ class StateTaskService(StateTask, abc.ABC):
         env: Environment,
         resource_runtime_part: ResourceRuntimePart,
         normalised_parameters: dict,
-        state_credentials: StateCredentials,
     ) -> None:
         output = env.stack[-1]
         self._verify_size_quota(env=env, value=output)
@@ -340,13 +291,9 @@ class StateTaskService(StateTask, abc.ABC):
         resource_runtime_part: ResourceRuntimePart = env.stack.pop()
 
         raw_parameters = self._eval_parameters(env=env)
-        state_credentials = self._eval_state_credentials(env=env)
 
         self._before_eval_execution(
-            env=env,
-            resource_runtime_part=resource_runtime_part,
-            raw_parameters=raw_parameters,
-            state_credentials=state_credentials,
+            env=env, resource_runtime_part=resource_runtime_part, raw_parameters=raw_parameters
         )
 
         normalised_parameters = copy.deepcopy(raw_parameters)
@@ -356,7 +303,6 @@ class StateTaskService(StateTask, abc.ABC):
             env=env,
             resource_runtime_part=resource_runtime_part,
             normalised_parameters=normalised_parameters,
-            state_credentials=state_credentials,
         )
 
         output_value = env.stack[-1]
@@ -366,5 +312,4 @@ class StateTaskService(StateTask, abc.ABC):
             env=env,
             resource_runtime_part=resource_runtime_part,
             normalised_parameters=normalised_parameters,
-            state_credentials=state_credentials,
         )

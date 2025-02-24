@@ -2,6 +2,8 @@ import os
 
 from localstack.version import __version__
 
+# temporary fix to avoid issues with missing version package in image
+# FIXME: remove this once all images contain the version package
 VERSION = __version__
 
 # HTTP headers used to forward proxy request URLs
@@ -20,9 +22,6 @@ LOCALHOST = "localhost"
 LOCALHOST_IP = "127.0.0.1"
 LOCALHOST_HOSTNAME = "localhost.localstack.cloud"
 
-# User-agent string used in outgoing HTTP requests made by LocalStack
-USER_AGENT_STRING = f"localstack/{VERSION}"
-
 # version of the Maven dependency with Java utility code
 LOCALSTACK_MAVEN_VERSION = "0.2.21"
 MAVEN_REPO_URL = "https://repo1.maven.org/maven2"
@@ -30,8 +29,9 @@ MAVEN_REPO_URL = "https://repo1.maven.org/maven2"
 # URL of localstack's artifacts repository on GitHub
 ARTIFACTS_REPO = "https://github.com/localstack/localstack-artifacts"
 
-# Artifacts endpoint
-ASSETS_ENDPOINT = "https://assets.localstack.cloud"
+# Download URLs
+SSL_CERT_URL = f"{ARTIFACTS_REPO}/raw/master/local-certs/server.key"
+SSL_CERT_URL_FALLBACK = "{api_endpoint}/proxy/localstack.cert.key"
 
 # host to bind to when starting the services
 BIND_HOST = "0.0.0.0"
@@ -75,7 +75,7 @@ ENV_INTERNAL_TEST_RUN = "LOCALSTACK_INTERNAL_TEST_RUN"
 # environment variable name to tag collect metrics during a test run
 ENV_INTERNAL_TEST_COLLECT_METRIC = "LOCALSTACK_INTERNAL_TEST_COLLECT_METRIC"
 
-# environment variable that flags whether pro was activated. do not use it for security purposes!
+# environment variable that flags whether pro was activated. do not use for security purposes!
 ENV_PRO_ACTIVATED = "PRO_ACTIVATED"
 
 # content types / encodings
@@ -128,7 +128,7 @@ API_ENDPOINT = os.environ.get("API_ENDPOINT") or "https://api.localstack.cloud/v
 # new analytics API endpoint
 ANALYTICS_API = os.environ.get("ANALYTICS_API") or "https://analytics.localstack.cloud/v1"
 
-# environment variable to indicate this process should run the localstack infrastructure
+# environment variable to indicates this process should run the localstack infrastructure
 LOCALSTACK_INFRA_PROCESS = "LOCALSTACK_INFRA_PROCESS"
 
 # AWS region us-east-1
@@ -178,6 +178,3 @@ READY_MARKER_OUTPUT = "Ready."
 # eg.
 #   Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request
 AUTH_CREDENTIAL_REGEX = r"Credential=(?P<access_key_id>[a-zA-Z0-9-_.]{1,})/(?P<date>\d{8})/(?P<region_name>[a-z0-9-]{1,})/(?P<service_name>[a-z0-9]{1,})/"
-
-# Custom resource tag to override the generated resource ID.
-TAG_KEY_CUSTOM_ID = "_custom_id_"

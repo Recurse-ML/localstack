@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -29,16 +28,13 @@ ClientToken = str
 ConfigurationSchema = str
 ConnectionArn = str
 Description = str
-DetectionReason = str
 DisableRollback = bool
 DriftedStackInstancesCount = int
-EnableStackCreation = bool
 EnableTerminationProtection = bool
 ErrorCode = str
 ErrorMessage = str
 EventId = str
 ExecutionRoleName = str
-ExecutionStatusReason = str
 ExportName = str
 ExportValue = str
 FailedStackInstancesCount = int
@@ -47,7 +43,6 @@ FailureTolerancePercentage = int
 GeneratedTemplateId = str
 GeneratedTemplateName = str
 HookInvocationCount = int
-HookResultId = str
 HookStatusReason = str
 HookTargetTypeName = str
 HookType = str
@@ -146,9 +141,6 @@ StackPolicyBody = str
 StackPolicyDuringUpdateBody = str
 StackPolicyDuringUpdateURL = str
 StackPolicyURL = str
-StackRefactorId = str
-StackRefactorResourceIdentifier = str
-StackRefactorStatusReason = str
 StackSetARN = str
 StackSetId = str
 StackSetName = str
@@ -187,44 +179,44 @@ Value = str
 Version = str
 
 
-class AccountFilterType(StrEnum):
+class AccountFilterType(str):
     NONE = "NONE"
     INTERSECTION = "INTERSECTION"
     DIFFERENCE = "DIFFERENCE"
     UNION = "UNION"
 
 
-class AccountGateStatus(StrEnum):
+class AccountGateStatus(str):
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     SKIPPED = "SKIPPED"
 
 
-class AttributeChangeType(StrEnum):
+class AttributeChangeType(str):
     Add = "Add"
     Remove = "Remove"
     Modify = "Modify"
 
 
-class CallAs(StrEnum):
+class CallAs(str):
     SELF = "SELF"
     DELEGATED_ADMIN = "DELEGATED_ADMIN"
 
 
-class Capability(StrEnum):
+class Capability(str):
     CAPABILITY_IAM = "CAPABILITY_IAM"
     CAPABILITY_NAMED_IAM = "CAPABILITY_NAMED_IAM"
     CAPABILITY_AUTO_EXPAND = "CAPABILITY_AUTO_EXPAND"
 
 
-class Category(StrEnum):
+class Category(str):
     REGISTERED = "REGISTERED"
     ACTIVATED = "ACTIVATED"
     THIRD_PARTY = "THIRD_PARTY"
     AWS_TYPES = "AWS_TYPES"
 
 
-class ChangeAction(StrEnum):
+class ChangeAction(str):
     Add = "Add"
     Modify = "Modify"
     Remove = "Remove"
@@ -232,13 +224,13 @@ class ChangeAction(StrEnum):
     Dynamic = "Dynamic"
 
 
-class ChangeSetHooksStatus(StrEnum):
+class ChangeSetHooksStatus(str):
     PLANNING = "PLANNING"
     PLANNED = "PLANNED"
     UNAVAILABLE = "UNAVAILABLE"
 
 
-class ChangeSetStatus(StrEnum):
+class ChangeSetStatus(str):
     CREATE_PENDING = "CREATE_PENDING"
     CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
     CREATE_COMPLETE = "CREATE_COMPLETE"
@@ -249,13 +241,13 @@ class ChangeSetStatus(StrEnum):
     FAILED = "FAILED"
 
 
-class ChangeSetType(StrEnum):
+class ChangeSetType(str):
     CREATE = "CREATE"
     UPDATE = "UPDATE"
     IMPORT = "IMPORT"
 
 
-class ChangeSource(StrEnum):
+class ChangeSource(str):
     ResourceReference = "ResourceReference"
     ParameterReference = "ParameterReference"
     ResourceAttribute = "ResourceAttribute"
@@ -263,42 +255,42 @@ class ChangeSource(StrEnum):
     Automatic = "Automatic"
 
 
-class ChangeType(StrEnum):
+class ChangeType(str):
     Resource = "Resource"
 
 
-class ConcurrencyMode(StrEnum):
+class ConcurrencyMode(str):
     STRICT_FAILURE_TOLERANCE = "STRICT_FAILURE_TOLERANCE"
     SOFT_FAILURE_TOLERANCE = "SOFT_FAILURE_TOLERANCE"
 
 
-class DeletionMode(StrEnum):
+class DeletionMode(str):
     STANDARD = "STANDARD"
     FORCE_DELETE_STACK = "FORCE_DELETE_STACK"
 
 
-class DeprecatedStatus(StrEnum):
+class DeprecatedStatus(str):
     LIVE = "LIVE"
     DEPRECATED = "DEPRECATED"
 
 
-class DetailedStatus(StrEnum):
+class DetailedStatus(str):
     CONFIGURATION_COMPLETE = "CONFIGURATION_COMPLETE"
     VALIDATION_FAILED = "VALIDATION_FAILED"
 
 
-class DifferenceType(StrEnum):
+class DifferenceType(str):
     ADD = "ADD"
     REMOVE = "REMOVE"
     NOT_EQUAL = "NOT_EQUAL"
 
 
-class EvaluationType(StrEnum):
+class EvaluationType(str):
     Static = "Static"
     Dynamic = "Dynamic"
 
 
-class ExecutionStatus(StrEnum):
+class ExecutionStatus(str):
     UNAVAILABLE = "UNAVAILABLE"
     AVAILABLE = "AVAILABLE"
     EXECUTE_IN_PROGRESS = "EXECUTE_IN_PROGRESS"
@@ -307,19 +299,19 @@ class ExecutionStatus(StrEnum):
     OBSOLETE = "OBSOLETE"
 
 
-class GeneratedTemplateDeletionPolicy(StrEnum):
+class GeneratedTemplateDeletionPolicy(str):
     DELETE = "DELETE"
     RETAIN = "RETAIN"
 
 
-class GeneratedTemplateResourceStatus(StrEnum):
+class GeneratedTemplateResourceStatus(str):
     PENDING = "PENDING"
     IN_PROGRESS = "IN_PROGRESS"
     FAILED = "FAILED"
     COMPLETE = "COMPLETE"
 
 
-class GeneratedTemplateStatus(StrEnum):
+class GeneratedTemplateStatus(str):
     CREATE_PENDING = "CREATE_PENDING"
     UPDATE_PENDING = "UPDATE_PENDING"
     DELETE_PENDING = "DELETE_PENDING"
@@ -330,12 +322,12 @@ class GeneratedTemplateStatus(StrEnum):
     COMPLETE = "COMPLETE"
 
 
-class GeneratedTemplateUpdateReplacePolicy(StrEnum):
+class GeneratedTemplateUpdateReplacePolicy(str):
     DELETE = "DELETE"
     RETAIN = "RETAIN"
 
 
-class HandlerErrorCode(StrEnum):
+class HandlerErrorCode(str):
     NotUpdatable = "NotUpdatable"
     InvalidRequest = "InvalidRequest"
     AccessDenied = "AccessDenied"
@@ -357,74 +349,67 @@ class HandlerErrorCode(StrEnum):
     UnsupportedTarget = "UnsupportedTarget"
 
 
-class HookFailureMode(StrEnum):
+class HookFailureMode(str):
     FAIL = "FAIL"
     WARN = "WARN"
 
 
-class HookInvocationPoint(StrEnum):
+class HookInvocationPoint(str):
     PRE_PROVISION = "PRE_PROVISION"
 
 
-class HookStatus(StrEnum):
+class HookStatus(str):
     HOOK_IN_PROGRESS = "HOOK_IN_PROGRESS"
     HOOK_COMPLETE_SUCCEEDED = "HOOK_COMPLETE_SUCCEEDED"
     HOOK_COMPLETE_FAILED = "HOOK_COMPLETE_FAILED"
     HOOK_FAILED = "HOOK_FAILED"
 
 
-class HookTargetType(StrEnum):
+class HookTargetType(str):
     RESOURCE = "RESOURCE"
 
 
-class IdentityProvider(StrEnum):
+class IdentityProvider(str):
     AWS_Marketplace = "AWS_Marketplace"
     GitHub = "GitHub"
     Bitbucket = "Bitbucket"
 
 
-class ListHookResultsTargetType(StrEnum):
-    CHANGE_SET = "CHANGE_SET"
-    STACK = "STACK"
-    RESOURCE = "RESOURCE"
-    CLOUD_CONTROL = "CLOUD_CONTROL"
-
-
-class OnFailure(StrEnum):
+class OnFailure(str):
     DO_NOTHING = "DO_NOTHING"
     ROLLBACK = "ROLLBACK"
     DELETE = "DELETE"
 
 
-class OnStackFailure(StrEnum):
+class OnStackFailure(str):
     DO_NOTHING = "DO_NOTHING"
     ROLLBACK = "ROLLBACK"
     DELETE = "DELETE"
 
 
-class OperationResultFilterName(StrEnum):
+class OperationResultFilterName(str):
     OPERATION_RESULT_STATUS = "OPERATION_RESULT_STATUS"
 
 
-class OperationStatus(StrEnum):
+class OperationStatus(str):
     PENDING = "PENDING"
     IN_PROGRESS = "IN_PROGRESS"
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
 
 
-class OrganizationStatus(StrEnum):
+class OrganizationStatus(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
     DISABLED_PERMANENTLY = "DISABLED_PERMANENTLY"
 
 
-class PermissionModels(StrEnum):
+class PermissionModels(str):
     SERVICE_MANAGED = "SERVICE_MANAGED"
     SELF_MANAGED = "SELF_MANAGED"
 
 
-class PolicyAction(StrEnum):
+class PolicyAction(str):
     Delete = "Delete"
     Retain = "Retain"
     Snapshot = "Snapshot"
@@ -433,47 +418,47 @@ class PolicyAction(StrEnum):
     ReplaceAndSnapshot = "ReplaceAndSnapshot"
 
 
-class ProvisioningType(StrEnum):
+class ProvisioningType(str):
     NON_PROVISIONABLE = "NON_PROVISIONABLE"
     IMMUTABLE = "IMMUTABLE"
     FULLY_MUTABLE = "FULLY_MUTABLE"
 
 
-class PublisherStatus(StrEnum):
+class PublisherStatus(str):
     VERIFIED = "VERIFIED"
     UNVERIFIED = "UNVERIFIED"
 
 
-class RegionConcurrencyType(StrEnum):
+class RegionConcurrencyType(str):
     SEQUENTIAL = "SEQUENTIAL"
     PARALLEL = "PARALLEL"
 
 
-class RegistrationStatus(StrEnum):
+class RegistrationStatus(str):
     COMPLETE = "COMPLETE"
     IN_PROGRESS = "IN_PROGRESS"
     FAILED = "FAILED"
 
 
-class RegistryType(StrEnum):
+class RegistryType(str):
     RESOURCE = "RESOURCE"
     MODULE = "MODULE"
     HOOK = "HOOK"
 
 
-class Replacement(StrEnum):
+class Replacement(str):
     True_ = "True"
     False_ = "False"
     Conditional = "Conditional"
 
 
-class RequiresRecreation(StrEnum):
+class RequiresRecreation(str):
     Never = "Never"
     Conditionally = "Conditionally"
     Always = "Always"
 
 
-class ResourceAttribute(StrEnum):
+class ResourceAttribute(str):
     Properties = "Properties"
     Metadata = "Metadata"
     CreationPolicy = "CreationPolicy"
@@ -483,19 +468,19 @@ class ResourceAttribute(StrEnum):
     Tags = "Tags"
 
 
-class ResourceScanStatus(StrEnum):
+class ResourceScanStatus(str):
     IN_PROGRESS = "IN_PROGRESS"
     FAILED = "FAILED"
     COMPLETE = "COMPLETE"
     EXPIRED = "EXPIRED"
 
 
-class ResourceSignalStatus(StrEnum):
+class ResourceSignalStatus(str):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
 
 
-class ResourceStatus(StrEnum):
+class ResourceStatus(str):
     CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
     CREATE_FAILED = "CREATE_FAILED"
     CREATE_COMPLETE = "CREATE_COMPLETE"
@@ -512,12 +497,6 @@ class ResourceStatus(StrEnum):
     IMPORT_ROLLBACK_IN_PROGRESS = "IMPORT_ROLLBACK_IN_PROGRESS"
     IMPORT_ROLLBACK_FAILED = "IMPORT_ROLLBACK_FAILED"
     IMPORT_ROLLBACK_COMPLETE = "IMPORT_ROLLBACK_COMPLETE"
-    EXPORT_FAILED = "EXPORT_FAILED"
-    EXPORT_COMPLETE = "EXPORT_COMPLETE"
-    EXPORT_IN_PROGRESS = "EXPORT_IN_PROGRESS"
-    EXPORT_ROLLBACK_IN_PROGRESS = "EXPORT_ROLLBACK_IN_PROGRESS"
-    EXPORT_ROLLBACK_FAILED = "EXPORT_ROLLBACK_FAILED"
-    EXPORT_ROLLBACK_COMPLETE = "EXPORT_ROLLBACK_COMPLETE"
     UPDATE_ROLLBACK_IN_PROGRESS = "UPDATE_ROLLBACK_IN_PROGRESS"
     UPDATE_ROLLBACK_COMPLETE = "UPDATE_ROLLBACK_COMPLETE"
     UPDATE_ROLLBACK_FAILED = "UPDATE_ROLLBACK_FAILED"
@@ -526,20 +505,20 @@ class ResourceStatus(StrEnum):
     ROLLBACK_FAILED = "ROLLBACK_FAILED"
 
 
-class StackDriftDetectionStatus(StrEnum):
+class StackDriftDetectionStatus(str):
     DETECTION_IN_PROGRESS = "DETECTION_IN_PROGRESS"
     DETECTION_FAILED = "DETECTION_FAILED"
     DETECTION_COMPLETE = "DETECTION_COMPLETE"
 
 
-class StackDriftStatus(StrEnum):
+class StackDriftStatus(str):
     DRIFTED = "DRIFTED"
     IN_SYNC = "IN_SYNC"
     UNKNOWN = "UNKNOWN"
     NOT_CHECKED = "NOT_CHECKED"
 
 
-class StackInstanceDetailedStatus(StrEnum):
+class StackInstanceDetailedStatus(str):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     SUCCEEDED = "SUCCEEDED"
@@ -550,62 +529,26 @@ class StackInstanceDetailedStatus(StrEnum):
     FAILED_IMPORT = "FAILED_IMPORT"
 
 
-class StackInstanceFilterName(StrEnum):
+class StackInstanceFilterName(str):
     DETAILED_STATUS = "DETAILED_STATUS"
     LAST_OPERATION_ID = "LAST_OPERATION_ID"
     DRIFT_STATUS = "DRIFT_STATUS"
 
 
-class StackInstanceStatus(StrEnum):
+class StackInstanceStatus(str):
     CURRENT = "CURRENT"
     OUTDATED = "OUTDATED"
     INOPERABLE = "INOPERABLE"
 
 
-class StackRefactorActionEntity(StrEnum):
-    RESOURCE = "RESOURCE"
-    STACK = "STACK"
-
-
-class StackRefactorActionType(StrEnum):
-    MOVE = "MOVE"
-    CREATE = "CREATE"
-
-
-class StackRefactorDetection(StrEnum):
-    AUTO = "AUTO"
-    MANUAL = "MANUAL"
-
-
-class StackRefactorExecutionStatus(StrEnum):
-    UNAVAILABLE = "UNAVAILABLE"
-    AVAILABLE = "AVAILABLE"
-    OBSOLETE = "OBSOLETE"
-    EXECUTE_IN_PROGRESS = "EXECUTE_IN_PROGRESS"
-    EXECUTE_COMPLETE = "EXECUTE_COMPLETE"
-    EXECUTE_FAILED = "EXECUTE_FAILED"
-    ROLLBACK_IN_PROGRESS = "ROLLBACK_IN_PROGRESS"
-    ROLLBACK_COMPLETE = "ROLLBACK_COMPLETE"
-    ROLLBACK_FAILED = "ROLLBACK_FAILED"
-
-
-class StackRefactorStatus(StrEnum):
-    CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
-    CREATE_COMPLETE = "CREATE_COMPLETE"
-    CREATE_FAILED = "CREATE_FAILED"
-    DELETE_IN_PROGRESS = "DELETE_IN_PROGRESS"
-    DELETE_COMPLETE = "DELETE_COMPLETE"
-    DELETE_FAILED = "DELETE_FAILED"
-
-
-class StackResourceDriftStatus(StrEnum):
+class StackResourceDriftStatus(str):
     IN_SYNC = "IN_SYNC"
     MODIFIED = "MODIFIED"
     DELETED = "DELETED"
     NOT_CHECKED = "NOT_CHECKED"
 
 
-class StackSetDriftDetectionStatus(StrEnum):
+class StackSetDriftDetectionStatus(str):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     PARTIAL_SUCCESS = "PARTIAL_SUCCESS"
@@ -613,20 +556,20 @@ class StackSetDriftDetectionStatus(StrEnum):
     STOPPED = "STOPPED"
 
 
-class StackSetDriftStatus(StrEnum):
+class StackSetDriftStatus(str):
     DRIFTED = "DRIFTED"
     IN_SYNC = "IN_SYNC"
     NOT_CHECKED = "NOT_CHECKED"
 
 
-class StackSetOperationAction(StrEnum):
+class StackSetOperationAction(str):
     CREATE = "CREATE"
     UPDATE = "UPDATE"
     DELETE = "DELETE"
     DETECT_DRIFT = "DETECT_DRIFT"
 
 
-class StackSetOperationResultStatus(StrEnum):
+class StackSetOperationResultStatus(str):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     SUCCEEDED = "SUCCEEDED"
@@ -634,7 +577,7 @@ class StackSetOperationResultStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-class StackSetOperationStatus(StrEnum):
+class StackSetOperationStatus(str):
     RUNNING = "RUNNING"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
@@ -643,12 +586,12 @@ class StackSetOperationStatus(StrEnum):
     QUEUED = "QUEUED"
 
 
-class StackSetStatus(StrEnum):
+class StackSetStatus(str):
     ACTIVE = "ACTIVE"
     DELETED = "DELETED"
 
 
-class StackStatus(StrEnum):
+class StackStatus(str):
     CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
     CREATE_FAILED = "CREATE_FAILED"
     CREATE_COMPLETE = "CREATE_COMPLETE"
@@ -674,40 +617,40 @@ class StackStatus(StrEnum):
     IMPORT_ROLLBACK_COMPLETE = "IMPORT_ROLLBACK_COMPLETE"
 
 
-class TemplateFormat(StrEnum):
+class TemplateFormat(str):
     JSON = "JSON"
     YAML = "YAML"
 
 
-class TemplateStage(StrEnum):
+class TemplateStage(str):
     Original = "Original"
     Processed = "Processed"
 
 
-class ThirdPartyType(StrEnum):
+class ThirdPartyType(str):
     RESOURCE = "RESOURCE"
     MODULE = "MODULE"
     HOOK = "HOOK"
 
 
-class TypeTestsStatus(StrEnum):
+class TypeTestsStatus(str):
     PASSED = "PASSED"
     FAILED = "FAILED"
     IN_PROGRESS = "IN_PROGRESS"
     NOT_TESTED = "NOT_TESTED"
 
 
-class VersionBump(StrEnum):
+class VersionBump(str):
     MAJOR = "MAJOR"
     MINOR = "MINOR"
 
 
-class Visibility(StrEnum):
+class Visibility(str):
     PUBLIC = "PUBLIC"
     PRIVATE = "PRIVATE"
 
 
-class WarningType(StrEnum):
+class WarningType(str):
     MUTUALLY_EXCLUSIVE_PROPERTIES = "MUTUALLY_EXCLUSIVE_PROPERTIES"
     UNSUPPORTED_PROPERTIES = "UNSUPPORTED_PROPERTIES"
     MUTUALLY_EXCLUSIVE_TYPES = "MUTUALLY_EXCLUSIVE_TYPES"
@@ -745,12 +688,6 @@ class CreatedButModifiedException(ServiceException):
 
 class GeneratedTemplateNotFoundException(ServiceException):
     code: str = "GeneratedTemplateNotFound"
-    sender_fault: bool = True
-    status_code: int = 404
-
-
-class HookResultNotFoundException(ServiceException):
-    code: str = "HookResultNotFound"
     sender_fault: bool = True
     status_code: int = 404
 
@@ -841,12 +778,6 @@ class StackInstanceNotFoundException(ServiceException):
 
 class StackNotFoundException(ServiceException):
     code: str = "StackNotFoundException"
-    sender_fault: bool = True
-    status_code: int = 404
-
-
-class StackRefactorNotFoundException(ServiceException):
-    code: str = "StackRefactorNotFoundException"
     sender_fault: bool = True
     status_code: int = 404
 
@@ -1260,39 +1191,6 @@ class CreateStackOutput(TypedDict, total=False):
     StackId: Optional[StackId]
 
 
-class StackDefinition(TypedDict, total=False):
-    StackName: Optional[StackName]
-    TemplateBody: Optional[TemplateBody]
-    TemplateURL: Optional[TemplateURL]
-
-
-StackDefinitions = List[StackDefinition]
-
-
-class ResourceLocation(TypedDict, total=False):
-    StackName: StackName
-    LogicalResourceId: LogicalResourceId
-
-
-class ResourceMapping(TypedDict, total=False):
-    Source: ResourceLocation
-    Destination: ResourceLocation
-
-
-ResourceMappings = List[ResourceMapping]
-
-
-class CreateStackRefactorInput(ServiceRequest):
-    Description: Optional[Description]
-    EnableStackCreation: Optional[EnableStackCreation]
-    ResourceMappings: Optional[ResourceMappings]
-    StackDefinitions: StackDefinitions
-
-
-class CreateStackRefactorOutput(TypedDict, total=False):
-    StackRefactorId: StackRefactorId
-
-
 class ManagedExecution(TypedDict, total=False):
     Active: Optional[ManagedExecutionNullable]
 
@@ -1623,23 +1521,6 @@ class StackInstance(TypedDict, total=False):
 
 class DescribeStackInstanceOutput(TypedDict, total=False):
     StackInstance: Optional[StackInstance]
-
-
-class DescribeStackRefactorInput(ServiceRequest):
-    StackRefactorId: StackRefactorId
-
-
-StackIds = List[StackId]
-
-
-class DescribeStackRefactorOutput(TypedDict, total=False):
-    Description: Optional[Description]
-    StackRefactorId: Optional[StackRefactorId]
-    StackIds: Optional[StackIds]
-    ExecutionStatus: Optional[StackRefactorExecutionStatus]
-    ExecutionStatusReason: Optional[ExecutionStatusReason]
-    Status: Optional[StackRefactorStatus]
-    StatusReason: Optional[StackRefactorStatusReason]
 
 
 StackResourceDriftStatusFilters = List[StackResourceDriftStatus]
@@ -1992,10 +1873,6 @@ class ExecuteChangeSetOutput(TypedDict, total=False):
     pass
 
 
-class ExecuteStackRefactorInput(ServiceRequest):
-    StackRefactorId: StackRefactorId
-
-
 class Export(TypedDict, total=False):
     ExportingStackId: Optional[StackId]
     Name: Optional[ExportName]
@@ -2096,17 +1973,6 @@ class GetTemplateSummaryOutput(TypedDict, total=False):
     Warnings: Optional[Warnings]
 
 
-class HookResultSummary(TypedDict, total=False):
-    InvocationPoint: Optional[HookInvocationPoint]
-    FailureMode: Optional[HookFailureMode]
-    TypeName: Optional[HookTypeName]
-    TypeVersionId: Optional[HookTypeVersionId]
-    TypeConfigurationVersionId: Optional[HookTypeConfigurationVersionId]
-    Status: Optional[HookStatus]
-    HookStatusReason: Optional[HookStatusReason]
-
-
-HookResultSummaries = List[HookResultSummary]
 StackIdList = List[StackId]
 
 
@@ -2170,19 +2036,6 @@ TemplateSummaries = List[TemplateSummary]
 
 class ListGeneratedTemplatesOutput(TypedDict, total=False):
     Summaries: Optional[TemplateSummaries]
-    NextToken: Optional[NextToken]
-
-
-class ListHookResultsInput(ServiceRequest):
-    TargetType: ListHookResultsTargetType
-    TargetId: HookResultId
-    NextToken: Optional[NextToken]
-
-
-class ListHookResultsOutput(TypedDict, total=False):
-    TargetType: Optional[ListHookResultsTargetType]
-    TargetId: Optional[HookResultId]
-    HookResults: Optional[HookResultSummaries]
     NextToken: Optional[NextToken]
 
 
@@ -2332,63 +2185,6 @@ StackInstanceSummaries = List[StackInstanceSummary]
 
 class ListStackInstancesOutput(TypedDict, total=False):
     Summaries: Optional[StackInstanceSummaries]
-    NextToken: Optional[NextToken]
-
-
-class ListStackRefactorActionsInput(ServiceRequest):
-    StackRefactorId: StackRefactorId
-    NextToken: Optional[NextToken]
-    MaxResults: Optional[MaxResults]
-
-
-StackRefactorUntagResources = List[TagKey]
-StackRefactorTagResources = List[Tag]
-
-
-class StackRefactorAction(TypedDict, total=False):
-    Action: Optional[StackRefactorActionType]
-    Entity: Optional[StackRefactorActionEntity]
-    PhysicalResourceId: Optional[PhysicalResourceId]
-    ResourceIdentifier: Optional[StackRefactorResourceIdentifier]
-    Description: Optional[Description]
-    Detection: Optional[StackRefactorDetection]
-    DetectionReason: Optional[DetectionReason]
-    TagResources: Optional[StackRefactorTagResources]
-    UntagResources: Optional[StackRefactorUntagResources]
-    ResourceMapping: Optional[ResourceMapping]
-
-
-StackRefactorActions = List[StackRefactorAction]
-
-
-class ListStackRefactorActionsOutput(TypedDict, total=False):
-    StackRefactorActions: StackRefactorActions
-    NextToken: Optional[NextToken]
-
-
-StackRefactorExecutionStatusFilter = List[StackRefactorExecutionStatus]
-
-
-class ListStackRefactorsInput(ServiceRequest):
-    ExecutionStatusFilter: Optional[StackRefactorExecutionStatusFilter]
-    NextToken: Optional[NextToken]
-    MaxResults: Optional[MaxResults]
-
-
-class StackRefactorSummary(TypedDict, total=False):
-    StackRefactorId: Optional[StackRefactorId]
-    Description: Optional[Description]
-    ExecutionStatus: Optional[StackRefactorExecutionStatus]
-    ExecutionStatusReason: Optional[ExecutionStatusReason]
-    Status: Optional[StackRefactorStatus]
-    StatusReason: Optional[StackRefactorStatusReason]
-
-
-StackRefactorSummaries = List[StackRefactorSummary]
-
-
-class ListStackRefactorsOutput(TypedDict, total=False):
-    StackRefactorSummaries: StackRefactorSummaries
     NextToken: Optional[NextToken]
 
 
@@ -3012,18 +2808,6 @@ class CloudformationApi:
     ) -> CreateStackInstancesOutput:
         raise NotImplementedError
 
-    @handler("CreateStackRefactor")
-    def create_stack_refactor(
-        self,
-        context: RequestContext,
-        stack_definitions: StackDefinitions,
-        description: Description = None,
-        enable_stack_creation: EnableStackCreation = None,
-        resource_mappings: ResourceMappings = None,
-        **kwargs,
-    ) -> CreateStackRefactorOutput:
-        raise NotImplementedError
-
     @handler("CreateStackSet")
     def create_stack_set(
         self,
@@ -3202,12 +2986,6 @@ class CloudformationApi:
     ) -> DescribeStackInstanceOutput:
         raise NotImplementedError
 
-    @handler("DescribeStackRefactor")
-    def describe_stack_refactor(
-        self, context: RequestContext, stack_refactor_id: StackRefactorId, **kwargs
-    ) -> DescribeStackRefactorOutput:
-        raise NotImplementedError
-
     @handler("DescribeStackResource")
     def describe_stack_resource(
         self,
@@ -3340,12 +3118,6 @@ class CloudformationApi:
     ) -> ExecuteChangeSetOutput:
         raise NotImplementedError
 
-    @handler("ExecuteStackRefactor")
-    def execute_stack_refactor(
-        self, context: RequestContext, stack_refactor_id: StackRefactorId, **kwargs
-    ) -> None:
-        raise NotImplementedError
-
     @handler("GetGeneratedTemplate")
     def get_generated_template(
         self,
@@ -3428,17 +3200,6 @@ class CloudformationApi:
     ) -> ListGeneratedTemplatesOutput:
         raise NotImplementedError
 
-    @handler("ListHookResults")
-    def list_hook_results(
-        self,
-        context: RequestContext,
-        target_type: ListHookResultsTargetType,
-        target_id: HookResultId,
-        next_token: NextToken = None,
-        **kwargs,
-    ) -> ListHookResultsOutput:
-        raise NotImplementedError
-
     @handler("ListImports")
     def list_imports(
         self,
@@ -3515,28 +3276,6 @@ class CloudformationApi:
         call_as: CallAs = None,
         **kwargs,
     ) -> ListStackInstancesOutput:
-        raise NotImplementedError
-
-    @handler("ListStackRefactorActions")
-    def list_stack_refactor_actions(
-        self,
-        context: RequestContext,
-        stack_refactor_id: StackRefactorId,
-        next_token: NextToken = None,
-        max_results: MaxResults = None,
-        **kwargs,
-    ) -> ListStackRefactorActionsOutput:
-        raise NotImplementedError
-
-    @handler("ListStackRefactors")
-    def list_stack_refactors(
-        self,
-        context: RequestContext,
-        execution_status_filter: StackRefactorExecutionStatusFilter = None,
-        next_token: NextToken = None,
-        max_results: MaxResults = None,
-        **kwargs,
-    ) -> ListStackRefactorsOutput:
         raise NotImplementedError
 
     @handler("ListStackResources")

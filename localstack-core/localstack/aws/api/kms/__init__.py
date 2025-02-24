@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -41,7 +40,7 @@ XksProxyUriPathType = str
 XksProxyVpcEndpointServiceNameType = str
 
 
-class AlgorithmSpec(StrEnum):
+class AlgorithmSpec(str):
     RSAES_PKCS1_V1_5 = "RSAES_PKCS1_V1_5"
     RSAES_OAEP_SHA_1 = "RSAES_OAEP_SHA_1"
     RSAES_OAEP_SHA_256 = "RSAES_OAEP_SHA_256"
@@ -50,7 +49,7 @@ class AlgorithmSpec(StrEnum):
     SM2PKE = "SM2PKE"
 
 
-class ConnectionErrorCodeType(StrEnum):
+class ConnectionErrorCodeType(str):
     INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
     CLUSTER_NOT_FOUND = "CLUSTER_NOT_FOUND"
     NETWORK_ERRORS = "NETWORK_ERRORS"
@@ -73,7 +72,7 @@ class ConnectionErrorCodeType(StrEnum):
     XKS_PROXY_INVALID_TLS_CONFIGURATION = "XKS_PROXY_INVALID_TLS_CONFIGURATION"
 
 
-class ConnectionStateType(StrEnum):
+class ConnectionStateType(str):
     CONNECTED = "CONNECTED"
     CONNECTING = "CONNECTING"
     FAILED = "FAILED"
@@ -81,12 +80,12 @@ class ConnectionStateType(StrEnum):
     DISCONNECTING = "DISCONNECTING"
 
 
-class CustomKeyStoreType(StrEnum):
+class CustomKeyStoreType(str):
     AWS_CLOUDHSM = "AWS_CLOUDHSM"
     EXTERNAL_KEY_STORE = "EXTERNAL_KEY_STORE"
 
 
-class CustomerMasterKeySpec(StrEnum):
+class CustomerMasterKeySpec(str):
     RSA_2048 = "RSA_2048"
     RSA_3072 = "RSA_3072"
     RSA_4096 = "RSA_4096"
@@ -102,7 +101,7 @@ class CustomerMasterKeySpec(StrEnum):
     SM2 = "SM2"
 
 
-class DataKeyPairSpec(StrEnum):
+class DataKeyPairSpec(str):
     RSA_2048 = "RSA_2048"
     RSA_3072 = "RSA_3072"
     RSA_4096 = "RSA_4096"
@@ -113,24 +112,24 @@ class DataKeyPairSpec(StrEnum):
     SM2 = "SM2"
 
 
-class DataKeySpec(StrEnum):
+class DataKeySpec(str):
     AES_256 = "AES_256"
     AES_128 = "AES_128"
 
 
-class EncryptionAlgorithmSpec(StrEnum):
+class EncryptionAlgorithmSpec(str):
     SYMMETRIC_DEFAULT = "SYMMETRIC_DEFAULT"
     RSAES_OAEP_SHA_1 = "RSAES_OAEP_SHA_1"
     RSAES_OAEP_SHA_256 = "RSAES_OAEP_SHA_256"
     SM2PKE = "SM2PKE"
 
 
-class ExpirationModelType(StrEnum):
+class ExpirationModelType(str):
     KEY_MATERIAL_EXPIRES = "KEY_MATERIAL_EXPIRES"
     KEY_MATERIAL_DOES_NOT_EXPIRE = "KEY_MATERIAL_DOES_NOT_EXPIRE"
 
 
-class GrantOperation(StrEnum):
+class GrantOperation(str):
     Decrypt = "Decrypt"
     Encrypt = "Encrypt"
     GenerateDataKey = "GenerateDataKey"
@@ -147,23 +146,18 @@ class GrantOperation(StrEnum):
     GenerateDataKeyPairWithoutPlaintext = "GenerateDataKeyPairWithoutPlaintext"
     GenerateMac = "GenerateMac"
     VerifyMac = "VerifyMac"
-    DeriveSharedSecret = "DeriveSharedSecret"
 
 
-class KeyAgreementAlgorithmSpec(StrEnum):
-    ECDH = "ECDH"
-
-
-class KeyEncryptionMechanism(StrEnum):
+class KeyEncryptionMechanism(str):
     RSAES_OAEP_SHA_256 = "RSAES_OAEP_SHA_256"
 
 
-class KeyManagerType(StrEnum):
+class KeyManagerType(str):
     AWS = "AWS"
     CUSTOMER = "CUSTOMER"
 
 
-class KeySpec(StrEnum):
+class KeySpec(str):
     RSA_2048 = "RSA_2048"
     RSA_3072 = "RSA_3072"
     RSA_4096 = "RSA_4096"
@@ -179,7 +173,7 @@ class KeySpec(StrEnum):
     SM2 = "SM2"
 
 
-class KeyState(StrEnum):
+class KeyState(str):
     Creating = "Creating"
     Enabled = "Enabled"
     Disabled = "Disabled"
@@ -190,43 +184,42 @@ class KeyState(StrEnum):
     Updating = "Updating"
 
 
-class KeyUsageType(StrEnum):
+class KeyUsageType(str):
     SIGN_VERIFY = "SIGN_VERIFY"
     ENCRYPT_DECRYPT = "ENCRYPT_DECRYPT"
     GENERATE_VERIFY_MAC = "GENERATE_VERIFY_MAC"
-    KEY_AGREEMENT = "KEY_AGREEMENT"
 
 
-class MacAlgorithmSpec(StrEnum):
+class MacAlgorithmSpec(str):
     HMAC_SHA_224 = "HMAC_SHA_224"
     HMAC_SHA_256 = "HMAC_SHA_256"
     HMAC_SHA_384 = "HMAC_SHA_384"
     HMAC_SHA_512 = "HMAC_SHA_512"
 
 
-class MessageType(StrEnum):
+class MessageType(str):
     RAW = "RAW"
     DIGEST = "DIGEST"
 
 
-class MultiRegionKeyType(StrEnum):
+class MultiRegionKeyType(str):
     PRIMARY = "PRIMARY"
     REPLICA = "REPLICA"
 
 
-class OriginType(StrEnum):
+class OriginType(str):
     AWS_KMS = "AWS_KMS"
     EXTERNAL = "EXTERNAL"
     AWS_CLOUDHSM = "AWS_CLOUDHSM"
     EXTERNAL_KEY_STORE = "EXTERNAL_KEY_STORE"
 
 
-class RotationType(StrEnum):
+class RotationType(str):
     AUTOMATIC = "AUTOMATIC"
     ON_DEMAND = "ON_DEMAND"
 
 
-class SigningAlgorithmSpec(StrEnum):
+class SigningAlgorithmSpec(str):
     RSASSA_PSS_SHA_256 = "RSASSA_PSS_SHA_256"
     RSASSA_PSS_SHA_384 = "RSASSA_PSS_SHA_384"
     RSASSA_PSS_SHA_512 = "RSASSA_PSS_SHA_512"
@@ -239,14 +232,14 @@ class SigningAlgorithmSpec(StrEnum):
     SM2DSA = "SM2DSA"
 
 
-class WrappingKeySpec(StrEnum):
+class WrappingKeySpec(str):
     RSA_2048 = "RSA_2048"
     RSA_3072 = "RSA_3072"
     RSA_4096 = "RSA_4096"
     SM2 = "SM2"
 
 
-class XksProxyConnectivityType(StrEnum):
+class XksProxyConnectivityType(str):
     PUBLIC_ENDPOINT = "PUBLIC_ENDPOINT"
     VPC_ENDPOINT_SERVICE = "VPC_ENDPOINT_SERVICE"
 
@@ -671,7 +664,6 @@ class MultiRegionConfiguration(TypedDict, total=False):
     ReplicaKeys: Optional[MultiRegionKeyList]
 
 
-KeyAgreementAlgorithmSpecList = List[KeyAgreementAlgorithmSpec]
 SigningAlgorithmSpecList = List[SigningAlgorithmSpec]
 EncryptionAlgorithmSpecList = List[EncryptionAlgorithmSpec]
 
@@ -696,7 +688,6 @@ class KeyMetadata(TypedDict, total=False):
     KeySpec: Optional[KeySpec]
     EncryptionAlgorithms: Optional[EncryptionAlgorithmSpecList]
     SigningAlgorithms: Optional[SigningAlgorithmSpecList]
-    KeyAgreementAlgorithms: Optional[KeyAgreementAlgorithmSpecList]
     MultiRegion: Optional[NullableBooleanType]
     MultiRegionConfiguration: Optional[MultiRegionConfiguration]
     PendingDeletionWindowInDays: Optional[PendingWindowInDaysType]
@@ -772,26 +763,6 @@ class DeleteImportedKeyMaterialRequest(ServiceRequest):
     KeyId: KeyIdType
 
 
-PublicKeyType = bytes
-
-
-class DeriveSharedSecretRequest(ServiceRequest):
-    KeyId: KeyIdType
-    KeyAgreementAlgorithm: KeyAgreementAlgorithmSpec
-    PublicKey: PublicKeyType
-    GrantTokens: Optional[GrantTokenList]
-    DryRun: Optional[NullableBooleanType]
-    Recipient: Optional[RecipientInfo]
-
-
-class DeriveSharedSecretResponse(TypedDict, total=False):
-    KeyId: Optional[KeyIdType]
-    SharedSecret: Optional[PlaintextType]
-    CiphertextForRecipient: Optional[CiphertextType]
-    KeyAgreementAlgorithm: Optional[KeyAgreementAlgorithmSpec]
-    KeyOrigin: Optional[OriginType]
-
-
 class DescribeCustomKeyStoresRequest(ServiceRequest):
     CustomKeyStoreId: Optional[CustomKeyStoreIdType]
     CustomKeyStoreName: Optional[CustomKeyStoreNameType]
@@ -861,6 +832,9 @@ class GenerateDataKeyPairRequest(ServiceRequest):
     GrantTokens: Optional[GrantTokenList]
     Recipient: Optional[RecipientInfo]
     DryRun: Optional[NullableBooleanType]
+
+
+PublicKeyType = bytes
 
 
 class GenerateDataKeyPairResponse(TypedDict, total=False):
@@ -991,7 +965,6 @@ class GetPublicKeyResponse(TypedDict, total=False):
     KeyUsage: Optional[KeyUsageType]
     EncryptionAlgorithms: Optional[EncryptionAlgorithmSpecList]
     SigningAlgorithms: Optional[SigningAlgorithmSpecList]
-    KeyAgreementAlgorithms: Optional[KeyAgreementAlgorithmSpecList]
 
 
 class GrantListEntry(TypedDict, total=False):
@@ -1389,20 +1362,6 @@ class KmsApi:
     def delete_imported_key_material(
         self, context: RequestContext, key_id: KeyIdType, **kwargs
     ) -> None:
-        raise NotImplementedError
-
-    @handler("DeriveSharedSecret")
-    def derive_shared_secret(
-        self,
-        context: RequestContext,
-        key_id: KeyIdType,
-        key_agreement_algorithm: KeyAgreementAlgorithmSpec,
-        public_key: PublicKeyType,
-        grant_tokens: GrantTokenList = None,
-        dry_run: NullableBooleanType = None,
-        recipient: RecipientInfo = None,
-        **kwargs,
-    ) -> DeriveSharedSecretResponse:
         raise NotImplementedError
 
     @handler("DescribeCustomKeyStores")

@@ -14,9 +14,8 @@ Resources:
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
-            Action: "sts:AssumeRole"
-            Principal:
-              Service: firehose.amazonaws.com
+            Action: "*"
+            Resource: "*"
   MyBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -32,7 +31,7 @@ Resources:
       DeliveryStreamName: !Ref "DeliveryStreamName"
       DeliveryStreamType: DirectPut
       S3DestinationConfiguration:
-        BucketARN: !GetAtt "MyBucket.Arn"
+        BucketARN: !Ref MyBucket
         BufferingHints:
           IntervalInSeconds: 600
           SizeInMBs: 50

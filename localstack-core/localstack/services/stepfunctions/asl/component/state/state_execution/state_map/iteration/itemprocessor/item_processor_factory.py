@@ -19,7 +19,6 @@ def from_item_processor_decl(item_processor_decl: ItemProcessorDecl) -> Iteratio
     match item_processor_decl.processor_config.mode:
         case Mode.Inline:
             return InlineItemProcessor(
-                query_language=item_processor_decl.query_language,
                 start_at=item_processor_decl.start_at,
                 states=item_processor_decl.states,
                 comment=item_processor_decl.comment,
@@ -27,7 +26,6 @@ def from_item_processor_decl(item_processor_decl: ItemProcessorDecl) -> Iteratio
             )
         case Mode.Distributed:
             return DistributedItemProcessor(
-                query_language=item_processor_decl.query_language,
                 start_at=item_processor_decl.start_at,
                 states=item_processor_decl.states,
                 comment=item_processor_decl.comment,

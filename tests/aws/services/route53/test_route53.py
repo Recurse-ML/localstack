@@ -1,5 +1,3 @@
-from urllib.parse import urlparse
-
 import pytest
 
 from localstack.testing.pytest import markers
@@ -24,25 +22,17 @@ class TestRoute53:
         response = aws_client.route53.get_hosted_zone(Id=zone_id)
         snapshot.match("get_hosted_zone", response)
 
-    @markers.aws.validated
-    def test_crud_health_check(self, echo_http_server_post, echo_http_server, aws_client):
-        parsed_url = urlparse(echo_http_server_post)
-        protocol = parsed_url.scheme.upper()
-        host, _, port = parsed_url.netloc.partition(":")
-        port = port or (443 if protocol == "HTTPS" else 80)
-        path = (
-            f"{parsed_url.path}health"
-            if parsed_url.path.endswith("/")
-            else f"{parsed_url.path}/health"
-        )
-
+    @markers.aws.unknown
+    def test_crud_health_check(self, aws_client):
         response = aws_client.route53.create_health_check(
-            CallerReference=short_uid(),
+            CallerReference="test123",
             HealthCheckConfig={
-                "FullyQualifiedDomainName": host,
-                "Port": int(port),
-                "ResourcePath": path,
-                "Type": protocol,
+                "IPAddress": "10.0.0.25",
+                "Port": 80,
+                "Type": "HTTP",
+                "ResourcePath": "/",
+                "FullyQualifiedDomainName": "example.com",
+                "SearchString": "a good response",
                 "RequestInterval": 10,
                 "FailureThreshold": 2,
             },
@@ -99,10 +89,18 @@ class TestRoute53:
         zones = [zone for zone in response["HostedZones"] if name in zone["Name"]]
         snapshot.match("list_hosted_zones", zones)
 
-    @markers.aws.validated
+    @markers.aws.unknown
     def test_associate_vpc_with_hosted_zone(
         self, cleanups, hosted_zone, aws_client, account_id, region_name
     ):
+        name = "zone123"
+        response = hosted_zone(
+            Name=name,
+            HostedZoneConfig={"PrivateZone": True, "Comment": "test"},
+        )
+        zone_id = response["HostedZone"]["Id"]
+        zone_id = zone_id.replace("/hostedzone/", "")
+
         # create VPCs
         vpc1 = aws_client.ec2.create_vpc(CidrBlock="10.113.0.0/24")
         cleanups.append(lambda: aws_client.ec2.delete_vpc(VpcId=vpc1["Vpc"]["VpcId"]))
@@ -111,21 +109,9 @@ class TestRoute53:
         cleanups.append(lambda: aws_client.ec2.delete_vpc(VpcId=vpc2["Vpc"]["VpcId"]))
         vpc2_id = vpc2["Vpc"]["VpcId"]
 
-        name = "zone123"
-        response = hosted_zone(
-            Name=name,
-            HostedZoneConfig={
-                "PrivateZone": True,
-                "Comment": "test",
-            },
-            VPC={"VPCId": vpc1_id, "VPCRegion": region_name},
-        )
-        zone_id = response["HostedZone"]["Id"]
-        zone_id = zone_id.replace("/hostedzone/", "")
-
         # associate zone with VPC
         vpc_region = region_name
-        for vpc_id in [vpc2_id]:
+        for vpc_id in [vpc1_id, vpc2_id]:
             result = aws_client.route53.associate_vpc_with_hosted_zone(
                 HostedZoneId=zone_id,
                 VPC={"VPCRegion": vpc_region, "VPCId": vpc_id},
@@ -187,7 +173,7 @@ class TestRoute53:
 
         snapshot.match("failure-response", exc_info.value.response)
 
-    @markers.aws.validated
+    @markers.aws.unknown
     def test_reusable_delegation_sets(self, aws_client):
         client = aws_client.route53
 

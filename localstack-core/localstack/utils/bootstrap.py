@@ -13,13 +13,7 @@ from functools import wraps
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Union
 
 from localstack import config, constants
-from localstack.config import (
-    HostAndPort,
-    default_ip,
-    is_env_not_false,
-    is_env_true,
-    load_environment,
-)
+from localstack.config import HostAndPort, default_ip, is_env_not_false, is_env_true
 from localstack.constants import VERSION
 from localstack.runtime import hooks
 from localstack.utils.container_networking import get_main_container_name
@@ -37,10 +31,10 @@ from localstack.utils.container_utils.container_client import (
     VolumeMappings,
 )
 from localstack.utils.container_utils.docker_cmd_client import CmdDockerClient
-from localstack.utils.docker_utils import DOCKER_CLIENT
+from localstack.utils.docker_utils import DOCKER_CLIENT, container_ports_can_be_bound
 from localstack.utils.files import cache_dir, mkdir
 from localstack.utils.functions import call_safe
-from localstack.utils.net import get_free_tcp_port, get_free_tcp_port_range
+from localstack.utils.net import Port, get_free_tcp_port, get_free_tcp_port_range
 from localstack.utils.run import is_command_available, run, to_str
 from localstack.utils.serving import Server
 from localstack.utils.strings import short_uid
@@ -160,12 +154,8 @@ def get_docker_image_details(image_name: str = None) -> Dict[str, str]:
         result = DOCKER_CLIENT.inspect_image(image_name)
     except ContainerException:
         return {}
-
-    digests = result.get("RepoDigests")
-    sha256 = digests[0].rpartition(":")[2] if digests else "Unavailable"
     result = {
         "id": result["Id"].replace("sha256:", "")[:12],
-        "sha256": sha256,
         "tag": (result.get("RepoTags") or ["latest"])[0].split(":")[-1],
         "created": result["Created"].split(".")[0],
     }
@@ -366,9 +356,9 @@ def should_eager_load_api(api: str) -> bool:
 
 
 def start_infra_locally():
-    from localstack.runtime.main import main
+    from localstack.services import infra
 
-    return main()
+    return infra.start_infra()
 
 
 def validate_localstack_config(name: str):
@@ -461,7 +451,7 @@ def get_docker_image_to_start():
     image_name = os.environ.get("IMAGE_NAME")
     if not image_name:
         image_name = constants.DOCKER_IMAGE_NAME
-        if is_auth_token_configured():
+        if is_api_key_configured():
             image_name = constants.DOCKER_IMAGE_NAME_PRO
     return image_name
 
@@ -508,42 +498,10 @@ class ContainerConfigurators:
     @staticmethod
     def config_env_vars(cfg: ContainerConfiguration):
         """Sets all env vars from config.CONFIG_ENV_VARS."""
-
-        profile_env = {}
-        if config.LOADED_PROFILES:
-            load_environment(profiles=",".join(config.LOADED_PROFILES), env=profile_env)
-
-        non_prefixed_env_vars = []
         for env_var in config.CONFIG_ENV_VARS:
             value = os.environ.get(env_var, None)
             if value is not None:
-                if (
-                    env_var != "CI"
-                    and not env_var.startswith("LOCALSTACK_")
-                    and env_var not in profile_env
-                ):
-                    # Collect all env vars that are directly forwarded from the system env
-                    # to the container which has not been prefixed with LOCALSTACK_ here.
-                    # Suppress the "CI" env var.
-                    # Suppress if the env var was set from the profile.
-                    non_prefixed_env_vars.append(env_var)
                 cfg.env_vars[env_var] = value
-
-        # collectively log deprecation warnings for non-prefixed sys env vars
-        if non_prefixed_env_vars:
-            from localstack.utils.analytics import log
-
-            for non_prefixed_env_var in non_prefixed_env_vars:
-                # Show a deprecation warning for each individual env var collected above
-                LOG.warning(
-                    "Non-prefixed environment variable %(env_var)s is forwarded to the LocalStack container! "
-                    "Please use `LOCALSTACK_%(env_var)s` instead of %(env_var)s to explicitly mark this environment variable to be forwarded form the CLI to the LocalStack Runtime.",
-                    {"env_var": non_prefixed_env_var},
-                )
-
-            log.event(
-                event="non_prefixed_cli_env_vars", payload={"env_vars": non_prefixed_env_vars}
-            )
 
     @staticmethod
     def random_gateway_port(cfg: ContainerConfiguration):
@@ -589,6 +547,28 @@ class ContainerConfigurators:
             )
 
         return _cfg
+
+    @staticmethod
+    def publish_dns_ports(cfg: ContainerConfiguration):
+        dns_ports = [
+            Port(config.DNS_PORT, protocol="udp"),
+            Port(config.DNS_PORT, protocol="tcp"),
+        ]
+        if container_ports_can_be_bound(dns_ports, address=config.DNS_ADDRESS):
+            # expose the DNS server to the host
+            # TODO: update ContainerConfiguration to support multiple PortMappings objects with different bind addresses
+            docker_flags = []
+            for port in dns_ports:
+                docker_flags.extend(
+                    [
+                        "-p",
+                        f"{config.DNS_ADDRESS}:{port.port}:{port.port}/{port.protocol}",
+                    ]
+                )
+            if cfg.additional_flags is None:
+                cfg.additional_flags = " ".join(docker_flags)
+            else:
+                cfg.additional_flags += " " + " ".join(docker_flags)
 
     @staticmethod
     def container_name(name: str):
@@ -712,10 +692,6 @@ class ContainerConfigurators:
         def _cfg(cfg: ContainerConfiguration):
             if params.get("network"):
                 cfg.network = params.get("network")
-
-            if params.get("host_dns"):
-                cfg.ports.add(config.DNS_PORT, config.DNS_PORT, "udp")
-                cfg.ports.add(config.DNS_PORT, config.DNS_PORT, "tcp")
 
             # processed parsed -e, -p, and -v flags
             ContainerConfigurators.env_cli_params(params.get("env"))(cfg)
@@ -1210,6 +1186,7 @@ def configure_container(container: Container):
             ContainerConfigurators.service_port_range,
             ContainerConfigurators.mount_localstack_volume(config.VOLUME_DIR),
             ContainerConfigurators.mount_docker_socket,
+            ContainerConfigurators.publish_dns_ports,
             # overwrites any env vars set in the config that were previously set by configurators
             ContainerConfigurators.config_env_vars,
             # ensure that GATEWAY_LISTEN is taken from the config and not
@@ -1267,7 +1244,7 @@ def start_infra_in_docker(console, cli_params: Dict[str, Any] = None):
     # Set up signal handler, to enable clean shutdown across different operating systems.
     #  There are subtle differences across operating systems and terminal emulators when it
     #  comes to handling of CTRL-C - in particular, Linux sends SIGINT to the parent process,
-    #  whereas macOS sends SIGINT to the process group, which can result in multiple SIGINT signals
+    #  whereas MacOS sends SIGINT to the process group, which can result in multiple SIGINT signals
     #  being received (e.g., when running the localstack CLI as part of a "npm run .." script).
     #  Hence, using a shutdown handler and synchronization event here, to avoid inconsistencies.
     def shutdown_handler(*args):
@@ -1396,11 +1373,10 @@ def in_ci():
     return False
 
 
-def is_auth_token_configured() -> bool:
+def is_api_key_configured() -> bool:
     """Whether an API key is set in the environment."""
     return (
         True
-        if os.environ.get("LOCALSTACK_AUTH_TOKEN", "").strip()
-        or os.environ.get("LOCALSTACK_API_KEY", "").strip()
+        if os.environ.get("LOCALSTACK_API_KEY") and os.environ.get("LOCALSTACK_API_KEY").strip()
         else False
     )

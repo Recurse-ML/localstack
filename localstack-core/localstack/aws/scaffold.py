@@ -142,11 +142,11 @@ class ShapeNode:
 
     def _print_structure_declaration(self, output, doc=True, quote_types=False):
         if self.is_exception:
-            self._print_as_class(output, "ServiceException", doc, quote_types)
+            self._print_as_class(output, "ServiceException", doc)
             return
 
         if any(map(is_keyword, self.shape.members.keys())):
-            self._print_as_typed_dict(output, doc, quote_types)
+            self._print_as_typed_dict(output)
             return
 
         if self.is_request:
@@ -167,8 +167,8 @@ class ShapeNode:
         if self.is_exception:
             error_spec = self.shape.metadata.get("error", {})
             output.write(f'    code: str = "{error_spec.get("code", self.shape.name)}"\n')
-            output.write(f"    sender_fault: bool = {error_spec.get('senderFault', False)}\n")
-            output.write(f"    status_code: int = {error_spec.get('httpStatusCode', 400)}\n")
+            output.write(f'    sender_fault: bool = {error_spec.get("senderFault", False)}\n')
+            output.write(f'    status_code: int = {error_spec.get("httpStatusCode", 400)}\n')
         elif not self.shape.members:
             output.write("    pass\n")
 
@@ -265,7 +265,7 @@ class ShapeNode:
             )
         elif isinstance(shape, StringShape):
             if shape.enum:
-                output.write(f"class {to_valid_python_name(shape.name)}(StrEnum):\n")
+                output.write(f"class {to_valid_python_name(shape.name)}(str):\n")
                 for value in shape.enum:
                     name = to_valid_python_name(value)
                     output.write(f'    {name} = "{value}"\n')
@@ -315,11 +315,10 @@ class ShapeNode:
 
 
 def generate_service_types(output, service: ServiceModel, doc=True):
-    output.write("from datetime import datetime\n")
-    output.write("from enum import StrEnum\n")
     output.write(
         "from typing import Dict, List, Optional, Iterator, Iterable, IO, Union, TypedDict\n"
     )
+    output.write("from datetime import datetime\n")
     output.write("\n")
     output.write(
         "from localstack.aws.api import handler, RequestContext, ServiceException, ServiceRequest"

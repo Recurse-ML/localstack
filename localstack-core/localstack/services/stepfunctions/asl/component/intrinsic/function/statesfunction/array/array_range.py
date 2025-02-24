@@ -1,5 +1,5 @@
-from localstack.services.stepfunctions.asl.component.intrinsic.argument.argument import (
-    ArgumentList,
+from localstack.services.stepfunctions.asl.component.intrinsic.argument.function_argument_list import (
+    FunctionArgumentList,
 )
 from localstack.services.stepfunctions.asl.component.intrinsic.function.statesfunction.states_function import (
     StatesFunction,
@@ -22,18 +22,18 @@ class ArrayRange(StatesFunction):
     #
     # Returns
     # [1,3,5,7,9]
-    def __init__(self, argument_list: ArgumentList):
+    def __init__(self, arg_list: FunctionArgumentList):
         super().__init__(
             states_name=StatesFunctionName(function_type=StatesFunctionNameType.ArrayRange),
-            argument_list=argument_list,
+            arg_list=arg_list,
         )
-        if argument_list.size != 3:
+        if arg_list.size != 3:
             raise ValueError(
-                f"Expected 3 arguments for function type '{type(self)}', but got: '{argument_list}'."
+                f"Expected 3 arguments for function type '{type(self)}', but got: '{arg_list}'."
             )
 
     def _eval_body(self, env: Environment) -> None:
-        self.argument_list.eval(env=env)
+        self.arg_list.eval(env=env)
         range_vals = env.stack.pop()
 
         for range_val in range_vals:

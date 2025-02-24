@@ -1,7 +1,6 @@
 # LocalStack Resource Provider Scaffolding v2
 from __future__ import annotations
 
-import copy
 from pathlib import Path
 from typing import Optional, TypedDict
 
@@ -99,17 +98,14 @@ class ApiGatewayStageProvider(ResourceProvider[ApiGatewayStageProperties]):
         apigw = request.aws_client_factory.apigateway
 
         stage_name = model.get("StageName", "default")
-        stage_variables = model.get("Variables")
-        # we need to deep copy as several fields are nested dict and arrays
-        params = keys_to_lower(copy.deepcopy(model))
-        # TODO: add methodSettings
-        # TODO: add custom CfN tags
+        params = keys_to_lower(model.copy())
         param_names = [
             "restApiId",
             "deploymentId",
             "description",
             "cacheClusterEnabled",
             "cacheClusterSize",
+            "variables",
             "documentationVersion",
             "canarySettings",
             "tracingEnabled",
@@ -118,8 +114,6 @@ class ApiGatewayStageProvider(ResourceProvider[ApiGatewayStageProperties]):
         params = util.select_attributes(params, param_names)
         params["tags"] = {t["key"]: t["value"] for t in params.get("tags", [])}
         params["stageName"] = stage_name
-        if stage_variables:
-            params["variables"] = stage_variables
 
         result = apigw.create_stage(**params)
         model["StageName"] = result["stageName"]

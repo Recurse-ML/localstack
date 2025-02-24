@@ -6,7 +6,7 @@ import os
 import re
 import textwrap
 import time
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import botocore.auth
 import botocore.config
@@ -22,6 +22,9 @@ from werkzeug import Request, Response
 
 from localstack import config
 from localstack.aws.connect import ServiceLevelClientFactory
+from localstack.constants import (
+    AWS_REGION_US_EAST_1,
+)
 from localstack.services.stores import (
     AccountRegionBundle,
     BaseStore,
@@ -38,14 +41,12 @@ from localstack.testing.config import (
     TEST_AWS_REGION_NAME,
 )
 from localstack.utils import testutil
-from localstack.utils.aws.arns import get_partition
 from localstack.utils.aws.client import SigningHttpClient
 from localstack.utils.aws.resources import create_dynamodb_table
 from localstack.utils.bootstrap import is_api_enabled
 from localstack.utils.collections import ensure_list
-from localstack.utils.functions import call_safe, run_safe
+from localstack.utils.functions import run_safe
 from localstack.utils.http import safe_requests as requests
-from localstack.utils.id_generator import ResourceIdentifier, localstack_id_manager
 from localstack.utils.json import CustomEncoder, json_safe
 from localstack.utils.net import wait_for_port_open
 from localstack.utils.strings import short_uid, to_str
@@ -60,11 +61,6 @@ WAITER_CHANGE_SET_CREATE_COMPLETE = "change_set_create_complete"
 WAITER_STACK_CREATE_COMPLETE = "stack_create_complete"
 WAITER_STACK_UPDATE_COMPLETE = "stack_update_complete"
 WAITER_STACK_DELETE_COMPLETE = "stack_delete_complete"
-
-
-if TYPE_CHECKING:
-    from mypy_boto3_sqs import SQSClient
-    from mypy_boto3_sqs.type_defs import MessageTypeDef
 
 
 @pytest.fixture(scope="class")
@@ -95,7 +91,7 @@ def aws_http_client_factory(aws_session):
         aws_access_key_id: str = None,
         aws_secret_access_key: str = None,
     ):
-        region = region or TEST_AWS_REGION_NAME
+        region = region or aws_session.region_name or AWS_REGION_US_EAST_1
 
         if aws_access_key_id or aws_secret_access_key:
             credentials = botocore.credentials.Credentials(
@@ -120,10 +116,8 @@ def aws_http_client_factory(aws_session):
 
 
 @pytest.fixture(scope="class")
-def s3_vhost_client(aws_client_factory, region_name):
-    return aws_client_factory(
-        config=botocore.config.Config(s3={"addressing_style": "virtual"}), region_name=region_name
-    ).s3
+def s3_vhost_client(aws_client_factory):
+    return aws_client_factory(config=botocore.config.Config(s3={"addressing_style": "virtual"})).s3
 
 
 @pytest.fixture
@@ -211,29 +205,6 @@ def s3_create_bucket(s3_empty_bucket, aws_client):
         aws_client.s3.create_bucket(**kwargs)
         buckets.append(kwargs["Bucket"])
         return kwargs["Bucket"]
-
-    yield factory
-
-    # cleanup
-    for bucket in buckets:
-        try:
-            s3_empty_bucket(bucket)
-            aws_client.s3.delete_bucket(Bucket=bucket)
-        except Exception as e:
-            LOG.debug("error cleaning up bucket %s: %s", bucket, e)
-
-
-@pytest.fixture
-def s3_create_bucket_with_client(s3_empty_bucket, aws_client):
-    buckets = []
-
-    def factory(s3_client, **kwargs) -> str:
-        if "Bucket" not in kwargs:
-            kwargs["Bucket"] = f"test-bucket-{short_uid()}"
-
-        response = s3_client.create_bucket(**kwargs)
-        buckets.append(kwargs["Bucket"])
-        return response
 
     yield factory
 
@@ -371,65 +342,6 @@ def sqs_receive_num_messages(sqs_receive_messages_delete):
 
 
 @pytest.fixture
-def sqs_collect_messages(aws_client):
-    """Collects SQS messages from a given queue_url and deletes them by default.
-    Example usage:
-    messages = sqs_collect_messages(
-         my_queue_url,
-         expected=2,
-         timeout=10,
-         attribute_names=["All"],
-         message_attribute_names=["All"],
-    )
-    """
-
-    def factory(
-        queue_url: str,
-        expected: int,
-        timeout: int,
-        delete: bool = True,
-        attribute_names: list[str] = None,
-        message_attribute_names: list[str] = None,
-        max_number_of_messages: int = 1,
-        wait_time_seconds: int = 5,
-        sqs_client: "SQSClient | None" = None,
-    ) -> list["MessageTypeDef"]:
-        sqs_client = sqs_client or aws_client.sqs
-        collected = []
-
-        def _receive():
-            response = sqs_client.receive_message(
-                QueueUrl=queue_url,
-                # Maximum is 20 seconds. Performs long polling.
-                WaitTimeSeconds=wait_time_seconds,
-                # Maximum 10 messages
-                MaxNumberOfMessages=max_number_of_messages,
-                AttributeNames=attribute_names or [],
-                MessageAttributeNames=message_attribute_names or [],
-            )
-
-            if messages := response.get("Messages"):
-                collected.extend(messages)
-
-                if delete:
-                    for m in messages:
-                        sqs_client.delete_message(
-                            QueueUrl=queue_url, ReceiptHandle=m["ReceiptHandle"]
-                        )
-
-            return len(collected) >= expected
-
-        if not poll_condition(_receive, timeout=timeout):
-            raise TimeoutError(
-                f"gave up waiting for messages (expected={expected}, actual={len(collected)}"
-            )
-
-        return collected
-
-    yield factory
-
-
-@pytest.fixture
 def sqs_queue(sqs_create_queue):
     return sqs_create_queue()
 
@@ -521,7 +433,7 @@ def sns_subscription(aws_client):
         try:
             aws_client.sns.unsubscribe(SubscriptionArn=sub_arn)
         except Exception as e:
-            LOG.debug("error cleaning up subscription %s: %s", sub_arn, e)
+            LOG.debug(f"error cleaning up subscription {sub_arn}: {e}")
 
 
 @pytest.fixture
@@ -665,7 +577,7 @@ def route53_hosted_zone(aws_client):
         try:
             aws_client.route53.delete_hosted_zone(Id=zone)
         except Exception as e:
-            LOG.debug("error cleaning up route53 HostedZone %s: %s", zone, e)
+            LOG.debug(f"error cleaning up route53 HostedZone {zone}: {e}")
 
 
 @pytest.fixture
@@ -904,10 +816,10 @@ def opensearch_wait_for_cluster(aws_client):
     def _wait_for_cluster(domain_name: str):
         def finished_processing():
             status = aws_client.opensearch.describe_domain(DomainName=domain_name)["DomainStatus"]
-            return status["Processing"] is False and "Endpoint" in status
+            return status["Processing"] is False
 
         assert poll_condition(
-            finished_processing, timeout=25 * 60, **({"interval": 10} if is_aws_cloud() else {})
+            finished_processing, timeout=5 * 60
         ), f"could not start domain: {domain_name}"
 
     return _wait_for_cluster
@@ -979,7 +891,7 @@ def cleanup_stacks(aws_client):
                 aws_client.cloudformation.delete_stack(StackName=stack)
                 aws_client.cloudformation.get_waiter("stack_delete_complete").wait(StackName=stack)
             except Exception:
-                LOG.debug("Failed to cleanup stack '%s'", stack)
+                LOG.debug(f"Failed to cleanup stack '{stack}'")
 
     return _cleanup_stacks
 
@@ -992,7 +904,7 @@ def cleanup_changesets(aws_client):
             try:
                 aws_client.cloudformation.delete_change_set(ChangeSetName=cs)
             except Exception:
-                LOG.debug("Failed to cleanup changeset '%s'", cs)
+                LOG.debug(f"Failed to cleanup changeset '{cs}'")
 
     return _cleanup_changesets
 
@@ -1154,7 +1066,7 @@ def deploy_cfn_template(
         try:
             teardown()
         except Exception as e:
-            LOG.debug("Failed cleaning up stack stack_id=%s: %s", stack_id, e)
+            LOG.debug(f"Failed cleaning up stack {stack_id=}: {e}")
 
 
 @pytest.fixture
@@ -1251,7 +1163,7 @@ def wait_until_lambda_ready(aws_client):
                     client.get_function(FunctionName=function_name)["Configuration"]["State"]
                     != "Pending"
                 )
-                LOG.debug("lambda state result: result=%s", result)
+                LOG.debug(f"lambda state result: {result=}")
                 return result
             except Exception as e:
                 LOG.error(e)
@@ -1332,7 +1244,7 @@ def create_lambda_function_aws(aws_client):
         try:
             aws_client.lambda_.delete_function(FunctionName=arn)
         except Exception:
-            LOG.debug("Unable to delete function arn=%s in cleanup", arn)
+            LOG.debug(f"Unable to delete function {arn=} in cleanup")
 
 
 @pytest.fixture
@@ -1372,13 +1284,13 @@ def create_lambda_function(aws_client, wait_until_lambda_ready, lambda_su_role):
         try:
             client.delete_function(FunctionName=arn)
         except Exception:
-            LOG.debug("Unable to delete function arn=%s in cleanup", arn)
+            LOG.debug(f"Unable to delete function {arn=} in cleanup")
 
     for log_group_name in log_groups:
         try:
             logs_client.delete_log_group(logGroupName=log_group_name)
         except Exception:
-            LOG.debug("Unable to delete log group %s in cleanup", log_group_name)
+            LOG.debug(f"Unable to delete log group {log_group_name} in cleanup")
 
 
 @pytest.fixture
@@ -1386,8 +1298,7 @@ def create_echo_http_server(aws_client, create_lambda_function):
     from localstack.aws.api.lambda_ import Runtime
 
     lambda_client = aws_client.lambda_
-    handler_code = textwrap.dedent(
-        """
+    handler_code = textwrap.dedent("""
     import json
     import os
 
@@ -1420,8 +1331,7 @@ def create_echo_http_server(aws_client, create_lambda_function):
             "origin": event["requestContext"]["http"].get("sourceIp", ""),
             "path": event["requestContext"]["http"].get("path", ""),
         }
-        return make_response(response)"""
-    )
+        return make_response(response)""")
 
     def _create_echo_http_server(trim_x_headers: bool = False) -> str:
         """Creates a server that will echo any request. Any request will be returned with the
@@ -1442,7 +1352,7 @@ def create_echo_http_server(aws_client, create_lambda_function):
         create_lambda_function(
             func_name=func_name,
             zip_file=zip_file,
-            runtime=Runtime.python3_12,
+            runtime=Runtime.python3_9,
             envvars={"TRIM_X_HEADERS": "1" if trim_x_headers else "0"},
         )
         url_response = lambda_client.create_function_url_config(
@@ -1475,7 +1385,7 @@ def create_event_source_mapping(aws_client):
         try:
             aws_client.lambda_.delete_event_source_mapping(UUID=uuid)
         except Exception:
-            LOG.debug("Unable to delete event source mapping %s in cleanup", uuid)
+            LOG.debug(f"Unable to delete event source mapping {uuid} in cleanup")
 
 
 @pytest.fixture
@@ -1756,60 +1666,10 @@ def lambda_su_role(aws_client):
 
 
 @pytest.fixture
-def create_iam_role_and_attach_policy(aws_client):
-    """
-    Fixture that creates an IAM role with given role definition and predefined policy ARN.
-
-    Use this fixture with AWS managed policies like 'AmazonS3ReadOnlyAccess' or 'AmazonKinesisFullAccess'.
-    """
-    roles = []
-
-    def _inner(**kwargs: dict[str, any]) -> str:
-        """
-        :param dict RoleDefinition: role definition document
-        :param str PolicyArn: policy ARN
-        :param str RoleName: role name (autogenerated if omitted)
-        :return: role ARN
-        """
-        if "RoleName" not in kwargs:
-            kwargs["RoleName"] = f"test-role-{short_uid()}"
-
-        role = kwargs["RoleName"]
-        role_policy = json.dumps(kwargs["RoleDefinition"])
-
-        result = aws_client.iam.create_role(RoleName=role, AssumeRolePolicyDocument=role_policy)
-        role_arn = result["Role"]["Arn"]
-
-        policy_arn = kwargs["PolicyArn"]
-        aws_client.iam.attach_role_policy(PolicyArn=policy_arn, RoleName=role)
-
-        roles.append(role)
-        return role_arn
-
-    yield _inner
-
-    for role in roles:
-        try:
-            aws_client.iam.delete_role(RoleName=role)
-        except Exception as exc:
-            LOG.debug("Error deleting IAM role '%s': %s", role, exc)
-
-
-@pytest.fixture
 def create_iam_role_with_policy(aws_client):
-    """
-    Fixture that creates an IAM role with given role definition and policy definition.
-    """
     roles = {}
 
     def _create_role_and_policy(**kwargs: dict[str, any]) -> str:
-        """
-        :param dict RoleDefinition: role definition document
-        :param dict PolicyDefinition: policy definition document
-        :param str PolicyName: policy name (autogenerated if omitted)
-        :param str RoleName: role name (autogenerated if omitted)
-        :return: role ARN
-        """
         if "RoleName" not in kwargs:
             kwargs["RoleName"] = f"test-role-{short_uid()}"
         role = kwargs["RoleName"]
@@ -1831,14 +1691,8 @@ def create_iam_role_with_policy(aws_client):
     yield _create_role_and_policy
 
     for role_name, policy_name in roles.items():
-        try:
-            aws_client.iam.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
-        except Exception as exc:
-            LOG.debug("Error deleting IAM role policy '%s' '%s': %s", role_name, policy_name, exc)
-        try:
-            aws_client.iam.delete_role(RoleName=role_name)
-        except Exception as exc:
-            LOG.debug("Error deleting IAM role '%s': %s", role_name, exc)
+        aws_client.iam.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
+        aws_client.iam.delete_role(RoleName=role_name)
 
 
 @pytest.fixture
@@ -1861,6 +1715,40 @@ def firehose_create_delivery_stream(wait_for_delivery_stream_ready, aws_client):
             aws_client.firehose.delete_delivery_stream(DeliveryStreamName=delivery_stream_name)
         except Exception:
             LOG.info("Failed to delete delivery stream %s", delivery_stream_name)
+
+
+@pytest.fixture
+def events_create_rule(aws_client):
+    rules = []
+
+    def _create_rule(**kwargs):
+        rule_name = kwargs["Name"]
+        bus_name = kwargs.get("EventBusName", "")
+        pattern = kwargs.get("EventPattern", {})
+        schedule = kwargs.get("ScheduleExpression", "")
+        rule_arn = aws_client.events.put_rule(
+            Name=rule_name,
+            EventBusName=bus_name,
+            EventPattern=json.dumps(pattern),
+            ScheduleExpression=schedule,
+        )["RuleArn"]
+        rules.append({"name": rule_name, "bus": bus_name})
+        return rule_arn
+
+    yield _create_rule
+
+    for rule in rules:
+        targets = aws_client.events.list_targets_by_rule(
+            Rule=rule["name"], EventBusName=rule["bus"]
+        )["Targets"]
+
+        targetIds = [target["Id"] for target in targets]
+        if len(targetIds) > 0:
+            aws_client.events.remove_targets(
+                Rule=rule["name"], EventBusName=rule["bus"], Ids=targetIds
+            )
+
+        aws_client.events.delete_rule(Name=rule["name"], EventBusName=rule["bus"])
 
 
 @pytest.fixture
@@ -2006,11 +1894,6 @@ def region_name(aws_client):
 
 
 @pytest.fixture(scope="session")
-def partition(region_name):
-    return get_partition(region_name)
-
-
-@pytest.fixture(scope="session")
 def secondary_account_id(secondary_aws_client):
     if is_aws_cloud() or is_api_enabled("sts"):
         return secondary_aws_client.sts.get_caller_identity()["Account"]
@@ -2140,7 +2023,7 @@ def appsync_create_api(aws_client):
         try:
             aws_client.appsync.delete_graphql_api(apiId=api)
         except Exception as e:
-            LOG.debug("Error cleaning up AppSync API: %s, %s", api, e)
+            LOG.debug(f"Error cleaning up AppSync API: {api}, {e}")
 
 
 @pytest.fixture
@@ -2193,7 +2076,7 @@ def echo_http_server_post(echo_http_server):
     if is_aws_cloud():
         return f"{PUBLIC_HTTP_ECHO_SERVER_URL}/post"
 
-    return f"{echo_http_server}post"
+    return f"{echo_http_server}/post"
 
 
 def create_policy_doc(effect: str, actions: List, resource=None) -> Dict:
@@ -2332,232 +2215,3 @@ def hosted_zone(aws_client):
 
     for zone_id in zone_ids[::-1]:
         aws_client.route53.delete_hosted_zone(Id=zone_id)
-
-
-@pytest.fixture
-def openapi_validate(monkeypatch):
-    monkeypatch.setattr(config, "OPENAPI_VALIDATE_RESPONSE", "true")
-    monkeypatch.setattr(config, "OPENAPI_VALIDATE_REQUEST", "true")
-
-
-@pytest.fixture
-def set_resource_custom_id():
-    set_ids = []
-
-    def _set_custom_id(resource_identifier: ResourceIdentifier, custom_id):
-        localstack_id_manager.set_custom_id(
-            resource_identifier=resource_identifier, custom_id=custom_id
-        )
-        set_ids.append(resource_identifier)
-
-    yield _set_custom_id
-
-    for resource_identifier in set_ids:
-        localstack_id_manager.unset_custom_id(resource_identifier)
-
-
-###############################
-# Events (EventBridge) fixtures
-###############################
-
-
-@pytest.fixture
-def events_create_event_bus(aws_client, region_name, account_id):
-    event_bus_names = []
-
-    def _create_event_bus(**kwargs):
-        if "Name" not in kwargs:
-            kwargs["Name"] = f"test-event-bus-{short_uid()}"
-
-        response = aws_client.events.create_event_bus(**kwargs)
-        event_bus_names.append(kwargs["Name"])
-        return response
-
-    yield _create_event_bus
-
-    for event_bus_name in event_bus_names:
-        try:
-            response = aws_client.events.list_rules(EventBusName=event_bus_name)
-            rules = [rule["Name"] for rule in response["Rules"]]
-
-            # Delete all rules for the current event bus
-            for rule in rules:
-                try:
-                    response = aws_client.events.list_targets_by_rule(
-                        Rule=rule, EventBusName=event_bus_name
-                    )
-                    targets = [target["Id"] for target in response["Targets"]]
-
-                    # Remove all targets for the current rule
-                    if targets:
-                        for target in targets:
-                            aws_client.events.remove_targets(
-                                Rule=rule, EventBusName=event_bus_name, Ids=[target]
-                            )
-
-                    aws_client.events.delete_rule(Name=rule, EventBusName=event_bus_name)
-                except Exception as e:
-                    LOG.warning("Failed to delete rule %s: %s", rule, e)
-
-            # Delete archives for event bus
-            event_source_arn = (
-                f"arn:aws:events:{region_name}:{account_id}:event-bus/{event_bus_name}"
-            )
-            response = aws_client.events.list_archives(EventSourceArn=event_source_arn)
-            archives = [archive["ArchiveName"] for archive in response["Archives"]]
-            for archive in archives:
-                try:
-                    aws_client.events.delete_archive(ArchiveName=archive)
-                except Exception as e:
-                    LOG.warning("Failed to delete archive %s: %s", archive, e)
-
-            aws_client.events.delete_event_bus(Name=event_bus_name)
-        except Exception as e:
-            LOG.warning("Failed to delete event bus %s: %s", event_bus_name, e)
-
-
-@pytest.fixture
-def events_put_rule(aws_client):
-    rules = []
-
-    def _put_rule(**kwargs):
-        if "Name" not in kwargs:
-            kwargs["Name"] = f"rule-{short_uid()}"
-
-        response = aws_client.events.put_rule(**kwargs)
-        rules.append((kwargs["Name"], kwargs.get("EventBusName", "default")))
-        return response
-
-    yield _put_rule
-
-    for rule, event_bus_name in rules:
-        try:
-            response = aws_client.events.list_targets_by_rule(
-                Rule=rule, EventBusName=event_bus_name
-            )
-            targets = [target["Id"] for target in response["Targets"]]
-
-            # Remove all targets for the current rule
-            if targets:
-                for target in targets:
-                    aws_client.events.remove_targets(
-                        Rule=rule, EventBusName=event_bus_name, Ids=[target]
-                    )
-
-            aws_client.events.delete_rule(Name=rule, EventBusName=event_bus_name)
-        except Exception as e:
-            LOG.warning("Failed to delete rule %s: %s", rule, e)
-
-
-@pytest.fixture
-def events_create_rule(aws_client):
-    rules = []
-
-    def _create_rule(**kwargs):
-        rule_name = kwargs["Name"]
-        bus_name = kwargs.get("EventBusName", "")
-        pattern = kwargs.get("EventPattern", {})
-        schedule = kwargs.get("ScheduleExpression", "")
-        rule_arn = aws_client.events.put_rule(
-            Name=rule_name,
-            EventBusName=bus_name,
-            EventPattern=json.dumps(pattern),
-            ScheduleExpression=schedule,
-        )["RuleArn"]
-        rules.append({"name": rule_name, "bus": bus_name})
-        return rule_arn
-
-    yield _create_rule
-
-    for rule in rules:
-        targets = aws_client.events.list_targets_by_rule(
-            Rule=rule["name"], EventBusName=rule["bus"]
-        )["Targets"]
-
-        targetIds = [target["Id"] for target in targets]
-        if len(targetIds) > 0:
-            aws_client.events.remove_targets(
-                Rule=rule["name"], EventBusName=rule["bus"], Ids=targetIds
-            )
-
-        aws_client.events.delete_rule(Name=rule["name"], EventBusName=rule["bus"])
-
-
-@pytest.fixture
-def sqs_as_events_target(aws_client, sqs_get_queue_arn):
-    queue_urls = []
-
-    def _sqs_as_events_target(queue_name: str | None = None) -> tuple[str, str]:
-        if not queue_name:
-            queue_name = f"tests-queue-{short_uid()}"
-        sqs_client = aws_client.sqs
-        queue_url = sqs_client.create_queue(QueueName=queue_name)["QueueUrl"]
-        queue_urls.append(queue_url)
-        queue_arn = sqs_get_queue_arn(queue_url)
-        policy = {
-            "Version": "2012-10-17",
-            "Id": f"sqs-eventbridge-{short_uid()}",
-            "Statement": [
-                {
-                    "Sid": f"SendMessage-{short_uid()}",
-                    "Effect": "Allow",
-                    "Principal": {"Service": "events.amazonaws.com"},
-                    "Action": "sqs:SendMessage",
-                    "Resource": queue_arn,
-                }
-            ],
-        }
-        sqs_client.set_queue_attributes(
-            QueueUrl=queue_url, Attributes={"Policy": json.dumps(policy)}
-        )
-        return queue_url, queue_arn
-
-    yield _sqs_as_events_target
-
-    for queue_url in queue_urls:
-        try:
-            aws_client.sqs.delete_queue(QueueUrl=queue_url)
-        except Exception as e:
-            LOG.debug("error cleaning up queue %s: %s", queue_url, e)
-
-
-@pytest.fixture
-def clean_up(
-    aws_client,
-):  # TODO: legacy clean up fixtures for eventbridge - remove and use individual fixtures for creating resources instead
-    def _clean_up(
-        bus_name=None,
-        rule_name=None,
-        target_ids=None,
-        queue_url=None,
-        log_group_name=None,
-    ):
-        events_client = aws_client.events
-        kwargs = {"EventBusName": bus_name} if bus_name else {}
-        if target_ids:
-            target_ids = target_ids if isinstance(target_ids, list) else [target_ids]
-            call_safe(
-                events_client.remove_targets,
-                kwargs=dict(Rule=rule_name, Ids=target_ids, Force=True, **kwargs),
-            )
-        if rule_name:
-            call_safe(events_client.delete_rule, kwargs=dict(Name=rule_name, Force=True, **kwargs))
-        if bus_name:
-            call_safe(events_client.delete_event_bus, kwargs=dict(Name=bus_name))
-        if queue_url:
-            sqs_client = aws_client.sqs
-            call_safe(sqs_client.delete_queue, kwargs=dict(QueueUrl=queue_url))
-        if log_group_name:
-            logs_client = aws_client.logs
-
-            def _delete_log_group():
-                log_streams = logs_client.describe_log_streams(logGroupName=log_group_name)
-                for log_stream in log_streams["logStreams"]:
-                    logs_client.delete_log_stream(
-                        logGroupName=log_group_name, logStreamName=log_stream["logStreamName"]
-                    )
-                logs_client.delete_log_group(logGroupName=log_group_name)
-
-            call_safe(_delete_log_group)
-
-    yield _clean_up

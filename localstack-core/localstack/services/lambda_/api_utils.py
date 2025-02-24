@@ -8,7 +8,7 @@ import re
 import string
 from typing import TYPE_CHECKING, Any, Optional, Tuple
 
-from localstack.aws.api import CommonServiceException, RequestContext
+from localstack.aws.api import RequestContext
 from localstack.aws.api import lambda_ as api_spec
 from localstack.aws.api.lambda_ import (
     AliasConfiguration,
@@ -27,9 +27,7 @@ from localstack.aws.api.lambda_ import (
     TracingConfig,
     VpcConfigResponse,
 )
-from localstack.services.lambda_.invocation import AccessDeniedException
 from localstack.services.lambda_.runtimes import ALL_RUNTIMES, VALID_LAYER_RUNTIMES, VALID_RUNTIMES
-from localstack.utils.aws.arns import ARN_PARTITION_REGEX, get_partition
 from localstack.utils.collections import merge_recursive
 
 if TYPE_CHECKING:
@@ -46,13 +44,12 @@ if TYPE_CHECKING:
 
 # Pattern for a full (both with and without qualifier) lambda function ARN
 FULL_FN_ARN_PATTERN = re.compile(
-    rf"{ARN_PARTITION_REGEX}:lambda:(?P<region_name>[^:]+):(?P<account_id>\d{{12}}):function:(?P<function_name>[^:]+)(:(?P<qualifier>.*))?$"
+    r"^arn:aws:lambda:(?P<region_name>[^:]+):(?P<account_id>\d{12}):function:(?P<function_name>[^:]+)(:(?P<qualifier>.*))?$"
 )
 
-# Pattern for a full (both with and without qualifier) lambda layer ARN
-# TODO: It looks like they added `|(arn:[a-zA-Z0-9-]+:lambda:::awslayer:[a-zA-Z0-9-_]+` in 2024-11
+# Pattern for a full (both with and without qualifier) lambda function ARN
 LAYER_VERSION_ARN_PATTERN = re.compile(
-    rf"{ARN_PARTITION_REGEX}:lambda:(?P<region_name>[^:]+):(?P<account_id>\d{{12}}):layer:(?P<layer_name>[^:]+)(:(?P<layer_version>\d+))?$"
+    r"^arn:aws:lambda:(?P<region_name>[^:]+):(?P<account_id>\d{12}):layer:(?P<layer_name>[^:]+)(:(?P<layer_version>\d+))?$"
 )
 
 
@@ -95,8 +92,6 @@ VERSION_REGEX = re.compile(r"^[0-9]+$")
 ALIAS_REGEX = re.compile(r"(?!^[0-9]+$)(^[a-zA-Z0-9-_]+$)")
 # Permission statement id
 STATEMENT_ID_REGEX = re.compile(r"^[a-zA-Z0-9-_]+$")
-# Pattern for a valid SubnetId
-SUBNET_ID_REGEX = re.compile(r"^subnet-[0-9a-z]*$")
 
 
 URL_CHAR_SET = string.ascii_lowercase + string.digits
@@ -105,68 +100,6 @@ LAMBDA_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f+0000"
 
 # An unordered list of all Lambda CPU architectures supported by LocalStack.
 ARCHITECTURES = [Architecture.arm64, Architecture.x86_64]
-
-# ARN pattern returned in validation exception messages.
-# Some excpetions from AWS return a '\.' in the function name regex
-# pattern therefore we can sub this value in when appropriate.
-ARN_NAME_PATTERN_VALIDATION_TEMPLATE = "(arn:(aws[a-zA-Z-]*)?:lambda:)?([a-z]{{2}}((-gov)|(-iso([a-z]?)))?-[a-z]+-\\d{{1}}:)?(\\d{{12}}:)?(function:)?([a-zA-Z0-9-_{0}]+)(:(\\$LATEST|[a-zA-Z0-9-_]+))?"
-
-# AWS response when invalid ARNs are used in Tag operations.
-TAGGABLE_RESOURCE_ARN_PATTERN = "arn:(aws[a-zA-Z-]*):lambda:[a-z]{2}((-gov)|(-iso([a-z]?)))?-[a-z]+-\\d{1}:\\d{12}:(function:[a-zA-Z0-9-_]+(:(\\$LATEST|[a-zA-Z0-9-_]+))?|layer:([a-zA-Z0-9-_]+)|code-signing-config:csc-[a-z0-9]{17}|event-source-mapping:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-
-
-def validate_function_name(function_name_or_arn: str, operation_type: str):
-    function_name, *_ = function_locators_from_arn(function_name_or_arn)
-    arn_name_pattern = ARN_NAME_PATTERN_VALIDATION_TEMPLATE.format("")
-    max_length = 170
-
-    match operation_type:
-        case "GetFunction" | "Invoke":
-            arn_name_pattern = ARN_NAME_PATTERN_VALIDATION_TEMPLATE.format(r"\.")
-        case "CreateFunction" if function_name == function_name_or_arn:  # only a function name
-            max_length = 64
-        case "CreateFunction" | "DeleteFunction":
-            max_length = 140
-
-    validations = []
-    if len(function_name_or_arn) > max_length:
-        constraint = f"Member must have length less than or equal to {max_length}"
-        validation_msg = f"Value '{function_name_or_arn}' at 'functionName' failed to satisfy constraint: {constraint}"
-        validations.append(validation_msg)
-
-    if not AWS_FUNCTION_NAME_REGEX.match(function_name_or_arn) or not function_name:
-        constraint = f"Member must satisfy regular expression pattern: {arn_name_pattern}"
-        validation_msg = f"Value '{function_name_or_arn}' at 'functionName' failed to satisfy constraint: {constraint}"
-        validations.append(validation_msg)
-
-    return validations
-
-
-def validate_qualifier(qualifier: str):
-    validations = []
-
-    if len(qualifier) > 128:
-        constraint = "Member must have length less than or equal to 128"
-        validation_msg = (
-            f"Value '{qualifier}' at 'qualifier' failed to satisfy constraint: {constraint}"
-        )
-        validations.append(validation_msg)
-
-    if not QUALIFIER_REGEX.match(qualifier):
-        constraint = "Member must satisfy regular expression pattern: (|[a-zA-Z0-9$_-]+)"
-        validation_msg = (
-            f"Value '{qualifier}' at 'qualifier' failed to satisfy constraint: {constraint}"
-        )
-        validations.append(validation_msg)
-
-    return validations
-
-
-def construct_validation_exception_message(validation_errors):
-    if validation_errors:
-        return f"{len(validation_errors)} validation error{'s' if len(validation_errors) > 1 else ''} detected: {'; '.join(validation_errors)}"
-
-    return None
 
 
 def map_function_url_config(model: "FunctionUrlConfig") -> api_spec.FunctionUrlConfig:
@@ -251,22 +184,14 @@ def get_function_name(function_arn_or_name: str, context: RequestContext) -> str
     return name
 
 
-def function_locators_from_arn(arn: str) -> tuple[str | None, str | None, str | None, str | None]:
+def function_locators_from_arn(arn: str) -> tuple[str, str | None, str | None, str | None]:
     """
     Takes a full or partial arn, or a name
 
     :param arn: Given arn (or name)
     :return: tuple with (name, qualifier, account, region). Qualifier and region are none if missing
     """
-
-    if matched := FUNCTION_NAME_REGEX.match(arn):
-        name = matched.group("name")
-        qualifier = matched.group("qualifier")
-        account = matched.group("account")
-        region = matched.group("region")
-        return (name, qualifier, account, region)
-
-    return None, None, None, None
+    return FUNCTION_NAME_REGEX.match(arn).group("name", "qualifier", "account", "region")
 
 
 def get_account_and_region(function_arn_or_name: str, context: RequestContext) -> Tuple[str, str]:
@@ -284,63 +209,30 @@ def get_name_and_qualifier(
     function_arn_or_name: str, qualifier: str | None, context: RequestContext
 ) -> tuple[str, str | None]:
     """
-    Takes a full or partial arn, or a name and a qualifier.
+    Takes a full or partial arn, or a name and a qualifier
+    Will raise exception if a qualified arn is provided and the qualifier does not match (but is given)
 
     :param function_arn_or_name: Given arn (or name)
     :param qualifier: A qualifier for the function (or None)
     :param context: Request context
     :return: tuple with (name, qualifier). Qualifier is none if missing
-    :raises: `ResourceNotFoundException` when the context's region differs from the ARN's region
-    :raises: `AccessDeniedException` when the context's account ID differs from the ARN's account ID
-    :raises: `ValidationExcpetion` when a function ARN/name or qualifier fails validation checks
-    :raises: `InvalidParameterValueException` when a qualified arn is provided and the qualifier does not match (but is given)
     """
-    function_name, arn_qualifier, account, region = function_locators_from_arn(function_arn_or_name)
-    operation_type = context.operation.name
-
-    if operation_type not in _supported_resource_based_operations:
-        if account and account != context.account_id:
-            raise AccessDeniedException(None)
-
-    # TODO: should this only run if operation type is unsupported?
-    if region and region != context.region:
-        raise ResourceNotFoundException(
-            f"Functions from '{region}' are not reachable in this region ('{context.region}')",
-            Type="User",
-        )
-
-    validation_errors = []
-    if function_arn_or_name:
-        validation_errors.extend(validate_function_name(function_arn_or_name, operation_type))
-
-    if qualifier:
-        validation_errors.extend(validate_qualifier(qualifier))
-
-    is_only_function_name = function_arn_or_name == function_name
-    if validation_errors:
-        message = construct_validation_exception_message(validation_errors)
-        # Edge-case where the error type is not ValidationException
-        if (
-            operation_type == "CreateFunction"
-            and is_only_function_name
-            and arn_qualifier is None
-            and region is None
-        ):  # just name OR partial
-            raise InvalidParameterValueException(message=message, Type="User")
-        raise CommonServiceException(message=message, code="ValidationException")
-
+    function_name, arn_qualifier, _, arn_region = function_locators_from_arn(function_arn_or_name)
     if qualifier and arn_qualifier and arn_qualifier != qualifier:
         raise InvalidParameterValueException(
             "The derived qualifier from the function name does not match the specified qualifier.",
             Type="User",
         )
-
+    if arn_region and arn_region != context.region:
+        raise ResourceNotFoundException(
+            f"Functions from '{arn_region}' are not reachable in this region ('{context.region}')",
+            Type="User",
+        )
     qualifier = qualifier or arn_qualifier
     return function_name, qualifier
 
 
 def build_statement(
-    partition: str,
     resource_arn: str,
     statement_id: str,
     action: str,
@@ -364,9 +256,9 @@ def build_statement(
     if principal.endswith(".amazonaws.com"):
         statement["Principal"] = {"Service": principal}
     elif is_aws_account(principal):
-        statement["Principal"] = {"AWS": f"arn:{partition}:iam::{principal}:root"}
+        statement["Principal"] = {"AWS": f"arn:aws:iam::{principal}:root"}
     # TODO: potentially validate against IAM?
-    elif re.match(f"{ARN_PARTITION_REGEX}:iam:", principal):
+    elif principal.startswith("arn:aws:iam:"):
         statement["Principal"] = {"AWS": principal}
     elif principal == "*":
         statement["Principal"] = principal
@@ -414,14 +306,15 @@ def generate_random_url_id() -> str:
 
 def unqualified_lambda_arn(function_name: str, account: str, region: str):
     """
-    Generate an unqualified lambda arn
+    Generate a unqualified lambda arn
 
     :param function_name: Function name (not an arn!)
     :param account: Account ID
     :param region: Region
     :return: Unqualified lambda arn
     """
-    return f"arn:{get_partition(region)}:lambda:{region}:{account}:function:{function_name}"
+    # TODO should get partition here, but current way is too expensive (15-120ms) using aws_stack get_partition
+    return f"arn:aws:lambda:{region}:{account}:function:{function_name}"
 
 
 def qualified_lambda_arn(
@@ -637,18 +530,21 @@ def map_alias_out(alias: "VersionAlias", function: "Function") -> AliasConfigura
     )
 
 
-def validate_and_set_batch_size(service: str, batch_size: Optional[int] = None) -> int:
+def validate_and_set_batch_size(event_source_arn: str, batch_size: Optional[int] = None) -> int:
     min_batch_size = 1
 
     BATCH_SIZE_RANGES = {
         "kafka": (100, 10_000),
         "kinesis": (100, 10_000),
-        "dynamodb": (100, 10_000),
+        "dynamodb": (100, 1_000),
         "sqs-fifo": (10, 10),
         "sqs": (10, 10_000),
         "mq": (100, 10_000),
     }
-    svc_range = BATCH_SIZE_RANGES.get(service)
+    svc = event_source_arn.split(":")[2]  # arn:<parition>:<svc>:<region>:...
+    if svc == "sqs" and "fifo" in event_source_arn:
+        svc = "sqs-fifo"
+    svc_range = BATCH_SIZE_RANGES.get(svc)
 
     if svc_range:
         default_batch_size, max_batch_size = svc_range
@@ -683,11 +579,11 @@ def map_layer_out(layer_version: "LayerVersion") -> PublishLayerVersionResponse:
 
 
 def layer_arn(layer_name: str, account: str, region: str):
-    return f"arn:{get_partition(region)}:lambda:{region}:{account}:layer:{layer_name}"
+    return f"arn:aws:lambda:{region}:{account}:layer:{layer_name}"
 
 
 def layer_version_arn(layer_name: str, account: str, region: str, version: str):
-    return f"arn:{get_partition(region)}:lambda:{region}:{account}:layer:{layer_name}:{version}"
+    return f"arn:aws:lambda:{region}:{account}:layer:{layer_name}:{version}"
 
 
 def parse_layer_arn(layer_version_arn: str) -> Tuple[str, str, str, str]:
@@ -730,35 +626,5 @@ def is_layer_arn(layer_name: str) -> bool:
     return LAYER_VERSION_ARN_PATTERN.match(layer_name) is not None
 
 
-# See Lambda API actions that support resource-based IAM policies
-# https://docs.aws.amazon.com/lambda/latest/dg/access-control-resource-based.html#permissions-resource-api
-_supported_resource_based_operations = {
-    "CreateAlias",
-    "DeleteAlias",
-    "DeleteFunction",
-    "DeleteFunctionConcurrency",
-    "DeleteFunctionEventInvokeConfig",
-    "DeleteProvisionedConcurrencyConfig",
-    "GetAlias",
-    "GetFunction",
-    "GetFunctionConcurrency",
-    "GetFunctionConfiguration",
-    "GetFunctionEventInvokeConfig",
-    "GetPolicy",
-    "GetProvisionedConcurrencyConfig",
-    "Invoke",
-    "ListAliases",
-    "ListFunctionEventInvokeConfigs",
-    "ListProvisionedConcurrencyConfigs",
-    "ListTags",
-    "ListVersionsByFunction",
-    "PublishVersion",
-    "PutFunctionConcurrency",
-    "PutFunctionEventInvokeConfig",
-    "PutProvisionedConcurrencyConfig",
-    "TagResource",
-    "UntagResource",
-    "UpdateAlias",
-    "UpdateFunctionCode",
-    "UpdateFunctionEventInvokeConfig",
-}
+def validate_function_name(function_name):
+    return AWS_FUNCTION_NAME_REGEX.match(function_name)

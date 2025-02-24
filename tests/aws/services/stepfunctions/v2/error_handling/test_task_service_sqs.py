@@ -19,6 +19,7 @@ from tests.aws.services.stepfunctions.templates.services.services_templates impo
 
 @markers.snapshot.skip_snapshot_verify(
     paths=[
+        "$..tracingConfiguration",
         # TODO: add support for Sdk Http metadata.
         "$..SdkHttpMetadata",
         "$..SdkResponseMetadata",
@@ -32,7 +33,7 @@ class TestTaskServiceSqs:
     def test_send_message_no_such_queue(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_snapshot,
     ):
@@ -49,8 +50,8 @@ class TestTaskServiceSqs:
         message_body = "test_message_body"
         exec_input = json.dumps({"QueueUrl": queue_url, "MessageBody": message_body})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -61,7 +62,7 @@ class TestTaskServiceSqs:
     def test_send_message_no_such_queue_no_catch(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sfn_snapshot,
     ):
@@ -78,8 +79,8 @@ class TestTaskServiceSqs:
         message_body = "test_message_body"
         exec_input = json.dumps({"QueueUrl": queue_url, "MessageBody": message_body})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -93,7 +94,7 @@ class TestTaskServiceSqs:
     def test_send_message_empty_body(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sqs_create_queue,
         sfn_snapshot,
@@ -110,8 +111,8 @@ class TestTaskServiceSqs:
 
         exec_input = json.dumps({"QueueUrl": queue_url, "MessageBody": None})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,
@@ -122,7 +123,7 @@ class TestTaskServiceSqs:
     def test_sqs_failure_in_wait_for_task_tok(
         self,
         aws_client,
-        create_state_machine_iam_role,
+        create_iam_role_for_sfn,
         create_state_machine,
         sqs_create_queue,
         sqs_send_task_failure_state_machine,
@@ -151,8 +152,8 @@ class TestTaskServiceSqs:
         message_txt = "test_message_txt"
         exec_input = json.dumps({"QueueUrl": queue_url, "Message": message_txt})
         create_and_record_execution(
-            aws_client,
-            create_state_machine_iam_role,
+            aws_client.stepfunctions,
+            create_iam_role_for_sfn,
             create_state_machine,
             sfn_snapshot,
             definition,

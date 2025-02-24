@@ -9,7 +9,6 @@ from localstack_snapshot.snapshots.transformer import (
     RegexTransformer,
 )
 
-from localstack.aws.api.stepfunctions import StateMachineType
 from localstack.testing.aws.util import is_aws_cloud
 from localstack.testing.pytest.stepfunctions.utils import await_execution_success
 from localstack.utils.strings import short_uid
@@ -21,52 +20,6 @@ LOG = logging.getLogger(__name__)
 def sfn_snapshot(snapshot):
     snapshot.add_transformers_list(snapshot.transform.stepfunctions_api())
     return snapshot
-
-
-@pytest.fixture
-def sfn_batch_snapshot(sfn_snapshot):
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(jsonpath="$..JobDefinition", replacement="job-definition")
-    )
-    sfn_snapshot.add_transformer(JsonpathTransformer(jsonpath="$..JobName", replacement="job-name"))
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(jsonpath="$..JobQueue", replacement="job-queue")
-    )
-    sfn_snapshot.add_transformer(JsonpathTransformer(jsonpath="$..roleArn", replacement="role-arn"))
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(
-            jsonpath="$..x-amz-apigw-id", replacement="x-amz-apigw-id", replace_reference=False
-        )
-    )
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(
-            jsonpath="$..X-Amzn-Trace-Id", replacement="X-Amzn-Trace-Id", replace_reference=False
-        )
-    )
-    sfn_snapshot.add_transformer(JsonpathTransformer(jsonpath="$..TaskArn", replacement="task-arn"))
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(jsonpath="$..ExecutionRoleArn", replacement="execution-role-arn")
-    )
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(jsonpath="$..LogStreamName", replacement="log-stream-name")
-    )
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(jsonpath="$..StartedAt", replacement="time", replace_reference=False)
-    )
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(jsonpath="$..StoppedAt", replacement="time", replace_reference=False)
-    )
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(jsonpath="$..CreatedAt", replacement="time", replace_reference=False)
-    )
-    sfn_snapshot.add_transformer(
-        JsonpathTransformer(
-            jsonpath="$..PrivateIpv4Address",
-            replacement="private-ipv4-address",
-            replace_reference=False,
-        )
-    )
-    return sfn_snapshot
 
 
 @pytest.fixture
@@ -138,18 +91,19 @@ def sfn_ecs_snapshot(sfn_snapshot):
 
 
 @pytest.fixture
-def aws_client_no_sync_prefix(aws_client_factory):
-    # For StartSyncExecution and TestState calls, boto will prepend "sync-" to the endpoint string.
-    # As we operate on localhost, this function creates a new stepfunctions client with that functionality disabled.
-    return aws_client_factory(config=Config(inject_host_prefix=is_aws_cloud()))
+def stepfunctions_client_test_state(aws_client_factory):
+    # For TestState calls, boto will prepend "sync-" to the endpoint string. As we operate on localhost,
+    # this function creates a new stepfunctions client with that functionality disabled.
+    # Using this client only for test_state calls forces future occurrences to handle this issue explicitly.
+    return aws_client_factory(config=Config(inject_host_prefix=is_aws_cloud())).stepfunctions
 
 
 @pytest.fixture
-def create_state_machine_iam_role(cleanups, create_state_machine):
-    def _create(target_aws_client):
-        iam_client = target_aws_client.iam
-        stepfunctions_client = target_aws_client.stepfunctions
+def create_iam_role_for_sfn(aws_client, cleanups, create_state_machine):
+    iam_client = aws_client.iam
+    stepfunctions_client = aws_client.stepfunctions
 
+    def _create():
         role_name = f"test-sfn-role-{short_uid()}"
         policy_name = f"test-sfn-policy-{short_uid()}"
         role = iam_client.create_role(
@@ -215,7 +169,7 @@ def create_state_machine_iam_role(cleanups, create_state_machine):
                 },
             }
             creation_resp = create_state_machine(
-                target_aws_client, name=sm_name, definition=json.dumps(sm_def), roleArn=role_arn
+                name=sm_name, definition=json.dumps(sm_def), roleArn=role_arn
             )
             state_machine_arn = creation_resp["stateMachineArn"]
 
@@ -239,31 +193,26 @@ def create_state_machine_iam_role(cleanups, create_state_machine):
 
 
 @pytest.fixture
-def create_state_machine():
-    created_state_machine_references = list()
+def create_state_machine(aws_client):
+    _state_machine_arns: Final[list[str]] = list()
 
-    def _create_state_machine(target_aws_client, **kwargs):
-        sfn_client = target_aws_client.stepfunctions
-        create_output = sfn_client.create_state_machine(**kwargs)
+    def _create_state_machine(**kwargs):
+        create_output = aws_client.stepfunctions.create_state_machine(**kwargs)
         create_output_arn = create_output["stateMachineArn"]
-        created_state_machine_references.append(
-            (create_output_arn, kwargs.get("type", StateMachineType.STANDARD), sfn_client)
-        )
+        _state_machine_arns.append(create_output_arn)
         return create_output
 
     yield _create_state_machine
 
-    # Delete all state machine, attempting to stop all running executions of STANDARD state machines,
-    # as other types, such as EXPRESS, cannot be manually stopped.
-    for arn, typ, client in created_state_machine_references:
+    for state_machine_arn in _state_machine_arns:
         try:
-            if typ == StateMachineType.STANDARD:
-                executions = client.list_executions(stateMachineArn=arn)
-                for execution in executions["executions"]:
-                    client.stop_execution(executionArn=execution["executionArn"])
-            client.delete_state_machine(stateMachineArn=arn)
-        except Exception as ex:
-            LOG.debug("Unable to delete state machine '%s' during cleanup: %s", arn, ex)
+            executions = aws_client.stepfunctions.list_executions(stateMachineArn=state_machine_arn)
+            for execution in executions["executions"]:
+                aws_client.stepfunctions.stop_execution(executionArn=execution["executionArn"])
+
+            aws_client.stepfunctions.delete_state_machine(stateMachineArn=state_machine_arn)
+        except Exception:
+            LOG.debug(f"Unable to delete state machine '{state_machine_arn}' during cleanup.")
 
 
 @pytest.fixture
@@ -282,15 +231,13 @@ def create_activity(aws_client):
         try:
             aws_client.stepfunctions.delete_activity(activityArn=activity_arn)
         except Exception:
-            LOG.debug("Unable to delete Activity '%s' during cleanup.", activity_arn)
+            LOG.debug(f"Unable to delete Activity '{activity_arn}' during cleanup.")
 
 
 @pytest.fixture
-def sqs_send_task_success_state_machine(
-    aws_client, create_state_machine, create_state_machine_iam_role
-):
+def sqs_send_task_success_state_machine(aws_client, create_state_machine, create_iam_role_for_sfn):
     def _create_state_machine(sqs_queue_url):
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
         sm_name: str = f"sqs_send_task_success_state_machine_{short_uid()}"
 
         template = {
@@ -364,7 +311,7 @@ def sqs_send_task_success_state_machine(
         }
 
         creation_resp = create_state_machine(
-            aws_client, name=sm_name, definition=json.dumps(template), roleArn=snf_role_arn
+            name=sm_name, definition=json.dumps(template), roleArn=snf_role_arn
         )
         state_machine_arn = creation_resp["stateMachineArn"]
 
@@ -377,11 +324,9 @@ def sqs_send_task_success_state_machine(
 
 
 @pytest.fixture
-def sqs_send_task_failure_state_machine(
-    aws_client, create_state_machine, create_state_machine_iam_role
-):
+def sqs_send_task_failure_state_machine(aws_client, create_state_machine, create_iam_role_for_sfn):
     def _create_state_machine(sqs_queue_url):
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
         sm_name: str = f"sqs_send_task_failure_state_machine_{short_uid()}"
 
         template = {
@@ -456,7 +401,7 @@ def sqs_send_task_failure_state_machine(
         }
 
         creation_resp = create_state_machine(
-            aws_client, name=sm_name, definition=json.dumps(template), roleArn=snf_role_arn
+            name=sm_name, definition=json.dumps(template), roleArn=snf_role_arn
         )
         state_machine_arn = creation_resp["stateMachineArn"]
 
@@ -470,10 +415,10 @@ def sqs_send_task_failure_state_machine(
 
 @pytest.fixture
 def sqs_send_heartbeat_and_task_success_state_machine(
-    aws_client, create_state_machine, create_state_machine_iam_role
+    aws_client, create_state_machine, create_iam_role_for_sfn
 ):
     def _create_state_machine(sqs_queue_url):
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
         sm_name: str = f"sqs_send_heartbeat_and_task_success_state_machine_{short_uid()}"
 
         template = {
@@ -559,7 +504,7 @@ def sqs_send_heartbeat_and_task_success_state_machine(
         }
 
         creation_resp = create_state_machine(
-            aws_client, name=sm_name, definition=json.dumps(template), roleArn=snf_role_arn
+            name=sm_name, definition=json.dumps(template), roleArn=snf_role_arn
         )
         state_machine_arn = creation_resp["stateMachineArn"]
 
@@ -572,14 +517,14 @@ def sqs_send_heartbeat_and_task_success_state_machine(
 
 
 @pytest.fixture
-def sfn_activity_consumer(aws_client, create_state_machine, create_state_machine_iam_role):
+def sfn_activity_consumer(aws_client, create_state_machine, create_iam_role_for_sfn):
     def _create_state_machine(template, activity_arn):
-        snf_role_arn = create_state_machine_iam_role(aws_client)
+        snf_role_arn = create_iam_role_for_sfn()
         sm_name: str = f"activity_send_task_failure_on_task_{short_uid()}"
         definition = json.dumps(template)
 
         creation_resp = create_state_machine(
-            aws_client, name=sm_name, definition=definition, roleArn=snf_role_arn
+            name=sm_name, definition=definition, roleArn=snf_role_arn
         )
         state_machine_arn = creation_resp["stateMachineArn"]
 
@@ -696,7 +641,7 @@ def sfn_glue_create_job(aws_client, create_role, create_policy, wait_and_assume_
             aws_client.glue.delete_job(JobName=job_name)
         except Exception as ex:
             # TODO: the glue provider should not fail on deletion of deleted job, however this is currently the case.
-            LOG.warning("Could not delete job '%s': %s", job_name, ex)
+            LOG.warning(f"Could not delete job '{job_name}': {ex}")
 
 
 @pytest.fixture
@@ -717,97 +662,4 @@ def sfn_create_log_group(aws_client, snapshot):
         try:
             aws_client.logs.delete_log_group(logGroupName=log_group_name)
         except Exception:
-            LOG.debug("Cannot delete log group %s", log_group_name)
-
-
-@pytest.fixture
-def create_cross_account_admin_role_and_policy(create_state_machine, create_state_machine_iam_role):
-    created = list()
-
-    def _create_role_and_policy(trusting_aws_client, trusted_aws_client, trusted_account_id) -> str:
-        trusting_iam_client = trusting_aws_client.iam
-
-        role_name = f"admin-test-role-cross-account-{short_uid()}"
-        policy_name = f"admin-test-policy-cross-account-{short_uid()}"
-
-        trust_policy = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {"AWS": f"arn:aws:iam::{trusted_account_id}:root"},
-                    "Action": "sts:AssumeRole",
-                }
-            ],
-        }
-
-        create_role_response = trusting_iam_client.create_role(
-            RoleName=role_name,
-            AssumeRolePolicyDocument=json.dumps(trust_policy),
-        )
-        role_arn = create_role_response["Role"]["Arn"]
-
-        policy_document = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": "*",
-                    "Resource": "*",
-                }
-            ],
-        }
-
-        trusting_iam_client.put_role_policy(
-            RoleName=role_name, PolicyName=policy_name, PolicyDocument=json.dumps(policy_document)
-        )
-
-        def _wait_sfn_can_assume_admin_role():
-            trusted_stepfunctions_client = trusted_aws_client.stepfunctions
-            sm_name = f"test-wait-sfn-can-assume-cross-account-admin-role-{short_uid()}"
-            sm_role = create_state_machine_iam_role(trusted_aws_client)
-            sm_def = {
-                "StartAt": "PullAssumeRole",
-                "States": {
-                    "PullAssumeRole": {
-                        "Type": "Task",
-                        "Parameters": {},
-                        "Resource": "arn:aws:states:::aws-sdk:s3:listBuckets",
-                        "Credentials": {"RoleArn": role_arn},
-                        "Retry": [
-                            {
-                                "ErrorEquals": ["States.ALL"],
-                                "IntervalSeconds": 2,
-                                "MaxAttempts": 60,
-                            }
-                        ],
-                        "End": True,
-                    }
-                },
-            }
-            creation_response = create_state_machine(
-                trusted_aws_client, name=sm_name, definition=json.dumps(sm_def), roleArn=sm_role
-            )
-            state_machine_arn = creation_response["stateMachineArn"]
-
-            exec_resp = trusted_stepfunctions_client.start_execution(
-                stateMachineArn=state_machine_arn, input="{}"
-            )
-            execution_arn = exec_resp["executionArn"]
-
-            await_execution_success(
-                stepfunctions_client=trusted_stepfunctions_client, execution_arn=execution_arn
-            )
-
-            trusted_stepfunctions_client.delete_state_machine(stateMachineArn=state_machine_arn)
-
-        if is_aws_cloud():
-            _wait_sfn_can_assume_admin_role()
-
-        return role_arn
-
-    yield _create_role_and_policy
-
-    for aws_client, role_name, policy_name in created:
-        aws_client.iam.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
-        aws_client.iam.delete_role(RoleName=role_name)
+            LOG.debug(f"Cannot delete log group {log_group_name}")

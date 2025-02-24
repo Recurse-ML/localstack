@@ -25,9 +25,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install release helper dependencies
-        run: pip install --upgrade setuptools setuptools_scm
-
       - name: Cache LocalStack community dependencies (venv)
         uses: actions/cache@v4
         with:
@@ -79,6 +76,7 @@ jobs:
           echo "Pinning botocore, boto3, and boto3-stubs to version $BOTOCORE_VERSION"
           bin/release-helper.sh set-dep-ver botocore "==$BOTOCORE_VERSION"
           bin/release-helper.sh set-dep-ver boto3 "==$BOTOCORE_VERSION"
+          bin/release-helper.sh set-dep-ver boto3-stubs "==$BOTOCORE_VERSION"
 
           # upgrade the requirements files only for the botocore package
           pip install pip-tools
@@ -86,7 +84,7 @@ jobs:
           pip-compile --strip-extras --upgrade-package "botocore==$BOTOCORE_VERSION" --upgrade-package "boto3==$BOTOCORE_VERSION" --upgrade-package "awscli" --extra runtime -o requirements-runtime.txt pyproject.toml
           pip-compile --strip-extras --upgrade-package "botocore==$BOTOCORE_VERSION" --upgrade-package "boto3==$BOTOCORE_VERSION" --upgrade-package "awscli" --extra test -o requirements-test.txt pyproject.toml
           pip-compile --strip-extras --upgrade-package "botocore==$BOTOCORE_VERSION" --upgrade-package "boto3==$BOTOCORE_VERSION" --upgrade-package "awscli" --extra dev -o requirements-dev.txt pyproject.toml
-          pip-compile --strip-extras --upgrade-package "botocore==$BOTOCORE_VERSION" --upgrade-package "boto3==$BOTOCORE_VERSION" --upgrade-package "awscli" --extra typehint -o requirements-typehint.txt pyproject.toml
+          pip-compile --strip-extras --upgrade-package "botocore==$BOTOCORE_VERSION" --upgrade-package "boto3==$BOTOCORE_VERSION" --upgrade-package "awscli" --upgrade-package "boto3-stubs==$BOTOCORE_VERSION" --extra typehint -o requirements-typehint.txt pyproject.toml
 
       - name: Read PR markdown template
         if: ${{ success() && steps.check-for-changes.outputs.diff-count != '0' && steps.check-for-changes.outputs.diff-count != '' }}
@@ -98,14 +96,14 @@ jobs:
       - name: Add changed services to template
         if: ${{ success() && steps.check-for-changes.outputs.diff-count != '0' && steps.check-for-changes.outputs.diff-count != '' }}
         id: markdown
-        uses: mad9000/actions-find-and-replace-string@5
+        uses: mad9000/actions-find-and-replace-string@4
         with:
           source: ${{ steps.template.outputs.content }}
           find: '{{ SERVICES }}'
           replace: ${{ steps.check-for-changes.outputs.changed-services }}
 
       - name: Create PR
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v6
         if: ${{ success() && steps.check-for-changes.outputs.diff-count != '0' && steps.check-for-changes.outputs.diff-count != '' }}
         with:
           title: "Update ASF APIs"
@@ -116,4 +114,4 @@ jobs:
           commit-message: "update generated ASF APIs to latest version"
           labels: "area: asf, area: dependencies, semver: patch"
           token: ${{ secrets.PRO_ACCESS_TOKEN }}
-          reviewers: silv-io,alexrashed
+          reviewers: alexrashed

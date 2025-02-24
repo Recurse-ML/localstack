@@ -428,15 +428,3 @@ class DynamoDBTableProvider(ResourceProvider[DynamoDBTableProperties]):
         if args:
             args["TableName"] = properties["TableName"]
         return args
-
-    def list(
-        self,
-        request: ResourceRequest[DynamoDBTableProperties],
-    ) -> ProgressEvent[DynamoDBTableProperties]:
-        resources = request.aws_client_factory.dynamodb.list_tables()
-        return ProgressEvent(
-            status=OperationStatus.SUCCESS,
-            resource_models=[
-                DynamoDBTableProperties(TableName=resource) for resource in resources["TableNames"]
-            ],
-        )

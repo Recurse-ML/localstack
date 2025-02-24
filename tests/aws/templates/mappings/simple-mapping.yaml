@@ -5,10 +5,6 @@ Parameters:
   TopicNameSuffixSelector:
     Type: String
 
-  TopicAttributeSelector:
-    Type: String
-    Default: Suffix
-
 Resources:
   MyTopic:
     Type: AWS::SNS::Topic
@@ -17,7 +13,7 @@ Resources:
         "Fn::Join":
           - "-"
           - - !Ref TopicName
-            - !FindInMap [TopicSuffixMap, !Ref TopicNameSuffixSelector, !Ref TopicAttributeSelector]
+            - !FindInMap [TopicSuffixMap, !Ref TopicNameSuffixSelector, Suffix]
 
 Mappings:
   TopicSuffixMap:

@@ -11,13 +11,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: test-role-123
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
+      AssumeRolePolicyDocument: {}
   MyFunc:
     Type: AWS::Serverless::Function
     Properties:

@@ -11,7 +11,6 @@ import pytest
 import requests
 from botocore.auth import SigV4Auth
 from botocore.exceptions import ClientError
-from moto.secretsmanager.utils import SecretsManagerSecretIdentifier
 
 from localstack.aws.api.lambda_ import Runtime
 from localstack.aws.api.secretsmanager import (
@@ -23,7 +22,6 @@ from localstack.aws.api.secretsmanager import (
 )
 from localstack.testing.config import TEST_AWS_ACCESS_KEY_ID, TEST_AWS_REGION_NAME
 from localstack.testing.pytest import markers
-from localstack.testing.snapshots.transformer_utility import TransformerUtility
 from localstack.utils.aws import aws_stack
 from localstack.utils.aws.request_context import mock_aws_request_headers
 from localstack.utils.collections import select_from_typed_dict
@@ -79,9 +77,9 @@ class TestSecretsManager:
             secret_ids: set[str] = {secret["Name"] for secret in lst.get("SecretList", [])}
             return secret_id in secret_ids
 
-        assert poll_condition(condition=_is_secret_in_list, timeout=60, interval=2), (
-            f"Retried check for listing of {secret_id=} timed out"
-        )
+        assert poll_condition(
+            condition=_is_secret_in_list, timeout=60, interval=2
+        ), f"Retried check for listing of {secret_id=} timed out"
 
     @staticmethod
     def _wait_force_deletion_completed(client, secret_id: str):
@@ -99,8 +97,7 @@ class TestSecretsManager:
         success = poll_condition(condition=_is_secret_deleted, timeout=120, interval=30)
         if not success:
             LOG.warning(
-                "Timed out whilst awaiting for force deletion of secret '%s' to complete.",
-                secret_id,
+                f"Timed out whilst awaiting for force deletion of secret '{secret_id}' to complete."
             )
 
     @staticmethod
@@ -117,8 +114,7 @@ class TestSecretsManager:
         success = poll_condition(condition=_is_secret_rotated, timeout=120, interval=5)
         if not success:
             LOG.warning(
-                "Timed out whilst awaiting for secret '%s' to be rotated to new version.",
-                secret_id,
+                f"Timed out whilst awaiting for secret '{secret_id}' to be rotated to new version."
             )
 
     @pytest.mark.parametrize(
@@ -217,29 +213,6 @@ class TestSecretsManager:
         sm_snapshot.match("list_secret_version_ids_not_found_ex", not_found.value.response)
 
     @markers.aws.validated
-    def test_secret_version_not_found(self, secret_name: str, sm_snapshot, cleanups, aws_client):
-        aws_client.secretsmanager.create_secret(
-            Name=secret_name,
-        )
-
-        version_id = str(uuid.uuid4())
-        sm_snapshot.add_transformer(sm_snapshot.transform.regex(version_id, "<version-id>"))
-
-        with pytest.raises(ClientError) as not_found:
-            aws_client.secretsmanager.get_secret_value(SecretId=secret_name)
-        sm_snapshot.match("get_secret_value_no_version_ex", not_found.value)
-
-        with pytest.raises(ClientError) as not_found:
-            aws_client.secretsmanager.get_secret_value(SecretId=secret_name, VersionId=version_id)
-        sm_snapshot.match("get_secret_value_version_not_found_ex", not_found.value)
-
-        with pytest.raises(ClientError) as not_found:
-            aws_client.secretsmanager.get_secret_value(
-                SecretId=secret_name, VersionStage="AWSPENDING"
-            )
-        sm_snapshot.match("get_secret_value_stage_not_found_ex", not_found.value)
-
-    @markers.aws.validated
     def test_call_lists_secrets_multiple_times(self, secret_name, aws_client, cleanups):
         aws_client.secretsmanager.create_secret(
             Name=secret_name,
@@ -310,12 +283,12 @@ class TestSecretsManager:
 
         def assert_secret_names(res: dict, include_secrets: set[str], exclude_secrets: set[str]):
             secret_names = {secret["Name"] for secret in res["SecretList"]}
-            assert (include_secrets - secret_names) == set(), (
-                "At least one secret which should be included is not."
-            )
-            assert (exclude_secrets - secret_names) == exclude_secrets, (
-                "At least one secret which should not be included is."
-            )
+            assert (
+                include_secrets - secret_names
+            ) == set(), "At least one secret which should be included is not."
+            assert (
+                exclude_secrets - secret_names
+            ) == exclude_secrets, "At least one secret which should not be included is."
 
         response = aws_client.secretsmanager.list_secrets(
             Filters=[{"Key": "name", "Values": ["/"]}]
@@ -550,7 +523,7 @@ class TestSecretsManager:
         function_arn = create_lambda_function(
             handler_file=TEST_LAMBDA_ROTATE_SECRET,
             func_name=function_name,
-            runtime=Runtime.python3_12,
+            runtime=Runtime.python3_9,
         )["CreateFunctionResponse"]["FunctionArn"]
 
         aws_client.lambda_.add_permission(
@@ -2396,99 +2369,6 @@ class TestSecretsManager:
                 SecretId=secret_name, VersionId=version_id, VersionStage="AWSPREVIOUS"
             )
         sm_snapshot.match("mismatch_version_id_and_stage", exc.value.response)
-
-    @markers.aws.validated
-    def test_get_secret_value(
-        self, aws_client, aws_http_client_factory, region_name, create_secret, sm_snapshot
-    ):
-        """
-        This is a regession test for #11319
-        AWS returns decoded value when fetching secret from a SDK
-        but AWS returns base64 encoded value for a plain HTTP API request
-        This tests tries to verify both of these behaviours.
-        """
-        secret_name = short_uid()
-        secret_string = "footest"
-
-        response = create_secret(
-            Name=secret_name,
-            SecretBinary=secret_string,
-        )
-
-        sm_snapshot.add_transformers_list(
-            sm_snapshot.transform.secretsmanager_secret_id_arn(response, 0)
-        )
-
-        secret_arn = response["ARN"]
-
-        # Testing from Boto client
-
-        secret_value_response = aws_client.secretsmanager.get_secret_value(SecretId=secret_arn)
-
-        sm_snapshot.match("secret_value_response", secret_value_response)
-
-        # Testing as HTTP request
-
-        client = aws_http_client_factory(
-            "secretsmanager", region=region_name, signer_factory=SigV4Auth
-        )
-        parameters = {"SecretId": secret_name}
-
-        headers = {
-            "X-Amz-Target": "secretsmanager.GetSecretValue",
-            "Content-Type": "application/x-amz-json-1.1",
-        }
-
-        response = client.post("/", data=json.dumps(parameters), headers=headers)
-        json_response = response.json()
-
-        sm_snapshot.add_transformer(
-            TransformerUtility.jsonpath("$..CreatedDate", "datetime", reference_replacement=False)
-        )
-        sm_snapshot.match("secret_value_http_response", json_response)
-
-    @markers.aws.only_localstack
-    def test_create_secret_with_custom_id(
-        self, account_id, region_name, create_secret, set_resource_custom_id
-    ):
-        secret_name = short_uid()
-        custom_id = "TestID"
-        set_resource_custom_id(
-            SecretsManagerSecretIdentifier(
-                account_id=account_id, region=region_name, secret_id=secret_name
-            ),
-            custom_id,
-        )
-
-        secret = create_secret(Name=secret_name, SecretBinary="test-secret")
-
-        assert secret["ARN"].split(":")[-1] == "-".join((secret_name, custom_id))
-
-    @markers.aws.validated
-    def test_force_delete_deleted_secret(self, sm_snapshot, secret_name, aws_client):
-        """Test if a deleted secret can be force deleted afterwards."""
-        create_secret_response = aws_client.secretsmanager.create_secret(
-            Name=secret_name, SecretString=f"secretstr-{short_uid()}"
-        )
-        sm_snapshot.match("create_secret_response", create_secret_response)
-        secret_id = create_secret_response["ARN"]
-
-        sm_snapshot.add_transformer(
-            sm_snapshot.transform.secretsmanager_secret_id_arn(create_secret_response, 0)
-        )
-
-        delete_secret_response = aws_client.secretsmanager.delete_secret(SecretId=secret_id)
-        sm_snapshot.match("delete_secret_response", delete_secret_response)
-
-        describe_secret_response = aws_client.secretsmanager.describe_secret(SecretId=secret_id)
-        sm_snapshot.match("describe_secret_response", describe_secret_response)
-
-        force_delete_secret_response = aws_client.secretsmanager.delete_secret(
-            SecretId=secret_id, ForceDeleteWithoutRecovery=True
-        )
-        sm_snapshot.match("force_delete_secret_response", force_delete_secret_response)
-
-        self._wait_force_deletion_completed(aws_client.secretsmanager, secret_id)
 
 
 class TestSecretsManagerMultiAccounts:

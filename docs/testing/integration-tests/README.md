@@ -46,12 +46,12 @@ class TestMyThing:
 
 ### Fixtures
 
-We use the pytest fixture concept, and provide several fixtures you can use when writing AWS tests. For example, to inject a boto client factory for all services, you can specify the `aws_client` fixture in your test method and access a client from it:
+We use the pytest fixture concept, and provide several fixtures you can use when writing AWS tests. For example, to inject a Boto client for SQS, you can specify the `sqs_client` in your test method:
 
 ```python
 class TestMyThing:
-  def test_something(self, aws_client):
-    assert len(aws_client.sqs.list_queues()["QueueUrls"]) == 0
+  def test_something(self, sqs_client):
+    assert len(sqs_client.list_queues()["QueueUrls"]) == 0
 ```
 
 We also provide fixtures for certain disposable resources, like buckets:
@@ -72,7 +72,7 @@ def test_something_on_multiple_buckets(s3_create_bucket):
   # both buckets will be deleted after the test returns
 ```
 
-You can find the list of available fixtures in the [fixtures.py](https://github.com/localstack/localstack/blob/master/localstack-core/localstack/testing/pytest/fixtures.py) file.
+You can find the list of available fixtures in the [fixtures.py](https://github.com/localstack/localstack/blob/master/localstack/testing/pytest/fixtures.py).
 
 
 ## Running the test suite
@@ -94,7 +94,7 @@ python -m pytest --log-cli-level=INFO tests/integration
 You can further specify the file and test class you want to run in the test path:
 
 ```bash
-TEST_PATH="tests/integration/docker_utils/test_docker.py::TestDockerClient" make test
+TEST_PATH="tests/integration/docker/test_docker.py::TestDockerClient" make test
 ```
 
 ### Test against a running LocalStack instance
@@ -118,7 +118,7 @@ Ideally every integration is tested against real AWS. To run the integration tes
 6.  Go to the newly created user under `IAM/Users`, go to the `Security Credentials` tab, and click on **Create access key** within the `Access Keys` section.
 7.  Pick the **Local code** option and check the **I understand the above recommendation and want to proceed to create an access key** box.
 8.  Click on **Create access key** and copy the Access Key ID and the Secret access key immediately.
-9.  Run `aws configure --profile ls-sandbox` and enter the Access Key ID, and the Secret access key when prompted.
+9.  Run `aws configure —-profile ls-sandbox` and enter the Access Key ID, and the Secret access key when prompted.
 10.  Verify that the profile is set up correctly by running: `aws sts get-caller-identity --profile ls-sandbox`.
 
 Here is how `~/.aws/credentials` should look like:
@@ -161,22 +161,8 @@ Once you're confident your test is reliably working against AWS you can add the 
 
 #### Create a snapshot test
 
-Once you verified that your test is running against AWS, you can record snapshots for the test run. A snapshot records the response from AWS and can be later on used to compare the response of LocalStack.
+Once you verified that your test is running against AWS, you can record snapshots for the test run. A snapshot records the response from AWS and can be later on used to compare the response of LocalStack. 
 
-Snapshot tests helps to increase the parity with AWS and to raise the confidence in the service implementations. Therefore, snapshot tests are preferred over normal integrations tests.
+Snapshot tests helps to increase the parity with AWS and to raise the confidence in the service implementations. Therefore, snapshot tests are preferred over normal integrations tests. 
 
-Please check our subsequent guide on [Parity Testing](../parity-testing/README.md) for a detailed explanation on how to write AWS validated snapshot tests.
-
-#### Force the start of a local instance
-
-When running test with `TEST_TARGET=AWS_CLOUD`, by default, no localstack instance will be created. This can be bypassed by also setting `TEST_FORCE_LOCALSTACK_START=1`.
-
-Note that the `aws_client` fixture will keep pointing at the aws instance and you will need to create your own client factory using the `aws_client_factory`.
-
-```python
-local_client = aws_client_factory(
-    endpoint_url=f"http://{localstack_host()}",
-    aws_access_key_id="test",
-    aws_secret_access_key="test",
-)
-```
+Please check our subsequent guide on [Parity Testing](parity-testing.md) for a detailed explanation on how to write AWS validated snapshot tests.

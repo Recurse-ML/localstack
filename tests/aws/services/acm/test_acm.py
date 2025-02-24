@@ -14,7 +14,10 @@ class TestACM:
     @markers.snapshot.skip_snapshot_verify(
         paths=[
             "$..Certificate.CreatedAt",
-            "$..Certificate.DomainValidationOptions",
+            "$..Certificate.DomainValidationOptions..ResourceRecord",
+            "$..Certificate.DomainValidationOptions..ValidationDomain",
+            "$..Certificate.DomainValidationOptions..ValidationMethod",
+            "$..Certificate.DomainValidationOptions..ValidationStatus",
             "$..Certificate.ExtendedKeyUsages",
             "$..Certificate.ExtendedKeyUsages..Name",
             "$..Certificate.ExtendedKeyUsages..OID",

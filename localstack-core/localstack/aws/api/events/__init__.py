@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -80,8 +79,6 @@ ReplayDescription = str
 ReplayName = str
 ReplayStateReason = str
 ResourceArn = str
-ResourceAssociationArn = str
-ResourceConfigurationArn = str
 RetentionDays = int
 RoleArn = str
 Route = str
@@ -110,7 +107,7 @@ TraceHeader = str
 TransformerInput = str
 
 
-class ApiDestinationHttpMethod(StrEnum):
+class ApiDestinationHttpMethod(str):
     POST = "POST"
     GET = "GET"
     HEAD = "HEAD"
@@ -120,12 +117,12 @@ class ApiDestinationHttpMethod(StrEnum):
     DELETE = "DELETE"
 
 
-class ApiDestinationState(StrEnum):
+class ApiDestinationState(str):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
 
 
-class ArchiveState(StrEnum):
+class ArchiveState(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
     CREATING = "CREATING"
@@ -134,24 +131,24 @@ class ArchiveState(StrEnum):
     UPDATE_FAILED = "UPDATE_FAILED"
 
 
-class AssignPublicIp(StrEnum):
+class AssignPublicIp(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
 
 
-class ConnectionAuthorizationType(StrEnum):
+class ConnectionAuthorizationType(str):
     BASIC = "BASIC"
     OAUTH_CLIENT_CREDENTIALS = "OAUTH_CLIENT_CREDENTIALS"
     API_KEY = "API_KEY"
 
 
-class ConnectionOAuthHttpMethod(StrEnum):
+class ConnectionOAuthHttpMethod(str):
     GET = "GET"
     POST = "POST"
     PUT = "PUT"
 
 
-class ConnectionState(StrEnum):
+class ConnectionState(str):
     CREATING = "CREATING"
     UPDATING = "UPDATING"
     DELETING = "DELETING"
@@ -159,11 +156,9 @@ class ConnectionState(StrEnum):
     DEAUTHORIZED = "DEAUTHORIZED"
     AUTHORIZING = "AUTHORIZING"
     DEAUTHORIZING = "DEAUTHORIZING"
-    ACTIVE = "ACTIVE"
-    FAILED_CONNECTIVITY = "FAILED_CONNECTIVITY"
 
 
-class EndpointState(StrEnum):
+class EndpointState(str):
     ACTIVE = "ACTIVE"
     CREATING = "CREATING"
     UPDATING = "UPDATING"
@@ -173,34 +168,34 @@ class EndpointState(StrEnum):
     DELETE_FAILED = "DELETE_FAILED"
 
 
-class EventSourceState(StrEnum):
+class EventSourceState(str):
     PENDING = "PENDING"
     ACTIVE = "ACTIVE"
     DELETED = "DELETED"
 
 
-class LaunchType(StrEnum):
+class LaunchType(str):
     EC2 = "EC2"
     FARGATE = "FARGATE"
     EXTERNAL = "EXTERNAL"
 
 
-class PlacementConstraintType(StrEnum):
+class PlacementConstraintType(str):
     distinctInstance = "distinctInstance"
     memberOf = "memberOf"
 
 
-class PlacementStrategyType(StrEnum):
+class PlacementStrategyType(str):
     random = "random"
     spread = "spread"
     binpack = "binpack"
 
 
-class PropagateTags(StrEnum):
+class PropagateTags(str):
     TASK_DEFINITION = "TASK_DEFINITION"
 
 
-class ReplayState(StrEnum):
+class ReplayState(str):
     STARTING = "STARTING"
     RUNNING = "RUNNING"
     CANCELLING = "CANCELLING"
@@ -209,21 +204,15 @@ class ReplayState(StrEnum):
     FAILED = "FAILED"
 
 
-class ReplicationState(StrEnum):
+class ReplicationState(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
 
 
-class RuleState(StrEnum):
+class RuleState(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
     ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS = "ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS"
-
-
-class AccessDeniedException(ServiceException):
-    code: str = "AccessDeniedException"
-    sender_fault: bool = False
-    status_code: int = 400
 
 
 class ConcurrentModificationException(ServiceException):
@@ -288,12 +277,6 @@ class ResourceAlreadyExistsException(ServiceException):
 
 class ResourceNotFoundException(ServiceException):
     code: str = "ResourceNotFoundException"
-    sender_fault: bool = False
-    status_code: int = 400
-
-
-class ThrottlingException(ServiceException):
-    code: str = "ThrottlingException"
     sender_fault: bool = False
     status_code: int = 400
 
@@ -403,15 +386,6 @@ class ConnectionApiKeyAuthResponseParameters(TypedDict, total=False):
     ApiKeyName: Optional[AuthHeaderParameters]
 
 
-class DescribeConnectionResourceParameters(TypedDict, total=False):
-    ResourceConfigurationArn: ResourceConfigurationArn
-    ResourceAssociationArn: ResourceAssociationArn
-
-
-class DescribeConnectionConnectivityParameters(TypedDict, total=False):
-    ResourceParameters: DescribeConnectionResourceParameters
-
-
 class ConnectionBodyParameter(TypedDict, total=False):
     Key: Optional[String]
     Value: Optional[SensitiveString]
@@ -465,18 +439,9 @@ class ConnectionAuthResponseParameters(TypedDict, total=False):
     OAuthParameters: Optional[ConnectionOAuthResponseParameters]
     ApiKeyAuthParameters: Optional[ConnectionApiKeyAuthResponseParameters]
     InvocationHttpParameters: Optional[ConnectionHttpParameters]
-    ConnectivityParameters: Optional[DescribeConnectionConnectivityParameters]
 
 
 ConnectionResponseList = List[Connection]
-
-
-class ConnectivityResourceConfigurationArn(TypedDict, total=False):
-    ResourceConfigurationArn: ResourceConfigurationArn
-
-
-class ConnectivityResourceParameters(TypedDict, total=False):
-    ResourceParameters: ConnectivityResourceConfigurationArn
 
 
 class CreateApiDestinationRequest(ServiceRequest):
@@ -537,7 +502,6 @@ class CreateConnectionAuthRequestParameters(TypedDict, total=False):
     OAuthParameters: Optional[CreateConnectionOAuthRequestParameters]
     ApiKeyAuthParameters: Optional[CreateConnectionApiKeyAuthRequestParameters]
     InvocationHttpParameters: Optional[ConnectionHttpParameters]
-    ConnectivityParameters: Optional[ConnectivityResourceParameters]
 
 
 class CreateConnectionRequest(ServiceRequest):
@@ -545,7 +509,6 @@ class CreateConnectionRequest(ServiceRequest):
     Description: Optional[ConnectionDescription]
     AuthorizationType: ConnectionAuthorizationType
     AuthParameters: CreateConnectionAuthRequestParameters
-    InvocationConnectivityParameters: Optional[ConnectivityResourceParameters]
 
 
 class CreateConnectionResponse(TypedDict, total=False):
@@ -749,7 +712,6 @@ class DescribeConnectionResponse(TypedDict, total=False):
     ConnectionArn: Optional[ConnectionArn]
     Name: Optional[ConnectionName]
     Description: Optional[ConnectionDescription]
-    InvocationConnectivityParameters: Optional[DescribeConnectionConnectivityParameters]
     ConnectionState: Optional[ConnectionState]
     StateReason: Optional[ConnectionStateReason]
     AuthorizationType: Optional[ConnectionAuthorizationType]
@@ -1491,7 +1453,6 @@ class UpdateConnectionAuthRequestParameters(TypedDict, total=False):
     OAuthParameters: Optional[UpdateConnectionOAuthRequestParameters]
     ApiKeyAuthParameters: Optional[UpdateConnectionApiKeyAuthRequestParameters]
     InvocationHttpParameters: Optional[ConnectionHttpParameters]
-    ConnectivityParameters: Optional[ConnectivityResourceParameters]
 
 
 class UpdateConnectionRequest(ServiceRequest):
@@ -1499,7 +1460,6 @@ class UpdateConnectionRequest(ServiceRequest):
     Description: Optional[ConnectionDescription]
     AuthorizationType: Optional[ConnectionAuthorizationType]
     AuthParameters: Optional[UpdateConnectionAuthRequestParameters]
-    InvocationConnectivityParameters: Optional[ConnectivityResourceParameters]
 
 
 class UpdateConnectionResponse(TypedDict, total=False):
@@ -1597,7 +1557,6 @@ class EventsApi:
         authorization_type: ConnectionAuthorizationType,
         auth_parameters: CreateConnectionAuthRequestParameters,
         description: ConnectionDescription = None,
-        invocation_connectivity_parameters: ConnectivityResourceParameters = None,
         **kwargs,
     ) -> CreateConnectionResponse:
         raise NotImplementedError
@@ -2065,7 +2024,6 @@ class EventsApi:
         description: ConnectionDescription = None,
         authorization_type: ConnectionAuthorizationType = None,
         auth_parameters: UpdateConnectionAuthRequestParameters = None,
-        invocation_connectivity_parameters: ConnectivityResourceParameters = None,
         **kwargs,
     ) -> UpdateConnectionResponse:
         raise NotImplementedError

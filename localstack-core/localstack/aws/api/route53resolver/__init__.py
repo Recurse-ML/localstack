@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -41,7 +40,6 @@ ResolverQueryLogConfigPolicy = str
 ResolverRulePolicy = str
 ResourceId = str
 Rfc3339TimeString = str
-ServerNameIndication = str
 ServicePrinciple = str
 SortByKey = str
 StatusMessage = str
@@ -52,44 +50,33 @@ TagValue = str
 Unsigned = int
 
 
-class Action(StrEnum):
+class Action(str):
     ALLOW = "ALLOW"
     BLOCK = "BLOCK"
     ALERT = "ALERT"
 
 
-class AutodefinedReverseFlag(StrEnum):
+class AutodefinedReverseFlag(str):
     ENABLE = "ENABLE"
     DISABLE = "DISABLE"
     USE_LOCAL_RESOURCE_SETTING = "USE_LOCAL_RESOURCE_SETTING"
 
 
-class BlockOverrideDnsType(StrEnum):
+class BlockOverrideDnsType(str):
     CNAME = "CNAME"
 
 
-class BlockResponse(StrEnum):
+class BlockResponse(str):
     NODATA = "NODATA"
     NXDOMAIN = "NXDOMAIN"
     OVERRIDE = "OVERRIDE"
 
 
-class ConfidenceThreshold(StrEnum):
-    LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
-
-
-class DnsThreatProtection(StrEnum):
-    DGA = "DGA"
-    DNS_TUNNELING = "DNS_TUNNELING"
-
-
-class FirewallDomainImportOperation(StrEnum):
+class FirewallDomainImportOperation(str):
     REPLACE = "REPLACE"
 
 
-class FirewallDomainListStatus(StrEnum):
+class FirewallDomainListStatus(str):
     COMPLETE = "COMPLETE"
     COMPLETE_IMPORT_FAILED = "COMPLETE_IMPORT_FAILED"
     IMPORTING = "IMPORTING"
@@ -97,36 +84,36 @@ class FirewallDomainListStatus(StrEnum):
     UPDATING = "UPDATING"
 
 
-class FirewallDomainRedirectionAction(StrEnum):
+class FirewallDomainRedirectionAction(str):
     INSPECT_REDIRECTION_DOMAIN = "INSPECT_REDIRECTION_DOMAIN"
     TRUST_REDIRECTION_DOMAIN = "TRUST_REDIRECTION_DOMAIN"
 
 
-class FirewallDomainUpdateOperation(StrEnum):
+class FirewallDomainUpdateOperation(str):
     ADD = "ADD"
     REMOVE = "REMOVE"
     REPLACE = "REPLACE"
 
 
-class FirewallFailOpenStatus(StrEnum):
+class FirewallFailOpenStatus(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
     USE_LOCAL_RESOURCE_SETTING = "USE_LOCAL_RESOURCE_SETTING"
 
 
-class FirewallRuleGroupAssociationStatus(StrEnum):
+class FirewallRuleGroupAssociationStatus(str):
     COMPLETE = "COMPLETE"
     DELETING = "DELETING"
     UPDATING = "UPDATING"
 
 
-class FirewallRuleGroupStatus(StrEnum):
+class FirewallRuleGroupStatus(str):
     COMPLETE = "COMPLETE"
     DELETING = "DELETING"
     UPDATING = "UPDATING"
 
 
-class IpAddressStatus(StrEnum):
+class IpAddressStatus(str):
     CREATING = "CREATING"
     FAILED_CREATION = "FAILED_CREATION"
     ATTACHING = "ATTACHING"
@@ -141,12 +128,12 @@ class IpAddressStatus(StrEnum):
     UPDATE_FAILED = "UPDATE_FAILED"
 
 
-class MutationProtectionStatus(StrEnum):
+class MutationProtectionStatus(str):
     ENABLED = "ENABLED"
     DISABLED = "DISABLED"
 
 
-class OutpostResolverStatus(StrEnum):
+class OutpostResolverStatus(str):
     CREATING = "CREATING"
     OPERATIONAL = "OPERATIONAL"
     UPDATING = "UPDATING"
@@ -156,13 +143,13 @@ class OutpostResolverStatus(StrEnum):
     FAILED_DELETION = "FAILED_DELETION"
 
 
-class Protocol(StrEnum):
+class Protocol(str):
     DoH = "DoH"
     Do53 = "Do53"
     DoH_FIPS = "DoH-FIPS"
 
 
-class ResolverAutodefinedReverseStatus(StrEnum):
+class ResolverAutodefinedReverseStatus(str):
     ENABLING = "ENABLING"
     ENABLED = "ENABLED"
     DISABLING = "DISABLING"
@@ -171,7 +158,7 @@ class ResolverAutodefinedReverseStatus(StrEnum):
     USE_LOCAL_RESOURCE_SETTING = "USE_LOCAL_RESOURCE_SETTING"
 
 
-class ResolverDNSSECValidationStatus(StrEnum):
+class ResolverDNSSECValidationStatus(str):
     ENABLING = "ENABLING"
     ENABLED = "ENABLED"
     DISABLING = "DISABLING"
@@ -180,12 +167,12 @@ class ResolverDNSSECValidationStatus(StrEnum):
     USE_LOCAL_RESOURCE_SETTING = "USE_LOCAL_RESOURCE_SETTING"
 
 
-class ResolverEndpointDirection(StrEnum):
+class ResolverEndpointDirection(str):
     INBOUND = "INBOUND"
     OUTBOUND = "OUTBOUND"
 
 
-class ResolverEndpointStatus(StrEnum):
+class ResolverEndpointStatus(str):
     CREATING = "CREATING"
     OPERATIONAL = "OPERATIONAL"
     UPDATING = "UPDATING"
@@ -194,20 +181,20 @@ class ResolverEndpointStatus(StrEnum):
     DELETING = "DELETING"
 
 
-class ResolverEndpointType(StrEnum):
+class ResolverEndpointType(str):
     IPV6 = "IPV6"
     IPV4 = "IPV4"
     DUALSTACK = "DUALSTACK"
 
 
-class ResolverQueryLogConfigAssociationError(StrEnum):
+class ResolverQueryLogConfigAssociationError(str):
     NONE = "NONE"
     DESTINATION_NOT_FOUND = "DESTINATION_NOT_FOUND"
     ACCESS_DENIED = "ACCESS_DENIED"
     INTERNAL_SERVICE_ERROR = "INTERNAL_SERVICE_ERROR"
 
 
-class ResolverQueryLogConfigAssociationStatus(StrEnum):
+class ResolverQueryLogConfigAssociationStatus(str):
     CREATING = "CREATING"
     ACTIVE = "ACTIVE"
     ACTION_NEEDED = "ACTION_NEEDED"
@@ -215,14 +202,14 @@ class ResolverQueryLogConfigAssociationStatus(StrEnum):
     FAILED = "FAILED"
 
 
-class ResolverQueryLogConfigStatus(StrEnum):
+class ResolverQueryLogConfigStatus(str):
     CREATING = "CREATING"
     CREATED = "CREATED"
     DELETING = "DELETING"
     FAILED = "FAILED"
 
 
-class ResolverRuleAssociationStatus(StrEnum):
+class ResolverRuleAssociationStatus(str):
     CREATING = "CREATING"
     COMPLETE = "COMPLETE"
     DELETING = "DELETING"
@@ -230,31 +217,31 @@ class ResolverRuleAssociationStatus(StrEnum):
     OVERRIDDEN = "OVERRIDDEN"
 
 
-class ResolverRuleStatus(StrEnum):
+class ResolverRuleStatus(str):
     COMPLETE = "COMPLETE"
     DELETING = "DELETING"
     UPDATING = "UPDATING"
     FAILED = "FAILED"
 
 
-class RuleTypeOption(StrEnum):
+class RuleTypeOption(str):
     FORWARD = "FORWARD"
     SYSTEM = "SYSTEM"
     RECURSIVE = "RECURSIVE"
 
 
-class ShareStatus(StrEnum):
+class ShareStatus(str):
     NOT_SHARED = "NOT_SHARED"
     SHARED_WITH_ME = "SHARED_WITH_ME"
     SHARED_BY_ME = "SHARED_BY_ME"
 
 
-class SortOrder(StrEnum):
+class SortOrder(str):
     ASCENDING = "ASCENDING"
     DESCENDING = "DESCENDING"
 
 
-class Validation(StrEnum):
+class Validation(str):
     ENABLE = "ENABLE"
     DISABLE = "DISABLE"
     USE_LOCAL_RESOURCE_SETTING = "USE_LOCAL_RESOURCE_SETTING"
@@ -533,7 +520,7 @@ class CreateFirewallRuleGroupResponse(TypedDict, total=False):
 class CreateFirewallRuleRequest(ServiceRequest):
     CreatorRequestId: CreatorRequestId
     FirewallRuleGroupId: ResourceId
-    FirewallDomainListId: Optional[ResourceId]
+    FirewallDomainListId: ResourceId
     Priority: Priority
     Action: Action
     BlockResponse: Optional[BlockResponse]
@@ -543,14 +530,11 @@ class CreateFirewallRuleRequest(ServiceRequest):
     Name: Name
     FirewallDomainRedirectionAction: Optional[FirewallDomainRedirectionAction]
     Qtype: Optional[Qtype]
-    DnsThreatProtection: Optional[DnsThreatProtection]
-    ConfidenceThreshold: Optional[ConfidenceThreshold]
 
 
 class FirewallRule(TypedDict, total=False):
     FirewallRuleGroupId: Optional[ResourceId]
     FirewallDomainListId: Optional[ResourceId]
-    FirewallThreatProtectionId: Optional[ResourceId]
     Name: Optional[Name]
     Priority: Optional[Priority]
     Action: Optional[Action]
@@ -563,8 +547,6 @@ class FirewallRule(TypedDict, total=False):
     ModificationTime: Optional[Rfc3339TimeString]
     FirewallDomainRedirectionAction: Optional[FirewallDomainRedirectionAction]
     Qtype: Optional[Qtype]
-    DnsThreatProtection: Optional[DnsThreatProtection]
-    ConfidenceThreshold: Optional[ConfidenceThreshold]
 
 
 class CreateFirewallRuleResponse(TypedDict, total=False):
@@ -653,7 +635,6 @@ class TargetAddress(TypedDict, total=False):
     Port: Optional[Port]
     Ipv6: Optional[Ipv6]
     Protocol: Optional[Protocol]
-    ServerNameIndication: Optional[ServerNameIndication]
 
 
 TargetList = List[TargetAddress]
@@ -708,8 +689,7 @@ class DeleteFirewallRuleGroupResponse(TypedDict, total=False):
 
 class DeleteFirewallRuleRequest(ServiceRequest):
     FirewallRuleGroupId: ResourceId
-    FirewallDomainListId: Optional[ResourceId]
-    FirewallThreatProtectionId: Optional[ResourceId]
+    FirewallDomainListId: ResourceId
     Qtype: Optional[Qtype]
 
 
@@ -1294,8 +1274,7 @@ class UpdateFirewallRuleGroupAssociationResponse(TypedDict, total=False):
 
 class UpdateFirewallRuleRequest(ServiceRequest):
     FirewallRuleGroupId: ResourceId
-    FirewallDomainListId: Optional[ResourceId]
-    FirewallThreatProtectionId: Optional[ResourceId]
+    FirewallDomainListId: ResourceId
     Priority: Optional[Priority]
     Action: Optional[Action]
     BlockResponse: Optional[BlockResponse]
@@ -1305,8 +1284,6 @@ class UpdateFirewallRuleRequest(ServiceRequest):
     Name: Optional[Name]
     FirewallDomainRedirectionAction: Optional[FirewallDomainRedirectionAction]
     Qtype: Optional[Qtype]
-    DnsThreatProtection: Optional[DnsThreatProtection]
-    ConfidenceThreshold: Optional[ConfidenceThreshold]
 
 
 class UpdateFirewallRuleResponse(TypedDict, total=False):
@@ -1438,18 +1415,16 @@ class Route53ResolverApi:
         context: RequestContext,
         creator_request_id: CreatorRequestId,
         firewall_rule_group_id: ResourceId,
+        firewall_domain_list_id: ResourceId,
         priority: Priority,
         action: Action,
         name: Name,
-        firewall_domain_list_id: ResourceId = None,
         block_response: BlockResponse = None,
         block_override_domain: BlockOverrideDomain = None,
         block_override_dns_type: BlockOverrideDnsType = None,
         block_override_ttl: BlockOverrideTtl = None,
         firewall_domain_redirection_action: FirewallDomainRedirectionAction = None,
         qtype: Qtype = None,
-        dns_threat_protection: DnsThreatProtection = None,
-        confidence_threshold: ConfidenceThreshold = None,
         **kwargs,
     ) -> CreateFirewallRuleResponse:
         raise NotImplementedError
@@ -1535,8 +1510,7 @@ class Route53ResolverApi:
         self,
         context: RequestContext,
         firewall_rule_group_id: ResourceId,
-        firewall_domain_list_id: ResourceId = None,
-        firewall_threat_protection_id: ResourceId = None,
+        firewall_domain_list_id: ResourceId,
         qtype: Qtype = None,
         **kwargs,
     ) -> DeleteFirewallRuleResponse:
@@ -1953,8 +1927,7 @@ class Route53ResolverApi:
         self,
         context: RequestContext,
         firewall_rule_group_id: ResourceId,
-        firewall_domain_list_id: ResourceId = None,
-        firewall_threat_protection_id: ResourceId = None,
+        firewall_domain_list_id: ResourceId,
         priority: Priority = None,
         action: Action = None,
         block_response: BlockResponse = None,
@@ -1964,8 +1937,6 @@ class Route53ResolverApi:
         name: Name = None,
         firewall_domain_redirection_action: FirewallDomainRedirectionAction = None,
         qtype: Qtype = None,
-        dns_threat_protection: DnsThreatProtection = None,
-        confidence_threshold: ConfidenceThreshold = None,
         **kwargs,
     ) -> UpdateFirewallRuleResponse:
         raise NotImplementedError

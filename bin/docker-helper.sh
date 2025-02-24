@@ -5,10 +5,11 @@ set -eo pipefail
 shopt -s nullglob
 
 # global defaults
+VERSION_FILE=${VERSION_FILE-"VERSION"}
 DOCKERFILE=${DOCKERFILE-"Dockerfile"}
 DEFAULT_TAG=${DEFAULT_TAG-"latest"}
-DOCKER_BUILD_CONTEXT=${DOCKER_BUILD_CONTEXT-"."}
 
+# TODO extend help
 function usage() {
     echo "A set of commands that facilitate building and pushing versioned Docker images"
     echo ""
@@ -49,16 +50,7 @@ function _fail {
 }
 
 function _get_current_version() {
-    # check if setuptools_scm is installed, if not prompt to install. python3 is expected to be present
-    if ! python3 -m pip -qqq show setuptools_scm > /dev/null ; then
-      echo "ERROR: setuptools_scm is not installed. Run 'pip install --upgrade setuptools setuptools_scm'" >&2
-      exit 1
-    fi
-    python3 -m setuptools_scm
-}
-
-function _is_release_commit() {
-    [[ $(_get_current_version) =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+    cat ${VERSION_FILE}
 }
 
 function _get_current_branch() {
@@ -112,9 +104,6 @@ function cmd-build() {
     _enforce_image_name
     _set_version_defaults
 
-    if [ ! -f "pyproject.toml" ]; then
-      echo "No pyproject.toml found, setuptools_scm will not be able to retrieve configuration."
-    fi
     if [ -z "$DOCKERFILE" ]; then DOCKERFILE=Dockerfile; fi
     # by default we load the result to the docker daemon
     if [ "$DOCKER_BUILD_FLAGS" = "" ]; then DOCKER_BUILD_FLAGS="--load"; fi
@@ -124,12 +113,12 @@ function cmd-build() {
     # --cache-from: Use the inlined caching information when building the image
     DOCKER_BUILDKIT=1 docker buildx build --pull --progress=plain \
       --cache-from "$IMAGE_NAME" --build-arg BUILDKIT_INLINE_CACHE=1 \
-      --build-arg LOCALSTACK_PRE_RELEASE=$(_is_release_commit && echo "0" || echo "1") \
+      --build-arg LOCALSTACK_PRE_RELEASE=$(_get_current_version | grep -v '.dev' >> /dev/null && echo "0" || echo "1") \
       --build-arg LOCALSTACK_BUILD_GIT_HASH=$(git rev-parse --short HEAD) \
       --build-arg=LOCALSTACK_BUILD_DATE=$(date -u +"%Y-%m-%d") \
       --build-arg=LOCALSTACK_BUILD_VERSION=$IMAGE_TAG \
       --add-host="localhost.localdomain:127.0.0.1" \
-      -t "$IMAGE_NAME:$DEFAULT_TAG" $DOCKER_BUILD_FLAGS $DOCKER_BUILD_CONTEXT -f $DOCKERFILE
+      -t "$IMAGE_NAME:$DEFAULT_TAG" $DOCKER_BUILD_FLAGS . -f $DOCKERFILE
 }
 
 function cmd-save() {
@@ -175,12 +164,9 @@ function cmd-push() {
     # push default tag
     docker push $TARGET_IMAGE_NAME:$DEFAULT_TAG-$PLATFORM
 
-    function _push_versioned_tags() {
+    function _push() {
       # create explicitly set image tag (via $IMAGE_TAG)
       docker tag $TARGET_IMAGE_NAME:$DEFAULT_TAG-$PLATFORM $TARGET_IMAGE_NAME:$IMAGE_TAG-$PLATFORM
-
-      # always create "latest" tag on version push
-      docker tag $TARGET_IMAGE_NAME:$DEFAULT_TAG-$PLATFORM $TARGET_IMAGE_NAME:latest-$PLATFORM
 
       # create "stable" tag
       docker tag $TARGET_IMAGE_NAME:$DEFAULT_TAG-$PLATFORM $TARGET_IMAGE_NAME:stable-$PLATFORM
@@ -196,18 +182,22 @@ function cmd-push() {
 
       # push all the created tags
       docker push $TARGET_IMAGE_NAME:stable-$PLATFORM
-      docker push $TARGET_IMAGE_NAME:latest-$PLATFORM
       docker push $TARGET_IMAGE_NAME:$IMAGE_TAG-$PLATFORM
       docker push $TARGET_IMAGE_NAME:$MAJOR_VERSION-$PLATFORM
       docker push $TARGET_IMAGE_NAME:$MAJOR_VERSION.$MINOR_VERSION-$PLATFORM
       docker push $TARGET_IMAGE_NAME:$MAJOR_VERSION.$MINOR_VERSION.$PATCH_VERSION-$PLATFORM
     }
 
-    if _is_release_commit; then
-      echo "Pushing version tags, we're building the commit of a version tag."
-      _push_versioned_tags
+    if [ -n "$FORCE_VERSION_TAG_PUSH" ] && [ "$FORCE_VERSION_TAG_PUSH" -eq "1" ]; then
+      echo "Force-enabled version tag push."
+      _push
+    elif [ -n "$FORCE_VERSION_TAG_PUSH" ] && [ "$FORCE_VERSION_TAG_PUSH" -eq "0" ]; then
+      echo "Force-disabled version tag push. Not pushing any other tags."
+    elif (git diff HEAD^ ${VERSION_FILE} | tail -n 1 | grep -v '.dev'); then
+      echo "Pushing version tags, version has changed in last commit."
+      _push
     else
-      echo "Not pushing any other tags, we're not building a version-tagged commit."
+      echo "Not pushing any other tags, version has not changed in last commit."
     fi
 }
 
@@ -227,16 +217,11 @@ function cmd-push-manifests() {
     # push default tag
     docker manifest push $IMAGE_NAME:$DEFAULT_TAG
 
-    function _push_versioned_tags() {
+    function _push() {
       # create explicitly set image tag (via $IMAGE_TAG)
       docker manifest create $IMAGE_NAME:$IMAGE_TAG \
         --amend $IMAGE_NAME:$IMAGE_TAG-amd64 \
         --amend $IMAGE_NAME:$IMAGE_TAG-arm64
-
-      # always create "latest" tag on version push
-      docker manifest create $IMAGE_NAME:latest \
-        --amend $IMAGE_NAME:latest-amd64 \
-        --amend $IMAGE_NAME:latest-arm64
 
       # create "stable" tag
       docker manifest create $IMAGE_NAME:stable \
@@ -261,17 +246,21 @@ function cmd-push-manifests() {
       # push all the created tags
       docker manifest push $IMAGE_NAME:$IMAGE_TAG
       docker manifest push $IMAGE_NAME:stable
-      docker manifest push $IMAGE_NAME:latest
       docker manifest push $IMAGE_NAME:$MAJOR_VERSION
       docker manifest push $IMAGE_NAME:$MAJOR_VERSION.$MINOR_VERSION
       docker manifest push $IMAGE_NAME:$MAJOR_VERSION.$MINOR_VERSION.$PATCH_VERSION
     }
 
-    if _is_release_commit; then
-      echo "Pushing version tags, we're building the commit of a version tag."
-      _push_versioned_tags
+    if [ -n "$FORCE_VERSION_TAG_PUSH" ] && [ "$FORCE_VERSION_TAG_PUSH" -eq "1" ]; then
+      echo "Force-enabled version tag push."
+      _push
+    elif [ -n "$FORCE_VERSION_TAG_PUSH" ] && [ "$FORCE_VERSION_TAG_PUSH" -eq "0" ]; then
+      echo "Force-disabled version tag push. Not pushing any other tags."
+    elif (git diff HEAD^ ${VERSION_FILE} | tail -n 1 | grep -v '.dev'); then
+      echo "Pushing version tags, version has changed in last commit."
+      _push
     else
-      echo "Not pushing any other tags, we're not building a version-tagged commit."
+      echo "Not pushing any other tags, version has not changed in last commit."
     fi
 }
 

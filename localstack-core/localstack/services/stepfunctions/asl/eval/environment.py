@@ -8,14 +8,19 @@ from typing import Any, Final, Optional
 from localstack.aws.api.stepfunctions import (
     Arn,
     ExecutionFailedEventDetails,
-    StateMachineType,
     Timestamp,
 )
 from localstack.services.stepfunctions.asl.component.state.state_execution.state_map.iteration.itemprocessor.map_run_record import (
     MapRunRecordPoolManager,
 )
+from localstack.services.stepfunctions.asl.eval.aws_execution_details import AWSExecutionDetails
 from localstack.services.stepfunctions.asl.eval.callback.callback import CallbackPoolManager
-from localstack.services.stepfunctions.asl.eval.evaluation_details import AWSExecutionDetails
+from localstack.services.stepfunctions.asl.eval.contextobject.contex_object import (
+    ContextObject,
+    ContextObjectInitData,
+    ContextObjectManager,
+    Task,
+)
 from localstack.services.stepfunctions.asl.eval.event.event_manager import (
     EventHistoryContext,
     EventManager,
@@ -31,8 +36,6 @@ from localstack.services.stepfunctions.asl.eval.program_state import (
     ProgramStopped,
     ProgramTimedOut,
 )
-from localstack.services.stepfunctions.asl.eval.states import ContextObjectData, States
-from localstack.services.stepfunctions.asl.eval.variable_store import VariableStore
 from localstack.services.stepfunctions.backend.activity import Activity
 
 LOG = logging.getLogger(__name__)
@@ -47,9 +50,9 @@ class Environment:
     event_history_context: Final[EventHistoryContext]
     cloud_watch_logging_session: Final[Optional[CloudWatchLoggingSession]]
     aws_execution_details: Final[AWSExecutionDetails]
-    execution_type: Final[StateMachineType]
     callback_pool_manager: CallbackPoolManager
     map_run_record_pool_manager: MapRunRecordPoolManager
+    context_object_manager: Final[ContextObjectManager]
     activity_store: Final[dict[Arn, Activity]]
 
     _frames: Final[list[Environment]]
@@ -57,18 +60,15 @@ class Environment:
 
     heap: dict[str, Any] = dict()
     stack: list[Any] = list()
-    states: Final[States]
-    variable_store: Final[VariableStore]
+    inp: Optional[Any] = None
 
     def __init__(
         self,
         aws_execution_details: AWSExecutionDetails,
-        execution_type: StateMachineType,
-        context: ContextObjectData,
+        context_object_init: ContextObjectInitData,
         event_history_context: EventHistoryContext,
         cloud_watch_logging_session: Optional[CloudWatchLoggingSession],
         activity_store: dict[Arn, Activity],
-        variable_store: Optional[VariableStore] = None,
     ):
         super(Environment, self).__init__()
         self._state_mutex = threading.RLock()
@@ -80,9 +80,18 @@ class Environment:
         self.event_history_context = event_history_context
 
         self.aws_execution_details = aws_execution_details
-        self.execution_type = execution_type
         self.callback_pool_manager = CallbackPoolManager(activity_store=activity_store)
         self.map_run_record_pool_manager = MapRunRecordPoolManager()
+
+        self.context_object_manager = ContextObjectManager(
+            context_object=ContextObject(
+                Execution=context_object_init["Execution"],
+                StateMachine=context_object_init["StateMachine"],
+            )
+        )
+        task: Optional[Task] = context_object_init.get("Task")
+        if task is not None:
+            self.context_object_manager.context_object["Task"] = task
 
         self.activity_store = activity_store
 
@@ -91,67 +100,39 @@ class Environment:
 
         self.heap = dict()
         self.stack = list()
-        self.states = States(context=context)
-        self.variable_store = variable_store or VariableStore()
+        self.inp = None
 
     @classmethod
-    def as_frame_of(
-        cls, env: Environment, event_history_frame_cache: Optional[EventHistoryContext] = None
-    ) -> Environment:
-        return Environment.as_inner_frame_of(
-            env=env,
-            variable_store=env.variable_store,
-            event_history_frame_cache=event_history_frame_cache,
+    def as_frame_of(cls, env: Environment, event_history_frame_cache: EventHistoryContext):
+        context_object_init = ContextObjectInitData(
+            Execution=env.context_object_manager.context_object["Execution"],
+            StateMachine=env.context_object_manager.context_object["StateMachine"],
+            Task=env.context_object_manager.context_object.get("Task"),
         )
-
-    @classmethod
-    def as_inner_frame_of(
-        cls,
-        env: Environment,
-        variable_store: VariableStore,
-        event_history_frame_cache: Optional[EventHistoryContext] = None,
-    ) -> Environment:
-        # Construct the frame's context object data.
-        context = ContextObjectData(
-            Execution=env.states.context_object.context_object_data["Execution"],
-            StateMachine=env.states.context_object.context_object_data["StateMachine"],
-        )
-        if "Task" in env.states.context_object.context_object_data:
-            context["Task"] = env.states.context_object.context_object_data["Task"]
-
-        # The default logic provisions for child frame to extend the source frame event id.
-        if event_history_frame_cache is None:
-            event_history_frame_cache = EventHistoryContext(
-                previous_event_id=env.event_history_context.source_event_id
-            )
-
         frame = cls(
             aws_execution_details=env.aws_execution_details,
-            execution_type=env.execution_type,
-            context=context,
+            context_object_init=context_object_init,
             event_history_context=event_history_frame_cache,
             cloud_watch_logging_session=env.cloud_watch_logging_session,
             activity_store=env.activity_store,
-            variable_store=variable_store,
         )
         frame._is_frame = True
         frame.event_manager = env.event_manager
-        if "State" in env.states.context_object.context_object_data:
-            frame.states.context_object.context_object_data["State"] = copy.deepcopy(
-                env.states.context_object.context_object_data["State"]
+        if "State" in env.context_object_manager.context_object:
+            frame.context_object_manager.context_object["State"] = copy.deepcopy(
+                env.context_object_manager.context_object["State"]
             )
         frame.callback_pool_manager = env.callback_pool_manager
         frame.map_run_record_pool_manager = env.map_run_record_pool_manager
-        frame.heap = dict()
+        frame.heap = env.heap
         frame._program_state = copy.deepcopy(env._program_state)
         return frame
 
     @property
     def next_state_name(self) -> Optional[str]:
         next_state_name: Optional[str] = None
-        program_state = self._program_state
-        if isinstance(program_state, ProgramRunning):
-            next_state_name = program_state.next_state_name
+        if isinstance(self._program_state, ProgramRunning):
+            next_state_name = self._program_state.next_state_name
         return next_state_name
 
     @next_state_name.setter
@@ -164,23 +145,6 @@ class Environment:
         else:
             raise RuntimeError(
                 f"Could not set NextState value when in state '{type(self._program_state)}'."
-            )
-
-    @property
-    def next_field_name(self) -> Optional[str]:
-        next_field_name: Optional[str] = None
-        program_state = self._program_state
-        if isinstance(program_state, ProgramRunning):
-            next_field_name = program_state.next_field_name
-        return next_field_name
-
-    @next_field_name.setter
-    def next_field_name(self, next_field_name: str) -> None:
-        if isinstance(self._program_state, ProgramRunning):
-            self._program_state.next_field_name = next_field_name
-        else:
-            raise RuntimeError(
-                f"Could not set NextField value when in state '{type(self._program_state)}'."
             )
 
     def program_state(self) -> ProgramState:
@@ -227,22 +191,13 @@ class Environment:
         self, event_history_context: Optional[EventHistoryContext] = None
     ) -> Environment:
         with self._state_mutex:
-            frame = self.as_frame_of(env=self, event_history_frame_cache=event_history_context)
-            self._frames.append(frame)
-            return frame
+            # The default logic provisions for child frame to extend the source frame event id.
+            if event_history_context is None:
+                event_history_context = EventHistoryContext(
+                    previous_event_id=self.event_history_context.source_event_id
+                )
 
-    def open_inner_frame(
-        self, event_history_context: Optional[EventHistoryContext] = None
-    ) -> Environment:
-        with self._state_mutex:
-            variable_store = VariableStore.as_inner_scope_of(
-                outer_variable_store=self.variable_store
-            )
-            frame = self.as_inner_frame_of(
-                env=self,
-                variable_store=variable_store,
-                event_history_frame_cache=event_history_context,
-            )
+            frame = self.as_frame_of(self, event_history_context)
             self._frames.append(frame)
             return frame
 
@@ -259,6 +214,3 @@ class Environment:
 
     def is_frame(self) -> bool:
         return self._is_frame
-
-    def is_standard_workflow(self) -> bool:
-        return self.execution_type == StateMachineType.STANDARD

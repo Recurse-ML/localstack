@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import IO, Dict, Iterable, List, Optional, TypedDict, Union
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -15,26 +14,22 @@ StatusCode = str
 String = str
 
 
-class AccessAssociationSourceType(StrEnum):
-    VPCE = "VPCE"
-
-
-class ApiKeySourceType(StrEnum):
+class ApiKeySourceType(str):
     HEADER = "HEADER"
     AUTHORIZER = "AUTHORIZER"
 
 
-class ApiKeysFormat(StrEnum):
+class ApiKeysFormat(str):
     csv = "csv"
 
 
-class AuthorizerType(StrEnum):
+class AuthorizerType(str):
     TOKEN = "TOKEN"
     REQUEST = "REQUEST"
     COGNITO_USER_POOLS = "COGNITO_USER_POOLS"
 
 
-class CacheClusterSize(StrEnum):
+class CacheClusterSize(str):
     i_0_5 = "0.5"
     i_1_6 = "1.6"
     i_6_1 = "6.1"
@@ -45,7 +40,7 @@ class CacheClusterSize(StrEnum):
     i_237 = "237"
 
 
-class CacheClusterStatus(StrEnum):
+class CacheClusterStatus(str):
     CREATE_IN_PROGRESS = "CREATE_IN_PROGRESS"
     AVAILABLE = "AVAILABLE"
     DELETE_IN_PROGRESS = "DELETE_IN_PROGRESS"
@@ -53,17 +48,17 @@ class CacheClusterStatus(StrEnum):
     FLUSH_IN_PROGRESS = "FLUSH_IN_PROGRESS"
 
 
-class ConnectionType(StrEnum):
+class ConnectionType(str):
     INTERNET = "INTERNET"
     VPC_LINK = "VPC_LINK"
 
 
-class ContentHandlingStrategy(StrEnum):
+class ContentHandlingStrategy(str):
     CONVERT_TO_BINARY = "CONVERT_TO_BINARY"
     CONVERT_TO_TEXT = "CONVERT_TO_TEXT"
 
 
-class DocumentationPartType(StrEnum):
+class DocumentationPartType(str):
     API = "API"
     AUTHORIZER = "AUTHORIZER"
     MODEL = "MODEL"
@@ -78,7 +73,7 @@ class DocumentationPartType(StrEnum):
     RESPONSE_BODY = "RESPONSE_BODY"
 
 
-class DomainNameStatus(StrEnum):
+class DomainNameStatus(str):
     AVAILABLE = "AVAILABLE"
     UPDATING = "UPDATING"
     PENDING = "PENDING"
@@ -86,13 +81,13 @@ class DomainNameStatus(StrEnum):
     PENDING_OWNERSHIP_VERIFICATION = "PENDING_OWNERSHIP_VERIFICATION"
 
 
-class EndpointType(StrEnum):
+class EndpointType(str):
     REGIONAL = "REGIONAL"
     EDGE = "EDGE"
     PRIVATE = "PRIVATE"
 
 
-class GatewayResponseType(StrEnum):
+class GatewayResponseType(str):
     DEFAULT_4XX = "DEFAULT_4XX"
     DEFAULT_5XX = "DEFAULT_5XX"
     RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
@@ -116,7 +111,7 @@ class GatewayResponseType(StrEnum):
     WAF_FILTERED = "WAF_FILTERED"
 
 
-class IntegrationType(StrEnum):
+class IntegrationType(str):
     HTTP = "HTTP"
     AWS = "AWS"
     MOCK = "MOCK"
@@ -124,12 +119,12 @@ class IntegrationType(StrEnum):
     AWS_PROXY = "AWS_PROXY"
 
 
-class LocationStatusType(StrEnum):
+class LocationStatusType(str):
     DOCUMENTED = "DOCUMENTED"
     UNDOCUMENTED = "UNDOCUMENTED"
 
 
-class Op(StrEnum):
+class Op(str):
     add = "add"
     remove = "remove"
     replace = "replace"
@@ -138,34 +133,29 @@ class Op(StrEnum):
     test = "test"
 
 
-class PutMode(StrEnum):
+class PutMode(str):
     merge = "merge"
     overwrite = "overwrite"
 
 
-class QuotaPeriodType(StrEnum):
+class QuotaPeriodType(str):
     DAY = "DAY"
     WEEK = "WEEK"
     MONTH = "MONTH"
 
 
-class ResourceOwner(StrEnum):
-    SELF = "SELF"
-    OTHER_ACCOUNTS = "OTHER_ACCOUNTS"
-
-
-class SecurityPolicy(StrEnum):
+class SecurityPolicy(str):
     TLS_1_0 = "TLS_1_0"
     TLS_1_2 = "TLS_1_2"
 
 
-class UnauthorizedCacheControlHeaderStrategy(StrEnum):
+class UnauthorizedCacheControlHeaderStrategy(str):
     FAIL_WITH_403 = "FAIL_WITH_403"
     SUCCEED_WITH_RESPONSE_HEADER = "SUCCEED_WITH_RESPONSE_HEADER"
     SUCCEED_WITHOUT_RESPONSE_HEADER = "SUCCEED_WITHOUT_RESPONSE_HEADER"
 
 
-class VpcLinkStatus(StrEnum):
+class VpcLinkStatus(str):
     AVAILABLE = "AVAILABLE"
     PENDING = "PENDING"
     DELETING = "DELETING"
@@ -382,7 +372,6 @@ CreateAuthorizerRequest = TypedDict(
 
 class CreateBasePathMappingRequest(ServiceRequest):
     domainName: String
-    domainNameId: Optional[String]
     basePath: Optional[String]
     restApiId: String
     stage: Optional[String]
@@ -432,13 +421,6 @@ class CreateDocumentationVersionRequest(ServiceRequest):
     description: Optional[String]
 
 
-class CreateDomainNameAccessAssociationRequest(ServiceRequest):
-    domainNameArn: String
-    accessAssociationSourceType: AccessAssociationSourceType
-    accessAssociationSource: String
-    tags: Optional[MapOfStringToString]
-
-
 class MutualTlsAuthenticationInput(TypedDict, total=False):
     truststoreUri: Optional[String]
     truststoreVersion: Optional[String]
@@ -466,7 +448,6 @@ class CreateDomainNameRequest(ServiceRequest):
     securityPolicy: Optional[SecurityPolicy]
     mutualTlsAuthentication: Optional[MutualTlsAuthenticationInput]
     ownershipVerificationCertificateArn: Optional[String]
-    policy: Optional[String]
 
 
 class CreateModelRequest(ServiceRequest):
@@ -560,7 +541,6 @@ class DeleteAuthorizerRequest(ServiceRequest):
 
 class DeleteBasePathMappingRequest(ServiceRequest):
     domainName: String
-    domainNameId: Optional[String]
     basePath: String
 
 
@@ -583,13 +563,8 @@ class DeleteDocumentationVersionRequest(ServiceRequest):
     documentationVersion: String
 
 
-class DeleteDomainNameAccessAssociationRequest(ServiceRequest):
-    domainNameAccessAssociationArn: String
-
-
 class DeleteDomainNameRequest(ServiceRequest):
     domainName: String
-    domainNameId: Optional[String]
 
 
 class DeleteGatewayResponseRequest(ServiceRequest):
@@ -725,8 +700,6 @@ class MutualTlsAuthentication(TypedDict, total=False):
 
 class DomainName(TypedDict, total=False):
     domainName: Optional[String]
-    domainNameId: Optional[String]
-    domainNameArn: Optional[String]
     certificateName: Optional[String]
     certificateArn: Optional[String]
     certificateUploadDate: Optional[Timestamp]
@@ -743,24 +716,6 @@ class DomainName(TypedDict, total=False):
     tags: Optional[MapOfStringToString]
     mutualTlsAuthentication: Optional[MutualTlsAuthentication]
     ownershipVerificationCertificateArn: Optional[String]
-    managementPolicy: Optional[String]
-    policy: Optional[String]
-
-
-class DomainNameAccessAssociation(TypedDict, total=False):
-    domainNameAccessAssociationArn: Optional[String]
-    domainNameArn: Optional[String]
-    accessAssociationSourceType: Optional[AccessAssociationSourceType]
-    accessAssociationSource: Optional[String]
-    tags: Optional[MapOfStringToString]
-
-
-ListOfDomainNameAccessAssociation = List[DomainNameAccessAssociation]
-
-
-class DomainNameAccessAssociations(TypedDict, total=False):
-    position: Optional[String]
-    items: Optional[ListOfDomainNameAccessAssociation]
 
 
 ListOfDomainName = List[DomainName]
@@ -838,13 +793,11 @@ class GetAuthorizersRequest(ServiceRequest):
 
 class GetBasePathMappingRequest(ServiceRequest):
     domainName: String
-    domainNameId: Optional[String]
     basePath: String
 
 
 class GetBasePathMappingsRequest(ServiceRequest):
     domainName: String
-    domainNameId: Optional[String]
     position: Optional[String]
     limit: Optional[NullableInteger]
 
@@ -901,21 +854,13 @@ class GetDocumentationVersionsRequest(ServiceRequest):
     limit: Optional[NullableInteger]
 
 
-class GetDomainNameAccessAssociationsRequest(ServiceRequest):
-    position: Optional[String]
-    limit: Optional[NullableInteger]
-    resourceOwner: Optional[ResourceOwner]
-
-
 class GetDomainNameRequest(ServiceRequest):
     domainName: String
-    domainNameId: Optional[String]
 
 
 class GetDomainNamesRequest(ServiceRequest):
     position: Optional[String]
     limit: Optional[NullableInteger]
-    resourceOwner: Optional[ResourceOwner]
 
 
 class GetExportRequest(ServiceRequest):
@@ -1413,11 +1358,6 @@ class PutRestApiRequest(ServiceRequest):
     parameters: Optional[MapOfStringToString]
 
 
-class RejectDomainNameAccessAssociationRequest(ServiceRequest):
-    domainNameAccessAssociationArn: String
-    domainNameArn: String
-
-
 class RequestValidators(TypedDict, total=False):
     position: Optional[String]
     items: Optional[ListOfRequestValidator]
@@ -1525,7 +1465,6 @@ class UpdateAuthorizerRequest(ServiceRequest):
 
 class UpdateBasePathMappingRequest(ServiceRequest):
     domainName: String
-    domainNameId: Optional[String]
     basePath: String
     patchOperations: Optional[ListOfPatchOperation]
 
@@ -1555,7 +1494,6 @@ class UpdateDocumentationVersionRequest(ServiceRequest):
 
 class UpdateDomainNameRequest(ServiceRequest):
     domainName: String
-    domainNameId: Optional[String]
     patchOperations: Optional[ListOfPatchOperation]
 
 
@@ -1695,7 +1633,6 @@ class ApigatewayApi:
         context: RequestContext,
         domain_name: String,
         rest_api_id: String,
-        domain_name_id: String = None,
         base_path: String = None,
         stage: String = None,
         **kwargs,
@@ -1759,21 +1696,8 @@ class ApigatewayApi:
         security_policy: SecurityPolicy = None,
         mutual_tls_authentication: MutualTlsAuthenticationInput = None,
         ownership_verification_certificate_arn: String = None,
-        policy: String = None,
         **kwargs,
     ) -> DomainName:
-        raise NotImplementedError
-
-    @handler("CreateDomainNameAccessAssociation")
-    def create_domain_name_access_association(
-        self,
-        context: RequestContext,
-        domain_name_arn: String,
-        access_association_source_type: AccessAssociationSourceType,
-        access_association_source: String,
-        tags: MapOfStringToString = None,
-        **kwargs,
-    ) -> DomainNameAccessAssociation:
         raise NotImplementedError
 
     @handler("CreateModel")
@@ -1899,12 +1823,7 @@ class ApigatewayApi:
 
     @handler("DeleteBasePathMapping")
     def delete_base_path_mapping(
-        self,
-        context: RequestContext,
-        domain_name: String,
-        base_path: String,
-        domain_name_id: String = None,
-        **kwargs,
+        self, context: RequestContext, domain_name: String, base_path: String, **kwargs
     ) -> None:
         raise NotImplementedError
 
@@ -1933,15 +1852,7 @@ class ApigatewayApi:
         raise NotImplementedError
 
     @handler("DeleteDomainName")
-    def delete_domain_name(
-        self, context: RequestContext, domain_name: String, domain_name_id: String = None, **kwargs
-    ) -> None:
-        raise NotImplementedError
-
-    @handler("DeleteDomainNameAccessAssociation")
-    def delete_domain_name_access_association(
-        self, context: RequestContext, domain_name_access_association_arn: String, **kwargs
-    ) -> None:
+    def delete_domain_name(self, context: RequestContext, domain_name: String, **kwargs) -> None:
         raise NotImplementedError
 
     @handler("DeleteGatewayResponse")
@@ -2110,12 +2021,7 @@ class ApigatewayApi:
 
     @handler("GetBasePathMapping")
     def get_base_path_mapping(
-        self,
-        context: RequestContext,
-        domain_name: String,
-        base_path: String,
-        domain_name_id: String = None,
-        **kwargs,
+        self, context: RequestContext, domain_name: String, base_path: String, **kwargs
     ) -> BasePathMapping:
         raise NotImplementedError
 
@@ -2124,7 +2030,6 @@ class ApigatewayApi:
         self,
         context: RequestContext,
         domain_name: String,
-        domain_name_id: String = None,
         position: String = None,
         limit: NullableInteger = None,
         **kwargs,
@@ -2199,20 +2104,7 @@ class ApigatewayApi:
         raise NotImplementedError
 
     @handler("GetDomainName")
-    def get_domain_name(
-        self, context: RequestContext, domain_name: String, domain_name_id: String = None, **kwargs
-    ) -> DomainName:
-        raise NotImplementedError
-
-    @handler("GetDomainNameAccessAssociations")
-    def get_domain_name_access_associations(
-        self,
-        context: RequestContext,
-        position: String = None,
-        limit: NullableInteger = None,
-        resource_owner: ResourceOwner = None,
-        **kwargs,
-    ) -> DomainNameAccessAssociations:
+    def get_domain_name(self, context: RequestContext, domain_name: String, **kwargs) -> DomainName:
         raise NotImplementedError
 
     @handler("GetDomainNames")
@@ -2221,7 +2113,6 @@ class ApigatewayApi:
         context: RequestContext,
         position: String = None,
         limit: NullableInteger = None,
-        resource_owner: ResourceOwner = None,
         **kwargs,
     ) -> DomainNames:
         raise NotImplementedError
@@ -2613,16 +2504,6 @@ class ApigatewayApi:
     ) -> RestApi:
         raise NotImplementedError
 
-    @handler("RejectDomainNameAccessAssociation")
-    def reject_domain_name_access_association(
-        self,
-        context: RequestContext,
-        domain_name_access_association_arn: String,
-        domain_name_arn: String,
-        **kwargs,
-    ) -> None:
-        raise NotImplementedError
-
     @handler("TagResource")
     def tag_resource(
         self, context: RequestContext, resource_arn: String, tags: MapOfStringToString, **kwargs
@@ -2701,7 +2582,6 @@ class ApigatewayApi:
         context: RequestContext,
         domain_name: String,
         base_path: String,
-        domain_name_id: String = None,
         patch_operations: ListOfPatchOperation = None,
         **kwargs,
     ) -> BasePathMapping:
@@ -2755,7 +2635,6 @@ class ApigatewayApi:
         self,
         context: RequestContext,
         domain_name: String,
-        domain_name_id: String = None,
         patch_operations: ListOfPatchOperation = None,
         **kwargs,
     ) -> DomainName:

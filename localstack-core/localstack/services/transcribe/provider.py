@@ -226,7 +226,7 @@ class TranscribeProvider(TranscribeApi):
         model_path = LANGUAGE_MODEL_DIR / name
 
         with _DL_LOCK:
-            if model_path.exists():
+            if (model_path).exists():
                 return
             else:
                 model_path.mkdir(parents=True)
@@ -282,7 +282,7 @@ class TranscribeProvider(TranscribeApi):
                 )
             )
             format = ffprobe_output["format"]["format_name"]
-            LOG.debug("Media format detected as: %s", format)
+            LOG.debug(f"Media format detected as: {format}")
             job["MediaFormat"] = SUPPORTED_FORMAT_NAMES[format]
 
             # Determine the sample rate of input audio if possible

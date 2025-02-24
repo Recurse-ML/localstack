@@ -4,7 +4,6 @@ import requests
 from localstack import config
 
 
-@pytest.mark.usefixtures("openapi_validate")
 class TestInitScriptsResource:
     def test_stages_have_completed(self):
         response = requests.get(config.internal_service_url() + "/_localstack/init")
@@ -32,7 +31,6 @@ class TestInitScriptsResource:
         assert response.json()["completed"] == completed
 
 
-@pytest.mark.usefixtures("openapi_validate")
 class TestHealthResource:
     def test_get(self):
         response = requests.get(config.internal_service_url() + "/_localstack/health")
@@ -46,7 +44,6 @@ class TestHealthResource:
         assert not response.text
 
 
-@pytest.mark.usefixtures("openapi_validate")
 class TestInfoEndpoint:
     def test_get(self):
         response = requests.get(config.internal_service_url() + "/_localstack/info")

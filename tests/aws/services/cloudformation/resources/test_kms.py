@@ -2,10 +2,9 @@ import os.path
 
 from localstack.testing.pytest import markers
 from localstack.utils.strings import short_uid
-from localstack.utils.sync import retry
 
 
-@markers.aws.validated
+@markers.aws.unknown
 def test_kms_key_disabled(deploy_cfn_template, aws_client):
     stack = deploy_cfn_template(
         template_path=os.path.join(
@@ -46,18 +45,27 @@ def test_cfn_with_kms_resources(deploy_cfn_template, aws_client, snapshot):
     assert not _get_matching_aliases()
 
 
-@markers.aws.validated
+@markers.aws.unknown
 def test_deploy_stack_with_kms(deploy_cfn_template, aws_client):
+    environment = f"env-{short_uid()}"
+
     stack = deploy_cfn_template(
-        template_path=os.path.join(os.path.dirname(__file__), "../../../templates/cfn_kms_key.yml"),
+        template_path=os.path.join(
+            os.path.dirname(__file__), "../../../templates/cdk_template_with_kms.json"
+        ),
+        parameters={"Environment": environment},
     )
 
-    key_id = stack.outputs["KeyId"]
+    resources = aws_client.cloudformation.list_stack_resources(StackName=stack.stack_name)[
+        "StackResourceSummaries"
+    ]
+    kmskeys = [res for res in resources if res["ResourceType"] == "AWS::KMS::Key"]
+
+    assert len(kmskeys) == 1
+    assert kmskeys[0]["LogicalResourceId"] == "kmskeystack8A5DBE89"
+    key_id = kmskeys[0]["PhysicalResourceId"]
 
     stack.destroy()
 
-    def assert_key_deleted():
-        resp = aws_client.kms.describe_key(KeyId=key_id)["KeyMetadata"]
-        assert resp["KeyState"] == "PendingDeletion"
-
-    retry(assert_key_deleted, retries=5, sleep=5)
+    resp = aws_client.kms.describe_key(KeyId=key_id)["KeyMetadata"]
+    assert resp["KeyState"] == "PendingDeletion"

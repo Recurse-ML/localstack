@@ -22,7 +22,6 @@ from localstack.aws.api.firehose import (
     AmazonopensearchserviceDestinationUpdate,
     BooleanObject,
     CreateDeliveryStreamOutput,
-    DatabaseSourceConfiguration,
     DeleteDeliveryStreamOutput,
     DeliveryStreamDescription,
     DeliveryStreamEncryptionConfigurationInput,
@@ -35,7 +34,6 @@ from localstack.aws.api.firehose import (
     DestinationDescription,
     DestinationDescriptionList,
     DestinationId,
-    DirectPutSourceConfiguration,
     ElasticsearchDestinationConfiguration,
     ElasticsearchDestinationDescription,
     ElasticsearchDestinationUpdate,
@@ -45,8 +43,6 @@ from localstack.aws.api.firehose import (
     FirehoseApi,
     HttpEndpointDestinationConfiguration,
     HttpEndpointDestinationUpdate,
-    IcebergDestinationConfiguration,
-    IcebergDestinationUpdate,
     InvalidArgumentException,
     KinesisStreamSourceConfiguration,
     ListDeliveryStreamsInputLimit,
@@ -140,7 +136,7 @@ def _get_description_or_raise_not_found(
     delivery_stream_description = store.delivery_streams.get(delivery_stream_name)
     if not delivery_stream_description:
         raise ResourceNotFoundException(
-            f"Firehose {delivery_stream_name} under account {context.account_id} not found."
+            f"Firehose {delivery_stream_name} under account {context.account_id} " f"not found."
         )
     return delivery_stream_description
 
@@ -202,9 +198,7 @@ def get_search_db_connection(endpoint: str, region_name: str):
     return OpenSearch(hosts=[endpoint], verify_certs=verify_certs, use_ssl=use_ssl)
 
 
-def _drop_keys_in_destination_descriptions_not_in_output_types(
-    destinations: list,
-) -> list[dict]:
+def _drop_keys_in_destination_descriptions_not_in_output_types(destinations: list) -> list[dict]:
     """For supported destinations, drops the keys in the description not defined in the respective destination description return type"""
     for destination in destinations:
         if amazon_open_search_service_destination_description := destination.get(
@@ -233,9 +227,7 @@ def _drop_keys_in_destination_descriptions_not_in_output_types(
             )
         if redshift_destination_description := destination.get("RedshiftDestinationDescription"):
             destination["RedshiftDestinationDescription"] = select_from_typed_dict(
-                RedshiftDestinationDescription,
-                redshift_destination_description,
-                filter=True,
+                RedshiftDestinationDescription, redshift_destination_description, filter=True
             )
         if s3_destination_description := destination.get("S3DestinationDescription"):
             destination["S3DestinationDescription"] = select_from_typed_dict(
@@ -262,7 +254,6 @@ class FirehoseProvider(FirehoseApi):
         context: RequestContext,
         delivery_stream_name: DeliveryStreamName,
         delivery_stream_type: DeliveryStreamType = None,
-        direct_put_source_configuration: DirectPutSourceConfiguration = None,
         kinesis_stream_source_configuration: KinesisStreamSourceConfiguration = None,
         delivery_stream_encryption_configuration_input: DeliveryStreamEncryptionConfigurationInput = None,
         s3_destination_configuration: S3DestinationConfiguration = None,
@@ -276,11 +267,8 @@ class FirehoseProvider(FirehoseApi):
         amazon_open_search_serverless_destination_configuration: AmazonOpenSearchServerlessDestinationConfiguration = None,
         msk_source_configuration: MSKSourceConfiguration = None,
         snowflake_destination_configuration: SnowflakeDestinationConfiguration = None,
-        iceberg_destination_configuration: IcebergDestinationConfiguration = None,
-        database_source_configuration: DatabaseSourceConfiguration = None,
         **kwargs,
     ) -> CreateDeliveryStreamOutput:
-        # TODO add support for database_source_configuration and direct_put_source_configuration
         store = self.get_store(context.account_id, context.region)
 
         destinations: DestinationDescriptionList = []
@@ -389,9 +377,7 @@ class FirehoseProvider(FirehoseApi):
                     stream["DeliveryStreamStatus"] = DeliveryStreamStatus.ACTIVE
                 except Exception as e:
                     LOG.warning(
-                        "Unable to create Firehose delivery stream %s: %s",
-                        delivery_stream_name,
-                        e,
+                        "Unable to create Firehose delivery stream %s: %s", delivery_stream_name, e
                     )
                     stream["DeliveryStreamStatus"] = DeliveryStreamStatus.CREATING_FAILED
 
@@ -409,7 +395,7 @@ class FirehoseProvider(FirehoseApi):
         delivery_stream_description = store.delivery_streams.pop(delivery_stream_name, {})
         if not delivery_stream_description:
             raise ResourceNotFoundException(
-                f"Firehose {delivery_stream_name} under account {context.account_id} not found."
+                f"Firehose {delivery_stream_name} under account {context.account_id} " f"not found."
             )
 
         delivery_stream_arn = firehose_stream_arn(
@@ -548,7 +534,6 @@ class FirehoseProvider(FirehoseApi):
         http_endpoint_destination_update: HttpEndpointDestinationUpdate = None,
         amazon_open_search_serverless_destination_update: AmazonOpenSearchServerlessDestinationUpdate = None,
         snowflake_destination_update: SnowflakeDestinationUpdate = None,
-        iceberg_destination_update: IcebergDestinationUpdate = None,
         **kwargs,
     ) -> UpdateDestinationOutput:
         delivery_stream_description = _get_description_or_raise_not_found(
@@ -612,11 +597,7 @@ class FirehoseProvider(FirehoseApi):
         return self._put_records(account_id, region_name, fh_d_stream, records)
 
     def _put_record(
-        self,
-        account_id: str,
-        region_name: str,
-        delivery_stream_name: str,
-        record: Record,
+        self, account_id: str, region_name: str, delivery_stream_name: str, record: Record
     ) -> PutRecordOutput:
         """Put a record to the firehose stream from a PutRecord API call"""
         result = self._put_records(account_id, region_name, delivery_stream_name, [record])
@@ -696,7 +677,7 @@ class FirehoseProvider(FirehoseApi):
                 try:
                     requests.post(url, json=record_to_send, headers=headers)
                 except Exception as e:
-                    LOG.exception("Unable to put Firehose records to HTTP endpoint %s.", url)
+                    LOG.exception(f"Unable to put Firehose records to HTTP endpoint {url}.")
                     raise e
             if "RedshiftDestinationDescription" in destination:
                 s3_dest_desc = destination["RedshiftDestinationDescription"][
@@ -760,19 +741,18 @@ class FirehoseProvider(FirehoseApi):
             try:
                 body = json.loads(data)
             except Exception as e:
-                LOG.warning("%s only allows json input data!", db_flavor)
+                LOG.warning(f"{db_flavor} only allows json input data!")
                 raise e
 
-            if LOG.isEnabledFor(logging.DEBUG):
-                LOG.debug(
-                    "Publishing to %s destination. Data: %s",
-                    db_flavor,
-                    truncate(data, max_length=300),
+            LOG.debug(
+                "Publishing to {} destination. Data: {}".format(
+                    db_flavor, truncate(data, max_length=300)
                 )
+            )
             try:
                 db_connection.create(index=search_db_index, id=obj_id, body=body)
             except Exception as e:
-                LOG.exception("Unable to put record to stream %s.", delivery_stream_name)
+                LOG.exception(f"Unable to put record to stream {delivery_stream_name}.")
                 raise e
 
     def _add_missing_record_attributes(self, records: List[Dict]) -> None:
@@ -850,10 +830,7 @@ class FirehoseProvider(FirehoseApi):
             LOG.debug("Publishing to S3 destination: %s. Data: %s", bucket, batched_data)
             s3.put_object(Bucket=bucket, Key=obj_path, Body=batched_data)
         except Exception as e:
-            LOG.exception(
-                "Unable to put records %s to s3 bucket.",
-                records,
-            )
+            LOG.exception(f"Unable to put records {records} to s3 bucket.")
             raise e
 
     def _get_s3_object_path(self, stream_name, prefix, file_extension):
@@ -893,7 +870,7 @@ class FirehoseProvider(FirehoseApi):
 
         role_arn = redshift_destination_description.get("RoleARN")
         account_id = extract_account_id_from_arn(role_arn)
-        region_name = self._get_region_from_jdbc_url(jdbcurl)
+        region_name = extract_region_from_arn(role_arn)
         redshift_data = connect_to(
             aws_access_key_id=account_id, region_name=region_name
         ).redshift_data
@@ -901,16 +878,11 @@ class FirehoseProvider(FirehoseApi):
         for row_to_insert in rows_to_insert:  # redsift_data only allows single row inserts
             try:
                 LOG.debug(
-                    "Publishing to Redshift destination: %s. Data: %s",
-                    jdbcurl,
-                    row_to_insert,
+                    "Publishing to Redshift destination: %s. Data: %s", jdbcurl, row_to_insert
                 )
                 redshift_data.execute_statement(Parameters=row_to_insert, **execute_statement)
             except Exception as e:
-                LOG.exception(
-                    "Unable to put records %s to redshift cluster.",
-                    row_to_insert,
-                )
+                LOG.exception(f"Unable to put records {row_to_insert} to redshift cluster.")
                 raise e
 
     def _get_cluster_id_from_jdbc_url(self, jdbc_url: str) -> str:
@@ -920,14 +892,6 @@ class FirehoseProvider(FirehoseApi):
             return match.group(1)
         else:
             raise ValueError(f"Unable to extract cluster id from jdbc url: {jdbc_url}")
-
-    def _get_region_from_jdbc_url(self, jdbc_url: str) -> str | None:
-        match = re.search(r"://(?:[^.]+\.){2}([^.]+)\.", jdbc_url)
-        if match:
-            return match.group(1)
-        else:
-            LOG.debug("Cannot extract region from JDBC url '%s'", jdbc_url)
-            return None
 
     def _decode_record(self, record: Dict) -> Dict:
         data = base64.b64decode(record.get("Data") or record.get("data"))

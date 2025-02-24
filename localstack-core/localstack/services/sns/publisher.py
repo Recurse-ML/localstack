@@ -22,17 +22,14 @@ from localstack.aws.connect import connect_to
 from localstack.config import external_service_url
 from localstack.services.sns import constants as sns_constants
 from localstack.services.sns.certificate import SNS_SERVER_PRIVATE_KEY
-from localstack.services.sns.executor import TopicPartitionedThreadPoolExecutor
 from localstack.services.sns.filter import SubscriptionFilter
 from localstack.services.sns.models import (
     SnsApplicationPlatforms,
     SnsMessage,
-    SnsMessageType,
     SnsStore,
     SnsSubscription,
 )
 from localstack.utils.aws.arns import (
-    PARTITION_NAMES,
     extract_account_id_from_arn,
     extract_region_from_arn,
     extract_resource_from_arn,
@@ -239,12 +236,12 @@ class LambdaTopicPublisher(TopicPublisher):
         :param subscriber: the SNS subscription
         :return: an SNS message body formatted as a lambda Event in a JSON string
         """
-        external_url = get_cert_base_url()
+        external_url = external_service_url().rstrip("/")
         unsubscribe_url = create_unsubscribe_url(external_url, subscriber["SubscriptionArn"])
         message_attributes = prepare_message_attributes(message_context.message_attributes)
 
         event_payload = {
-            "Type": message_context.type or SnsMessageType.Notification,
+            "Type": message_context.type or "Notification",
             "MessageId": message_context.message_id,
             "Subject": message_context.subject,
             "TopicArn": subscriber["TopicArn"],
@@ -484,18 +481,15 @@ class HttpTopicPublisher(TopicPublisher):
                 "x-amz-sns-message-id": message_context.message_id,
                 "x-amz-sns-topic-arn": subscriber["TopicArn"],
             }
-            if message_context.type != SnsMessageType.SubscriptionConfirmation:
+            if message_context.type != "SubscriptionConfirmation":
                 # while testing, never had those from AWS but the docs above states it should be there
                 message_headers["x-amz-sns-subscription-arn"] = subscriber["SubscriptionArn"]
 
                 # When raw message delivery is enabled, x-amz-sns-rawdelivery needs to be set to 'true'
                 # indicating that the message has been published without JSON formatting.
                 # https://docs.aws.amazon.com/sns/latest/dg/sns-large-payload-raw-message-delivery.html
-                if message_context.type == SnsMessageType.Notification:
-                    if is_raw_message_delivery(subscriber):
-                        message_headers["x-amz-sns-rawdelivery"] = "true"
-                    if content_type := self._get_content_type(subscriber, context.topic_attributes):
-                        message_headers["Content-Type"] = content_type
+                if message_context.type == "Notification" and is_raw_message_delivery(subscriber):
+                    message_headers["x-amz-sns-rawdelivery"] = "true"
 
             response = requests.post(
                 subscriber["Endpoint"],
@@ -528,32 +522,8 @@ class HttpTopicPublisher(TopicPublisher):
                 topic_attributes=context.topic_attributes,
             )
             # AWS doesn't send to the DLQ if there's an error trying to deliver a UnsubscribeConfirmation msg
-            if message_context.type != SnsMessageType.UnsubscribeConfirmation:
+            if message_context.type != "UnsubscribeConfirmation":
                 sns_error_to_dead_letter_queue(subscriber, message_body, str(exc))
-
-    @staticmethod
-    def _get_content_type(subscriber: SnsSubscription, topic_attributes: dict) -> str | None:
-        # TODO: we need to load the DeliveryPolicy every time if there's one, we should probably save the loaded
-        #  policy on the subscription and dumps it when requested instead
-        # to be much faster, once the logic is implemented in moto, we would only need to fetch EffectiveDeliveryPolicy,
-        # which would already have the value from the topic
-        if json_sub_delivery_policy := subscriber.get("DeliveryPolicy"):
-            sub_delivery_policy = json.loads(json_sub_delivery_policy)
-            if sub_content_type := sub_delivery_policy.get("requestPolicy", {}).get(
-                "headerContentType"
-            ):
-                return sub_content_type
-
-        if json_topic_delivery_policy := topic_attributes.get("delivery_policy"):
-            topic_delivery_policy = json.loads(json_topic_delivery_policy)
-            if not (
-                topic_content_type := topic_delivery_policy.get(subscriber["Protocol"].lower())
-            ):
-                return
-            if content_type := topic_content_type.get("defaultRequestPolicy", {}).get(
-                "headerContentType"
-            ):
-                return content_type
 
 
 class EmailJsonTopicPublisher(TopicPublisher):
@@ -571,16 +541,13 @@ class EmailJsonTopicPublisher(TopicPublisher):
         region = extract_region_from_arn(subscriber["Endpoint"])
         ses_client = connect_to(aws_access_key_id=account_id, region_name=region).ses
         if endpoint := subscriber.get("Endpoint"):
-            # TODO: legacy value, replace by a more sane value in the future
-            #  no-reply@sns-localstack.cloud or similar
-            sender = config.SNS_SES_SENDER_ADDRESS or "admin@localstack.com"
             ses_client.verify_email_address(EmailAddress=endpoint)
-            ses_client.verify_email_address(EmailAddress=sender)
+            ses_client.verify_email_address(EmailAddress="admin@localstack.com")
             message_body = self.prepare_message(
                 context.message, subscriber, topic_attributes=context.topic_attributes
             )
             ses_client.send_email(
-                Source=sender,
+                Source="admin@localstack.com",
                 Message={
                     "Body": {"Text": {"Data": message_body}},
                     "Subject": {"Data": "SNS-Subscriber-Endpoint"},
@@ -858,7 +825,7 @@ def get_application_platform_arn_from_endpoint_arn(endpoint_arn: str) -> str:
     parsed_arn = parse_arn(endpoint_arn)
 
     _, platform_type, app_name, _ = parsed_arn["resource"].split("/")
-    base_arn = f"arn:aws:sns:{parsed_arn['region']}:{parsed_arn['account']}"
+    base_arn = f'arn:aws:sns:{parsed_arn["region"]}:{parsed_arn["account"]}'
     return f"{base_arn}:app/{platform_type}/{app_name}"
 
 
@@ -908,9 +875,7 @@ def send_message_to_gcm(
     )
     if response.status_code != 200:
         LOG.warning(
-            "Platform GCM returned response %s with content %s",
-            response.status_code,
-            response.content,
+            f"Platform GCM returned response {response.status_code} with content {response.content}"
         )
 
 
@@ -924,12 +889,9 @@ def compute_canonical_string(message: dict, notification_type: str) -> str:
     See https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html
     """
     # create the canonical string
-    if notification_type == SnsMessageType.Notification:
+    if notification_type == "Notification":
         fields = ["Message", "MessageId", "Subject", "Timestamp", "TopicArn", "Type"]
-    elif notification_type in (
-        SnsMessageType.SubscriptionConfirmation,
-        SnsMessageType.UnsubscribeConfirmation,
-    ):
+    elif notification_type in ("SubscriptionConfirmation", "UnsubscriptionConfirmation"):
         fields = ["Message", "MessageId", "SubscribeURL", "Timestamp", "Token", "TopicArn", "Type"]
     else:
         return ""
@@ -963,7 +925,7 @@ def create_sns_message_body(
     if message_type == "Notification" and is_raw_message_delivery(subscriber):
         return message_content
 
-    external_url = get_cert_base_url()
+    external_url = external_service_url().rstrip("/")
 
     data = {
         "Type": message_type,
@@ -973,14 +935,11 @@ def create_sns_message_body(
         "Timestamp": timestamp_millis(),
     }
 
-    if message_type == SnsMessageType.Notification:
+    if message_type == "Notification":
         unsubscribe_url = create_unsubscribe_url(external_url, subscriber["SubscriptionArn"])
         data["UnsubscribeURL"] = unsubscribe_url
 
-    elif message_type in (
-        SnsMessageType.SubscriptionConfirmation,
-        SnsMessageType.UnsubscribeConfirmation,
-    ):
+    elif message_type in ("UnsubscribeConfirmation", "SubscriptionConfirmation"):
         data["Token"] = message_context.token
         data["SubscribeURL"] = create_subscribe_url(
             external_url, subscriber["TopicArn"], message_context.token
@@ -1096,10 +1055,7 @@ def store_delivery_log(
         )
         return
 
-    log_group_name = subscriber.get("TopicArn", "")
-    for partition in PARTITION_NAMES:
-        log_group_name = log_group_name.replace(f"arn:{partition}:", "")
-    log_group_name = log_group_name.replace(":", "/")
+    log_group_name = subscriber.get("TopicArn", "").replace("arn:aws:", "").replace(":", "/")
     log_stream_name = long_uid()
     invocation_time = int(time.time() * 1000)
 
@@ -1137,13 +1093,6 @@ def store_delivery_log(
     )
 
 
-def get_cert_base_url() -> str:
-    if config.SNS_CERT_URL_HOST:
-        return f"https://{config.SNS_CERT_URL_HOST}"
-
-    return external_service_url().rstrip("/")
-
-
 def create_subscribe_url(external_url, topic_arn, subscription_token):
     return f"{external_url}/?Action=ConfirmSubscription&TopicArn={topic_arn}&Token={subscription_token}"
 
@@ -1177,13 +1126,9 @@ class PublishDispatcher:
 
     def __init__(self, num_thread: int = 10):
         self.executor = ThreadPoolExecutor(num_thread, thread_name_prefix="sns_pub")
-        self.topic_partitioned_executor = TopicPartitionedThreadPoolExecutor(
-            max_workers=num_thread, thread_name_prefix="sns_pub_fifo"
-        )
 
     def shutdown(self):
         self.executor.shutdown(wait=False)
-        self.topic_partitioned_executor.shutdown(wait=False)
 
     def _should_publish(
         self,
@@ -1232,7 +1177,7 @@ class PublishDispatcher:
                     subscriber["Protocol"],
                     subscriber["SubscriptionArn"],
                 )
-                self._submit_notification(notifier, ctx, subscriber)
+                self.executor.submit(notifier.publish, context=ctx, subscriber=subscriber)
 
     def publish_batch_to_topic(self, ctx: SnsBatchPublishContext, topic_arn: str) -> None:
         subscriptions = ctx.store.get_topic_subscriptions(topic_arn)
@@ -1279,7 +1224,9 @@ class PublishDispatcher:
                     subscriber["Protocol"],
                     subscriber["SubscriptionArn"],
                 )
-                self._submit_notification(notifier, subscriber_ctx, subscriber)
+                self.executor.submit(
+                    notifier.publish, context=subscriber_ctx, subscriber=subscriber
+                )
             else:
                 # if no batch support, fall back to sending them sequentially
                 notifier = self.topic_notifiers[subscriber["Protocol"]]
@@ -1298,18 +1245,9 @@ class PublishDispatcher:
                             subscriber["Protocol"],
                             subscriber["SubscriptionArn"],
                         )
-                        self._submit_notification(notifier, individual_ctx, subscriber)
-
-    def _submit_notification(
-        self, notifier, ctx: SnsPublishContext | SnsBatchPublishContext, subscriber: SnsSubscription
-    ):
-        if (topic_arn := subscriber.get("TopicArn", "")).endswith(".fifo"):
-            # TODO: we still need to implement Message deduplication on the topic level with `should_publish` for FIFO
-            self.topic_partitioned_executor.submit(
-                notifier.publish, topic_arn, context=ctx, subscriber=subscriber
-            )
-        else:
-            self.executor.submit(notifier.publish, context=ctx, subscriber=subscriber)
+                        self.executor.submit(
+                            notifier.publish, context=individual_ctx, subscriber=subscriber
+                        )
 
     def publish_to_phone_number(self, ctx: SnsPublishContext, phone_number: str) -> None:
         LOG.debug(

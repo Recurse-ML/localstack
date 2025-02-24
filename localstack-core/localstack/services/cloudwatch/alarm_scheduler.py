@@ -105,16 +105,14 @@ class AlarmScheduler:
     def _is_alarm_supported(self, alarm_details: MetricAlarm) -> bool:
         required_parameters = ["Period", "Statistic", "MetricName", "Threshold"]
         for param in required_parameters:
-            if param not in alarm_details:
+            if param not in alarm_details.keys():
                 LOG.debug(
-                    "Currently only simple MetricAlarm are supported. Alarm is missing '%s'. ExtendedStatistic is not yet supported.",
-                    param,
+                    f"Currently only simple MetricAlarm are supported. Alarm is missing '{param}'. ExtendedStatistic is not yet supported."
                 )
                 return False
-        if alarm_details["ComparisonOperator"] not in COMPARISON_OPS:
+        if alarm_details["ComparisonOperator"] not in COMPARISON_OPS.keys():
             LOG.debug(
-                "ComparisonOperator '%s' not yet supported.",
-                alarm_details["ComparisonOperator"],
+                f"ComparisonOperator '{alarm_details['ComparisonOperator']}' not yet supported."
             )
             return False
         return True

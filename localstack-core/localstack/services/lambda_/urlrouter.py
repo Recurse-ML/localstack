@@ -3,10 +3,9 @@
 import base64
 import json
 import logging
+import urllib
 from datetime import datetime
 from http import HTTPStatus
-
-from rolo.request import restore_payload
 
 from localstack.aws.api.lambda_ import InvocationType
 from localstack.aws.protocol.serializer import gen_amzn_requestid
@@ -54,11 +53,7 @@ class FunctionUrlRouter:
         )
 
     def handle_lambda_url_invocation(
-        self,
-        request: Request,
-        api_id: str,
-        region: str,
-        **url_params: str,
+        self, request: Request, api_id: str, region: str, **url_params: dict[str, str]
     ) -> Response:
         response = Response()
         response.mimetype = "application/json"
@@ -69,10 +64,7 @@ class FunctionUrlRouter:
             store = lambda_stores[account_id][region]
             for fn in store.functions.values():
                 for url_config in fn.function_url_configs.values():
-                    # AWS tags are case sensitive, but domains are not.
-                    # So we normalize them here to maximize both AWS and RFC
-                    # conformance
-                    if url_config.url_id.lower() == api_id.lower():
+                    if url_config.url_id == api_id:
                         lambda_url_config = url_config
 
         # TODO: check if errors are different when the URL has existed previously
@@ -84,7 +76,9 @@ class FunctionUrlRouter:
             # TODO: x-amzn-requestid
             return response
 
-        event = event_for_lambda_url(api_id, request)
+        event = event_for_lambda_url(
+            api_id, request.full_path, request.data, request.headers, request.method
+        )
 
         match = FULL_FN_ARN_PATTERN.search(lambda_url_config.function_arn).groupdict()
 
@@ -105,20 +99,18 @@ class FunctionUrlRouter:
         return response
 
 
-def event_for_lambda_url(api_id: str, request: Request) -> dict:
-    partitioned_uri = request.full_path.partition("?")
-    raw_path = partitioned_uri[0]
-    raw_query_string = partitioned_uri[2]
-
-    query_string_parameters = {k: ",".join(request.args.getlist(k)) for k in request.args.keys()}
+def event_for_lambda_url(api_id: str, path: str, data, headers, method: str) -> dict:
+    raw_path = path.split("?")[0]
+    raw_query_string = path.split("?")[1] if len(path.split("?")) > 1 else ""
+    query_string_parameters = (
+        {} if not raw_query_string else dict(urllib.parse.parse_qsl(raw_query_string))
+    )
 
     now = datetime.utcnow()
     readable = timestamp(time=now, format=TIMESTAMP_READABLE_FORMAT)
     if not any(char in readable for char in ["+", "-"]):
         readable += "+0000"
 
-    data = restore_payload(request)
-    headers = request.headers
     source_ip = headers.get("Remote-Addr", "")
     request_context = {
         "accountId": "anonymous",
@@ -126,7 +118,7 @@ def event_for_lambda_url(api_id: str, request: Request) -> dict:
         "domainName": headers.get("Host", ""),
         "domainPrefix": api_id,
         "http": {
-            "method": request.method,
+            "method": method,
             "path": raw_path,
             "protocol": "HTTP/1.1",
             "sourceIp": source_ip,

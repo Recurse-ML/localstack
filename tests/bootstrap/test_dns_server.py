@@ -71,25 +71,12 @@ def test_user_defined_network(
     assert container_ip in stdout.decode().splitlines()
 
 
-@pytest.mark.parametrize(
-    "prefix,suffix",
-    [("", ""), ("'", "'"), ('"', '"'), ("\"'", "'\""), ("'  ", "'  ")],
-    ids=[
-        "no-quotes",
-        "single-quotes",
-        "double-quotes",
-        "single-and-double-quotes",
-        "single-quotes-with-spaces",
-    ],
-)
 def test_skip_pattern(
     docker_network,
     container_factory: ContainerFactory,
     stream_container_logs,
     wait_for_localstack_ready,
     dns_query_from_container,
-    prefix,
-    suffix,
 ):
     """
     Add a skip pattern of localhost.localstack.cloud to ensure that we prioritise skips before
@@ -102,7 +89,7 @@ def test_skip_pattern(
             ContainerConfigurators.network(docker_network),
             ContainerConfigurators.env_vars(
                 {
-                    "DNS_NAME_PATTERNS_TO_RESOLVE_UPSTREAM": rf"{prefix}.*localhost.localstack.cloud{suffix}",
+                    "DNS_NAME_PATTERNS_TO_RESOLVE_UPSTREAM": r".*localhost.localstack.cloud",
                 }
             ),
         ]

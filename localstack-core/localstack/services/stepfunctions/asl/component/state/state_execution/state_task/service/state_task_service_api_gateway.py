@@ -23,11 +23,7 @@ from localstack.services.stepfunctions.asl.component.common.error_name.custom_er
 from localstack.services.stepfunctions.asl.component.common.error_name.failure_event import (
     FailureEvent,
 )
-from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.credentials import (
-    StateCredentials,
-)
 from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.service.resource import (
-    ResourceCondition,
     ResourceRuntimePart,
 )
 from localstack.services.stepfunctions.asl.component.state.state_execution.state_task.service.state_task_service_callback import (
@@ -41,9 +37,6 @@ from localstack.utils.urls import localstack_host
 
 LOG = logging.getLogger(__name__)
 
-_SUPPORTED_INTEGRATION_PATTERNS: Final[set[ResourceCondition]] = {
-    ResourceCondition.WaitForTaskToken,
-}
 
 ApiEndpoint = str
 Headers = dict
@@ -128,9 +121,6 @@ class StateTaskServiceApiGateway(StateTaskServiceCallback):
         "Www-Authenticate",
     }
 
-    def __init__(self):
-        super().__init__(supported_integration_patterns=_SUPPORTED_INTEGRATION_PATTERNS)
-
     def _get_supported_parameters(self) -> Optional[set[str]]:
         return self._SUPPORTED_API_PARAM_BINDINGS.get(self.resource.api_action.lower())
 
@@ -177,11 +167,6 @@ class StateTaskServiceApiGateway(StateTaskServiceCallback):
                 for forbidden_prefix in StateTaskServiceApiGateway._FORBIDDEN_HTTP_HEADERS_PREFIX:
                     if key.startswith(forbidden_prefix):
                         raise ValueError(f"The 'Headers' field contains unsupported values: {key}")
-
-                value = headers.get(key)
-                if isinstance(value, list):
-                    headers[key] = f"[{','.join(value)}]"
-
             if "RequestBody" in parameters:
                 headers[HEADER_CONTENT_TYPE] = APPLICATION_JSON
         headers["Accept"] = APPLICATION_JSON
@@ -209,11 +194,7 @@ class StateTaskServiceApiGateway(StateTaskServiceCallback):
         given_api_endpoint = parameters["ApiEndpoint"]
         api_endpoint = StateTaskServiceApiGateway._path_based_url_of(given_api_endpoint)
         if given_api_endpoint != api_endpoint:
-            LOG.warning(
-                "ApiEndpoint '%s' ignored in favour of %s",
-                given_api_endpoint,
-                api_endpoint,
-            )
+            LOG.warning(f"ApiEndpoint '{given_api_endpoint}' ignored in favour of {api_endpoint}")
 
         url_base = api_endpoint + "/"
         # http://localhost:4566/restapis/<api-id>/<stage>/_user_request_/<path>(?<query-parameters>)?
@@ -294,10 +275,7 @@ class StateTaskServiceApiGateway(StateTaskServiceCallback):
         env: Environment,
         resource_runtime_part: ResourceRuntimePart,
         normalised_parameters: dict,
-        state_credentials: StateCredentials,
     ):
-        # TODO: add support for task credentials
-
         task_parameters: TaskParameters = select_from_typed_dict(
             typed_dict=TaskParameters, obj=normalised_parameters
         )

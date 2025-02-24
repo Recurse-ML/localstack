@@ -56,7 +56,10 @@ class StepFunctionsActivityProvider(ResourceProvider[StepFunctionsActivityProper
         """
         model = request.desired_state
         step_functions = request.aws_client_factory.stepfunctions
-        response = step_functions.create_activity(**model)
+        if not model.get("Tags"):
+            response = step_functions.create_activity(name=model["Name"])
+        else:
+            response = step_functions.create_activity(name=model["Name"], tags=model["Tags"])
         model["Arn"] = response["activityArn"]
 
         return ProgressEvent(

@@ -92,9 +92,7 @@ class DynamoDBStreamsProvider(DynamodbstreamsApi, ServiceLifecycleHook):
                 stream_description = select_from_typed_dict(StreamDescription, stream)
                 return DescribeStreamOutput(StreamDescription=stream_description)
 
-        raise ResourceNotFoundException(
-            f"Requested resource not found: Stream: {stream_arn} not found"
-        )
+        raise ResourceNotFoundException(f"Stream {stream_arn} was not found.")
 
     @handler("GetRecords", expand=False)
     def get_records(self, context: RequestContext, payload: GetRecordsInput) -> GetRecordsOutput:

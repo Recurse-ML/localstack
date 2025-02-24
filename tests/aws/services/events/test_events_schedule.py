@@ -13,7 +13,6 @@ from localstack.utils.sync import retry
 from tests.aws.services.events.helper_functions import (
     events_time_string_to_timestamp,
     get_cron_expression,
-    is_old_provider,
     sqs_collect_messages,
 )
 
@@ -82,16 +81,15 @@ class TestScheduleRate:
         }
 
     @markers.aws.validated
-    @pytest.mark.skip(reason="flakey when comparing 'messages-second' against snapshot")
     def tests_schedule_rate_target_sqs(
         self,
-        sqs_as_events_target,
+        create_sqs_events_target,
         events_put_rule,
         aws_client,
         snapshot,
     ):
         queue_name = f"test-queue-{short_uid()}"
-        queue_url, queue_arn = sqs_as_events_target(queue_name)
+        queue_url, queue_arn = create_sqs_events_target(queue_name)
 
         bus_name = "default"
         rule_name = f"test-rule-{short_uid()}"
@@ -110,9 +108,7 @@ class TestScheduleRate:
         snapshot.match("list-targets", response)
 
         time.sleep(60)
-        messages_first = sqs_collect_messages(
-            aws_client, queue_url, expected_events_count=1, retries=3
-        )
+        messages_first = sqs_collect_messages(aws_client, queue_url, min_events=1, retries=3)
 
         snapshot.add_transformers_list(
             [
@@ -126,9 +122,7 @@ class TestScheduleRate:
         snapshot.match("messages-first", messages_first)
 
         time.sleep(60)
-        messages_second = sqs_collect_messages(
-            aws_client, queue_url, expected_events_count=1, retries=3
-        )
+        messages_second = sqs_collect_messages(aws_client, queue_url, min_events=1, retries=3)
         snapshot.match("messages-second", messages_second)
 
         # check if the messages are 60 seconds apart
@@ -145,9 +139,9 @@ class TestScheduleRate:
 
     @markers.aws.validated
     def tests_schedule_rate_custom_input_target_sqs(
-        self, sqs_as_events_target, events_put_rule, aws_client, snapshot
+        self, create_sqs_events_target, events_put_rule, aws_client, snapshot
     ):
-        queue_url, queue_arn = sqs_as_events_target()
+        queue_url, queue_arn = create_sqs_events_target()
 
         bus_name = "default"
         rule_name = f"test-rule-{short_uid()}"
@@ -170,9 +164,7 @@ class TestScheduleRate:
         snapshot.match("list-targets", response)
 
         time.sleep(60)
-        messages_first = sqs_collect_messages(
-            aws_client, queue_url, expected_events_count=1, retries=3
-        )
+        messages_first = sqs_collect_messages(aws_client, queue_url, min_events=1, retries=3)
 
         snapshot.add_transformers_list(
             [
@@ -281,13 +273,6 @@ class TestScheduleCron:
     @pytest.mark.parametrize(
         "schedule_cron",
         [
-            "cron(0 2 ? * SAT *)",  # Run at 2:00 am every Saturday
-            "cron(0 12 * * ? *)",  # Run at 12:00 pm every day
-            "cron(5,35 14 * * ? *)",  # Run at 2:05 pm and 2:35 pm every day
-            "cron(15 10 ? * 6L 2002-2005)",  # Run at 10:15 am on the last Friday of every month during the years 2002-2005
-            "cron(0 2 ? * SAT#3 *)",  # Run at 2:00 am on the third Saturday of every month
-            "cron(* * ? * SAT#3 *)",  # Run every minute on the third Saturday of every month
-            "cron(0/5 5 ? JAN 1-5 2022)",  # RUN every 5 minutes on the first 5 days of January 2022
             "cron(0 10 * * ? *)",  # Run at 10:00 am every day
             "cron(15 12 * * ? *)",  # Run at 12:15 pm every day
             "cron(0 18 ? * MON-FRI *)",  # Run at 6:00 pm every Monday through Friday
@@ -312,37 +297,15 @@ class TestScheduleCron:
         snapshot.match("list-rules", response)
 
     @markers.aws.validated
-    @pytest.mark.skipif(
-        is_old_provider(),
-        reason="V1 provider does not properly validate",
-    )
-    @pytest.mark.parametrize(
-        "schedule_cron",
-        [
-            "cron(0 1 * * * *)",  # you can't specify the Day-of-month and Day-of-week fields in the same cron expression
-            "cron(7 20 * * NOT *)",
-            "cron(INVALID)",
-            "cron(0 dummy ? * MON-FRI *)",
-            "cron(71 8 1 * ? *)",
-        ],
-    )
-    def tests_put_rule_with_invalid_schedule_cron(self, schedule_cron, events_put_rule, snapshot):
-        rule_name = f"rule-{short_uid()}"
-
-        with pytest.raises(ClientError) as e:
-            events_put_rule(Name=rule_name, ScheduleExpression=schedule_cron)
-        snapshot.match("invalid-put-rule", e.value.response)
-
-    @markers.aws.validated
     @pytest.mark.skip("Flaky, target time can be 1min off message time")
     def test_schedule_cron_target_sqs(
         self,
-        sqs_as_events_target,
+        create_sqs_events_target,
         events_put_rule,
         aws_client,
         snapshot,
     ):
-        queue_url, queue_arn = sqs_as_events_target()
+        queue_url, queue_arn = create_sqs_events_target()
 
         schedule_cron, target_datetime = get_cron_expression(
             1
@@ -362,7 +325,7 @@ class TestScheduleCron:
         )
 
         time.sleep(120)  # required to wait for time delta 1 minute starting from next full minute
-        messages = sqs_collect_messages(aws_client, queue_url, expected_events_count=1, retries=5)
+        messages = sqs_collect_messages(aws_client, queue_url, min_events=1, retries=5)
 
         snapshot.add_transformers_list(
             [
@@ -380,7 +343,7 @@ class TestScheduleCron:
 
         # TODO fix JobScheduler to execute on exact time
         # round datetime to nearest minute
-        if time_message.second > 0:
+        if time_message.second > 0 or time_message.microsecond > 0:
             time_message += timedelta(minutes=1)
             time_message = time_message.replace(second=0, microsecond=0)
 

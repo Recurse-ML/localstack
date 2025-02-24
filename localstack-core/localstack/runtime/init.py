@@ -1,5 +1,3 @@
-"""Module for initialization hooks https://docs.localstack.cloud/references/init-hooks/"""
-
 import dataclasses
 import logging
 import os.path
@@ -9,8 +7,7 @@ from enum import Enum
 from functools import cached_property
 from typing import Dict, List, Optional
 
-from plux import Plugin, PluginManager
-
+from localstack import constants
 from localstack.runtime import hooks
 from localstack.utils.objects import singleton_factory
 
@@ -50,13 +47,10 @@ class Script:
     state: State = State.UNKNOWN
 
 
-class ScriptRunner(Plugin):
+class ScriptRunner:
     """
     Interface for running scripts.
     """
-
-    namespace = "localstack.init.runner"
-    suffixes = []
 
     def run(self, path: str) -> None:
         """
@@ -66,28 +60,11 @@ class ScriptRunner(Plugin):
         """
         raise NotImplementedError
 
-    def should_run(self, script_file: str) -> bool:
-        """
-        Checks whether the given file should be run with this script runner. In case multiple runners
-        evaluate this condition to true on the same file (ideally this doesn't happen), the first one
-        loaded will be used, which is potentially indeterministic.
-
-        :param script_file: the script file to run
-        :return: True if this runner should be used, False otherwise
-        """
-        for suffix in self.suffixes:
-            if script_file.endswith(suffix):
-                return True
-        return False
-
 
 class ShellScriptRunner(ScriptRunner):
     """
     Runner that interprets scripts as shell scripts and calls them directly.
     """
-
-    name = "sh"
-    suffixes = [".sh"]
 
     def run(self, path: str) -> None:
         exit_code = subprocess.call(args=[], executable=path)
@@ -99,9 +76,6 @@ class PythonScriptRunner(ScriptRunner):
     """
     Runner that uses ``exec`` to run a python script.
     """
-
-    name = "py"
-    suffixes = [".py"]
 
     def run(self, path: str) -> None:
         with open(path, "rb") as fd:
@@ -116,22 +90,25 @@ class InitScriptManager:
         Stage.SHUTDOWN: "shutdown.d",
     }
 
+    _script_runners: Dict[str, ScriptRunner] = {
+        ".sh": ShellScriptRunner(),
+        ".py": PythonScriptRunner(),
+    }
+
     script_root: str
     stage_completed: Dict[Stage, bool]
 
     def __init__(self, script_root: str):
         self.script_root = script_root
         self.stage_completed = {stage: False for stage in Stage}
-        self.runner_manager: PluginManager[ScriptRunner] = PluginManager(ScriptRunner.namespace)
 
     @cached_property
     def scripts(self) -> Dict[Stage, List[Script]]:
         return self._find_scripts()
 
     def get_script_runner(self, script_file: str) -> Optional[ScriptRunner]:
-        runners = self.runner_manager.load_all()
-        for runner in runners:
-            if runner.should_run(script_file):
+        for suffix, runner in self._script_runners.items():
+            if script_file.endswith(suffix):
                 return runner
         return None
 
@@ -155,7 +132,12 @@ class InitScriptManager:
             for script in scripts:
                 LOG.debug("Running %s script %s", script.stage, script.path)
 
+                # Deprecated: To be removed in v4.0 major release.
+                # Explicit AWS credentials and region will need to be set in the script.
                 env_original = os.environ.copy()
+                os.environ["AWS_ACCESS_KEY_ID"] = constants.DEFAULT_AWS_ACCOUNT_ID
+                os.environ["AWS_SECRET_ACCESS_KEY"] = constants.INTERNAL_AWS_SECRET_ACCESS_KEY
+                os.environ["AWS_REGION"] = constants.AWS_REGION_US_EAST_1
 
                 try:
                     script.state = State.RUNNING
@@ -170,19 +152,13 @@ class InitScriptManager:
                 else:
                     script.state = State.SUCCESSFUL
                 finally:
-                    # Discard env variables overridden in startup script that may cause side-effects
-                    for env_var in (
-                        "AWS_ACCESS_KEY_ID",
-                        "AWS_SECRET_ACCESS_KEY",
-                        "AWS_SESSION_TOKEN",
-                        "AWS_DEFAULT_REGION",
-                        "AWS_PROFILE",
-                        "AWS_REGION",
-                    ):
+                    # Restore original state of Boto credentials.
+                    for env_var in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"):
                         if env_var in env_original:
                             os.environ[env_var] = env_original[env_var]
                         else:
                             os.environ.pop(env_var, None)
+
         finally:
             self.stage_completed[stage] = True
 
@@ -206,21 +182,19 @@ class InitScriptManager:
             if not os.path.isdir(stage_path):
                 continue
 
-            for root, dirs, files in os.walk(stage_path, topdown=True):
-                # from the docs: "When topdown is true, the caller can modify the dirnames list in-place"
-                dirs.sort()
-                files.sort()
-                for file in files:
-                    script_path = os.path.abspath(os.path.join(root, file))
-                    if not os.path.isfile(script_path):
-                        continue
+            for file in sorted(os.listdir(stage_path)):
+                script_path = os.path.join(stage_path, file)
+                if not os.path.isfile(script_path):
+                    continue
 
-                    # only add the script if there's a runner for it
-                    if not self.has_script_runner(script_path):
-                        LOG.debug("No runner available for script %s", script_path)
-                        continue
+                # only add the script if there's a runner for it
+                if not self.has_script_runner(script_path):
+                    LOG.debug("No runner available for script %s", script_path)
+                    continue
 
-                    scripts[stage].append(Script(path=script_path, stage=stage))
+                scripts[stage].append(
+                    Script(path=os.path.abspath(os.path.join(stage_path, script_path)), stage=stage)
+                )
         LOG.debug("Init scripts discovered: %s", scripts)
 
         return scripts

@@ -69,6 +69,3 @@ gen/
 
 # RAW snapshots
 *.raw.snapshot.json
-
-# setuptools_scm version.py
-*/*/version.py

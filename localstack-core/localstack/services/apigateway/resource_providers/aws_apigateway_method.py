@@ -12,6 +12,7 @@ from localstack.services.cloudformation.resource_provider import (
     ResourceProvider,
     ResourceRequest,
 )
+from localstack.utils.objects import keys_to_lower
 
 
 class ApiGatewayMethodProperties(TypedDict):
@@ -99,44 +100,78 @@ class ApiGatewayMethodProvider(ResourceProvider[ApiGatewayMethodProperties]):
         """
         model = request.desired_state
         apigw = request.aws_client_factory.apigateway
-        operation_model = apigw.meta.service_model.operation_model
 
-        apigw.put_method(
-            **util.convert_request_kwargs(model, operation_model("PutMethod").input_shape)
-        )
+        # key_to_lower makes in-place changes which will cause crash
+        # when we try to use model outside of this function
+        # for example generating composite physical id
+        params = keys_to_lower(deepcopy(model))
+        param_names = [
+            "restApiId",
+            "resourceId",
+            "httpMethod",
+            "apiKeyRequired",
+            "authorizationType",
+            "authorizationScopes",
+            "authorizerId",
+            "requestParameters",
+            "requestModels",
+            "requestValidatorId",
+            "operationName",
+        ]
+        params = util.select_attributes(params, param_names)
+        params["requestModels"] = params.get("requestModels") or {}
+        params["requestParameters"] = params.get("requestParameters") or {}
+
+        apigw.put_method(**params)
 
         # setting up integrations
         integration = model.get("Integration")
         if integration:
-            apigw.put_integration(
-                restApiId=model.get("RestApiId"),
-                resourceId=model.get("ResourceId"),
-                httpMethod=model.get("HttpMethod"),
-                **util.convert_request_kwargs(
-                    integration, operation_model("PutIntegration").input_shape
-                ),
-            )
+            api_id = model["RestApiId"]
+            res_id = model["ResourceId"]
 
-            integration_responses = integration.pop("IntegrationResponses", [])
+            kwargs = keys_to_lower(deepcopy(integration))
+            if uri := integration.get("Uri"):
+                kwargs["uri"] = uri
+
+            integration_responses = kwargs.pop("integrationResponses", [])
+            method = model.get("HttpMethod")
+
+            kwargs["requestParameters"] = kwargs.get("requestParameters") or {}
+            kwargs["requestTemplates"] = kwargs.get("requestTemplates") or {}
+
+            apigw.put_integration(
+                restApiId=api_id,
+                resourceId=res_id,
+                httpMethod=method,
+                **kwargs,
+            )
+            default_params = (
+                "responseParameters",
+                "responseTemplates",
+            )
             for integration_response in integration_responses:
+                integration_response["statusCode"] = str(integration_response["statusCode"])
+                for param in default_params:
+                    integration_response[param] = integration_response.get(param) or {}
                 apigw.put_integration_response(
-                    restApiId=model.get("RestApiId"),
-                    resourceId=model.get("ResourceId"),
-                    httpMethod=model.get("HttpMethod"),
-                    **util.convert_request_kwargs(
-                        integration_response, operation_model("PutIntegrationResponse").input_shape
-                    ),
+                    restApiId=api_id,
+                    resourceId=res_id,
+                    httpMethod=method,
+                    **keys_to_lower(integration_response),
                 )
 
-        responses = model.get("MethodResponses", [])
+        responses = model.get("MethodResponses") or []
         for response in responses:
+            api_id = model["RestApiId"]
+            res_id = model["ResourceId"]
             apigw.put_method_response(
-                restApiId=model.get("RestApiId"),
-                resourceId=model.get("ResourceId"),
-                httpMethod=model.get("HttpMethod"),
-                **util.convert_request_kwargs(
-                    response, operation_model("PutMethodResponse").input_shape
-                ),
+                restApiId=api_id,
+                resourceId=res_id,
+                httpMethod=model["HttpMethod"],
+                statusCode=str(response["StatusCode"]),
+                responseParameters=response.get("ResponseParameters") or {},
+                responseModels=response.get("ResponseModels") or {},
             )
 
         return ProgressEvent(
@@ -175,9 +210,9 @@ class ApiGatewayMethodProvider(ResourceProvider[ApiGatewayMethodProperties]):
 
         try:
             apigw.delete_method(
-                **util.convert_request_kwargs(
-                    model, apigw.meta.service_model.operation_model("DeleteMethod").input_shape
-                )
+                restApiId=model["RestApiId"],
+                resourceId=model["ResourceId"],
+                httpMethod=model["HttpMethod"],
             )
         except apigw.exceptions.NotFoundException:
             pass
@@ -202,30 +237,30 @@ class ApiGatewayMethodProvider(ResourceProvider[ApiGatewayMethodProperties]):
         """
         model = request.desired_state
         apigw = request.aws_client_factory.apigateway
-        operation_model = apigw.meta.service_model.operation_model
 
-        must_params = util.select_attributes(
-            model,
-            [
-                "RestApiId",
-                "ResourceId",
-                "HttpMethod",
-            ],
-        )
+        params = keys_to_lower(deepcopy(model))
+        param_names = [
+            "restApiId",
+            "resourceId",
+            "httpMethod",
+            "requestParameters",
+        ]
+        params = util.select_attributes(params, param_names)
 
-        if integration := deepcopy(model.get("Integration")):
-            integration.update(must_params)
-            apigw.put_integration(
-                **util.convert_request_kwargs(
-                    integration, operation_model("PutIntegration").input_shape
-                )
-            )
+        if integration := model.get("Integration"):
+            params["type"] = integration["Type"]
+            if integration.get("IntegrationHttpMethod"):
+                params["integrationHttpMethod"] = integration.get("IntegrationHttpMethod")
+            if integration.get("Uri"):
+                params["uri"] = integration.get("Uri")
+            params["requestParameters"] = integration.get("RequestParameters") or {}
+            params["requestTemplates"] = integration.get("RequestTemplates") or {}
+
+            apigw.put_integration(**params)
 
         else:
-            must_params.update({"AuthorizationType": model.get("AuthorizationType")})
-            apigw.put_method(
-                **util.convert_request_kwargs(must_params, operation_model("PutMethod").input_shape)
-            )
+            params["authorizationType"] = model.get("AuthorizationType")
+            apigw.put_method(**params)
 
         return ProgressEvent(
             status=OperationStatus.SUCCESS,

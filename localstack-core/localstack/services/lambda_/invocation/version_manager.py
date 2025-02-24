@@ -92,9 +92,7 @@ class LambdaVersionManager:
             # https://docs.aws.amazon.com/lambda/latest/dg/API_GetFunctionConfiguration.html#SSS-GetFunctionConfiguration-response-LastUpdateStatusReasonCode
             new_state = VersionState(state=State.Active)
             LOG.debug(
-                "Changing Lambda %s (id %s) to active",
-                self.function_arn,
-                self.function_version.config.internal_revision,
+                f"Changing Lambda {self.function_arn} (id {self.function_version.config.internal_revision}) to active"
             )
         except Exception as e:
             new_state = VersionState(
@@ -103,9 +101,8 @@ class LambdaVersionManager:
                 reason=f"Error while creating lambda: {e}",
             )
             LOG.debug(
-                "Changing Lambda %s (id %s) to failed. Reason: %s",
-                self.function_arn,
-                self.function_version.config.internal_revision,
+                f"Changing Lambda {self.function_arn} (id {self.function_version.config.internal_revision}) to "
+                f"failed. Reason: %s",
                 e,
                 exc_info=True,
             )

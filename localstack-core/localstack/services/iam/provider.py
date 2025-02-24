@@ -1,16 +1,22 @@
 import json
 import re
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import quote
 
 from moto.iam.models import (
+    AccessKey,
+    AWSManagedPolicy,
     IAMBackend,
+    InlinePolicy,
+    Policy,
     filter_items_with_path_prefix,
     iam_backends,
 )
 from moto.iam.models import Role as MotoRole
+from moto.iam.policy_validation import VALID_STATEMENT_ELEMENTS
 
+from localstack import config
 from localstack.aws.api import CommonServiceException, RequestContext, handler
 from localstack.aws.api.iam import (
     ActionNameListType,
@@ -60,24 +66,48 @@ from localstack.aws.api.iam import (
 )
 from localstack.aws.connect import connect_to
 from localstack.constants import INTERNAL_AWS_SECRET_ACCESS_KEY
-from localstack.services.iam.iam_patches import apply_iam_patches
 from localstack.services.moto import call_moto
 from localstack.utils.aws.request_context import extract_access_key_id_from_auth_header
 from localstack.utils.common import short_uid
+from localstack.utils.patch import patch
 
 SERVICE_LINKED_ROLE_PATH_PREFIX = "/aws-service-role"
 
+ADDITIONAL_MANAGED_POLICIES = {
+    "AWSLambdaExecute": {
+        "Arn": "arn:aws:iam::aws:policy/AWSLambdaExecute",
+        "Path": "/",
+        "CreateDate": "2017-10-20T17:23:10+00:00",
+        "DefaultVersionId": "v4",
+        "Document": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": ["logs:*"],
+                    "Resource": "arn:aws:logs:*:*:*",
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": ["s3:GetObject", "s3:PutObject"],
+                    "Resource": "arn:aws:s3:::*",
+                },
+            ],
+        },
+        "UpdateDate": "2019-05-20T18:22:18+00:00",
+    }
+}
 
 POLICY_ARN_REGEX = re.compile(r"arn:[^:]+:iam::(?:\d{12}|aws):policy/.*")
 
 
 def get_iam_backend(context: RequestContext) -> IAMBackend:
-    return iam_backends[context.account_id][context.partition]
+    return iam_backends[context.account_id]["global"]
 
 
 class IamProvider(IamApi):
     def __init__(self):
-        apply_iam_patches()
+        apply_patches()
 
     @handler("CreateRole", expand=False)
     def create_role(
@@ -307,8 +337,8 @@ class IamProvider(IamApi):
             tags={},
             max_session_duration=3600,
         )
-        role.service_linked_role_arn = "arn:{0}:iam::{1}:role/aws-service-role/{2}/{3}".format(
-            context.partition, context.account_id, aws_service_name, role.name
+        role.service_linked_role_arn = "arn:aws:iam::{0}:role/aws-service-role/{1}/{2}".format(
+            context.account_id, aws_service_name, role.name
         )
 
         res_role = self.moto_role_to_role_type(role)
@@ -378,7 +408,6 @@ class IamProvider(IamApi):
         if not moto_user and not user_name:
             access_key_id = extract_access_key_id_from_auth_header(context.request.headers)
             sts_client = connect_to(
-                region_name=context.region,
                 aws_access_key_id=access_key_id,
                 aws_secret_access_key=INTERNAL_AWS_SECRET_ACCESS_KEY,
             ).sts
@@ -420,3 +449,106 @@ class IamProvider(IamApi):
         if not POLICY_ARN_REGEX.match(policy_arn):
             raise InvalidInputException(f"ARN {policy_arn} is not valid.")
         return call_moto(context=context)
+
+    # def get_user(
+    #     self, context: RequestContext, user_name: existingUserNameType = None
+    # ) -> GetUserResponse:
+    #     # TODO: The following migrates patch 'iam_response_get_user' as a provider function.
+    #     #  However, there are concerns with utilising 'aws_stack.extract_access_key_id_from_auth_header'
+    #     #  in place of 'moto.core.responses.get_current_user'.
+    #     if not user_name:
+    #         access_key_id = aws_stack.extract_access_key_id_from_auth_header(context.request.headers)
+    #         moto_user = moto_iam_backend.get_user_from_access_key_id(access_key_id)
+    #         if moto_user is None:
+    #             moto_user = MotoUser("default_user")
+    #     else:
+    #         moto_user = moto_iam_backend.get_user(user_name)
+    #
+    #     response_user_name = config.TEST_IAM_USER_NAME or moto_user.name
+    #     response_user_id = config.TEST_IAM_USER_ID or moto_user.id
+    #     moto_user = moto_iam_backend.users.get(response_user_name) or moto_user
+    #     moto_tags = moto_iam_backend.tagger.list_tags_for_resource(moto_user.arn).get("Tags", [])
+    #     response_tags = None
+    #     if moto_tags:
+    #         response_tags = [Tag(Key=t["Key"], Value=t["Value"]) for t in moto_tags]
+    #
+    #     response_user = User()
+    #     response_user["Path"] = moto_user.path
+    #     response_user["UserName"] = response_user_name
+    #     response_user["UserId"] = response_user_id
+    #     response_user["Arn"] = moto_user.arn
+    #     response_user["CreateDate"] = moto_user.create_date
+    #     if moto_user.password_last_used:
+    #         response_user["PasswordLastUsed"] = moto_user.password_last_used
+    #     # response_user["PermissionsBoundary"] =   # TODO
+    #     if response_tags:
+    #         response_user["Tags"] = response_tags
+    #     return GetUserResponse(User=response_user)
+
+
+def apply_patches():
+    # support service linked roles
+
+    @property
+    def moto_role_arn(self):
+        return getattr(self, "service_linked_role_arn", None) or moto_role_og_arn_prop.__get__(self)
+
+    moto_role_og_arn_prop = MotoRole.arn
+    MotoRole.arn = moto_role_arn
+
+    # Add missing managed polices
+    # TODO this might not be necessary
+    @patch(IAMBackend._init_aws_policies)
+    def _init_aws_policies_extended(_init_aws_policies, self):
+        loaded_policies = _init_aws_policies(self)
+        loaded_policies.extend(
+            [
+                AWSManagedPolicy.from_data(name, self.account_id, self.region_name, d)
+                for name, d in ADDITIONAL_MANAGED_POLICIES.items()
+            ]
+        )
+        return loaded_policies
+
+    if "Principal" not in VALID_STATEMENT_ELEMENTS:
+        VALID_STATEMENT_ELEMENTS.append("Principal")
+
+    # patch policy __init__ to set document as attribute
+
+    @patch(Policy.__init__)
+    def policy__init__(
+        fn,
+        self,
+        name,
+        account_id,
+        region,
+        default_version_id=None,
+        description=None,
+        document=None,
+        **kwargs,
+    ):
+        fn(self, name, account_id, region, default_version_id, description, document, **kwargs)
+        self.document = document
+
+    # patch unapply_policy
+
+    @patch(InlinePolicy.unapply_policy)
+    def inline_policy_unapply_policy(fn, self, backend):
+        try:
+            fn(self, backend)
+        except Exception:
+            # Actually role can be deleted before policy being deleted in cloudformation
+            pass
+
+    @patch(AccessKey.__init__)
+    def access_key__init__(
+        fn,
+        self,
+        user_name: Optional[str],
+        prefix: str,
+        account_id: str,
+        status: str = "Active",
+        **kwargs,
+    ):
+        if not config.PARITY_AWS_ACCESS_KEY_ID:
+            prefix = "L" + prefix[1:]
+        fn(self, user_name, prefix, account_id, status, **kwargs)

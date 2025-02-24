@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Dict, Iterator, List, Optional, TypedDict
 
 from localstack.aws.api import RequestContext, ServiceException, ServiceRequest, handler
@@ -36,18 +35,18 @@ TagKey = str
 TagValue = str
 
 
-class ConsumerStatus(StrEnum):
+class ConsumerStatus(str):
     CREATING = "CREATING"
     DELETING = "DELETING"
     ACTIVE = "ACTIVE"
 
 
-class EncryptionType(StrEnum):
+class EncryptionType(str):
     NONE = "NONE"
     KMS = "KMS"
 
 
-class MetricsName(StrEnum):
+class MetricsName(str):
     IncomingBytes = "IncomingBytes"
     IncomingRecords = "IncomingRecords"
     OutgoingBytes = "OutgoingBytes"
@@ -58,11 +57,11 @@ class MetricsName(StrEnum):
     ALL = "ALL"
 
 
-class ScalingType(StrEnum):
+class ScalingType(str):
     UNIFORM_SCALING = "UNIFORM_SCALING"
 
 
-class ShardFilterType(StrEnum):
+class ShardFilterType(str):
     AFTER_SHARD_ID = "AFTER_SHARD_ID"
     AT_TRIM_HORIZON = "AT_TRIM_HORIZON"
     FROM_TRIM_HORIZON = "FROM_TRIM_HORIZON"
@@ -71,7 +70,7 @@ class ShardFilterType(StrEnum):
     FROM_TIMESTAMP = "FROM_TIMESTAMP"
 
 
-class ShardIteratorType(StrEnum):
+class ShardIteratorType(str):
     AT_SEQUENCE_NUMBER = "AT_SEQUENCE_NUMBER"
     AFTER_SEQUENCE_NUMBER = "AFTER_SEQUENCE_NUMBER"
     TRIM_HORIZON = "TRIM_HORIZON"
@@ -79,12 +78,12 @@ class ShardIteratorType(StrEnum):
     AT_TIMESTAMP = "AT_TIMESTAMP"
 
 
-class StreamMode(StrEnum):
+class StreamMode(str):
     PROVISIONED = "PROVISIONED"
     ON_DEMAND = "ON_DEMAND"
 
 
-class StreamStatus(StrEnum):
+class StreamStatus(str):
     CREATING = "CREATING"
     DELETING = "DELETING"
     ACTIVE = "ACTIVE"
@@ -240,7 +239,6 @@ class CreateStreamInput(ServiceRequest):
     StreamName: StreamName
     ShardCount: Optional[PositiveIntegerObject]
     StreamModeDetails: Optional[StreamModeDetails]
-    Tags: Optional[TagMap]
 
 
 Data = bytes
@@ -688,7 +686,6 @@ class KinesisApi:
         stream_name: StreamName,
         shard_count: PositiveIntegerObject = None,
         stream_mode_details: StreamModeDetails = None,
-        tags: TagMap = None,
         **kwargs,
     ) -> None:
         raise NotImplementedError

@@ -41,8 +41,6 @@ class LocalStackCliGroup(click.Group):
         "logout",
         "pod",
         "state",
-        "ephemeral",
-        "replicator",
     ]
 
     def invoke(self, ctx: click.Context):
@@ -157,13 +155,7 @@ _click_format_option = click.option(
         "show_default": True,
     },
 )
-@click.version_option(
-    VERSION,
-    "--version",
-    "-v",
-    message="LocalStack CLI %(version)s",
-    help="Show the version of the LocalStack CLI and exit",
-)
+@click.version_option(VERSION, "--version", "-v", message="%(version)s")
 @click.option("-d", "--debug", is_flag=True, help="Enable CLI debugging mode")
 @click.option("-p", "--profile", type=str, help="Set the configuration profile")
 def localstack(debug, profile) -> None:
@@ -210,7 +202,7 @@ def cmd_config_show(format_: str) -> None:
 
     try:
         # only load the ext config if it's available
-        from localstack.pro.core import config as ext_config
+        from localstack_ext import config as ext_config
 
         assert ext_config
     except ImportError:
@@ -361,7 +353,7 @@ def _print_docker_status_table(status: DockerStatus) -> None:
     grid.add_column()
     grid.add_column()
 
-    grid.add_row("Runtime version", f"[bold]{status['runtime_version']}[/bold]")
+    grid.add_row("Runtime version", f'[bold]{status["runtime_version"]}[/bold]')
     grid.add_row(
         "Docker image",
         f"tag: {status['image_tag']}, "
@@ -465,13 +457,6 @@ def _print_service_table(services: Dict[str, str]) -> None:
     multiple=True,
     required=False,
 )
-@click.option(
-    "--host-dns",
-    help="Expose the LocalStack DNS server to the host using port bindings.",
-    required=False,
-    is_flag=True,
-    default=False,
-)
 @publish_invocation
 def cmd_start(
     docker: bool,
@@ -482,7 +467,6 @@ def cmd_start(
     env: Tuple = (),
     publish: Tuple = (),
     volume: Tuple = (),
-    host_dns: bool = False,
 ) -> None:
     """
     Start the LocalStack runtime.
@@ -500,7 +484,6 @@ def cmd_start(
         print_banner()
         print_version()
         print_profile()
-        print_app()
         console.line()
 
     from localstack.utils import bootstrap
@@ -901,16 +884,14 @@ def localstack_completion(ctx: click.Context, shell: str) -> None:
 
 
 def print_version() -> None:
-    console.print(f"- [bold]LocalStack CLI:[/bold] [blue]{VERSION}[/blue]")
+    console.print(f" :laptop_computer: [bold]LocalStack CLI[/bold] [blue]{VERSION}[/blue]")
 
 
 def print_profile() -> None:
     if config.LOADED_PROFILES:
-        console.print(f"- [bold]Profile:[/bold] [blue]{', '.join(config.LOADED_PROFILES)}[/blue]")
-
-
-def print_app() -> None:
-    console.print("- [bold]App:[/bold] https://app.localstack.cloud")
+        console.print(
+            f" :bust_in_silhouette: [bold]Profile:[/bold] [blue]{', '.join(config.LOADED_PROFILES)}[/blue]"
+        )
 
 
 def print_banner() -> None:
