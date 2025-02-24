@@ -1,4 +1,4 @@
-"""Uploading to Tinybird of the metrics collected for a CircleCI run
+""" Uploading to Tinybird of the metrics collected for a CircleCI run
 
 The upload includes:
  * Test Data Raw
@@ -301,16 +301,20 @@ def main():
     )
     if not metric_report_dir:
         print(missing_info)
-        raise Exception("missing METRIC_REPORT_DIR_PATH")
+        print("missing METRIC_REPORT_DIR_PATH")
+        return
     if not impl_coverage_file:
         print(missing_info)
-        raise Exception("missing IMPLEMENTATION_COVERAGE_FILE")
+        print("missing IMPLEMENTATION_COVERAGE_FILE")
+        return
     if not source_type:
         print(missing_info)
-        raise Exception("missing SOURCE_TYPE")
+        print("missing SOURCE_TYPE")
+        return
     if not token:
         print(missing_info)
-        raise Exception("missing TINYBIRD_PARITY_ANALYTICS_TOKEN")
+        print("missing TINYBIRD_PARITY_ANALYTICS_TOKEN")
+        return
 
     # create one timestamp that will be used for all the data sent
     timestamp: str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")

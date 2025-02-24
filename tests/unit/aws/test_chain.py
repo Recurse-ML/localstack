@@ -14,7 +14,6 @@ class TestCompositeHandler:
         outer1 = mock.MagicMock()
         outer2 = mock.MagicMock()
         response1 = mock.MagicMock()
-        finalizer = mock.MagicMock()
 
         chain = HandlerChain()
 
@@ -26,14 +25,12 @@ class TestCompositeHandler:
         chain.request_handlers.append(composite)
         chain.request_handlers.append(outer2)
         chain.response_handlers.append(response1)
-        chain.finalizers.append(finalizer)
 
         chain.handle(RequestContext(), Response())
         outer1.assert_called_once()
         outer2.assert_not_called()
         inner2.assert_not_called()
         response1.assert_called_once()
-        finalizer.assert_called_once()
 
     def test_composite_handler_terminates_handler_chain(self):
         def inner1(_chain: HandlerChain, request: RequestContext, response: Response):
@@ -43,7 +40,6 @@ class TestCompositeHandler:
         outer1 = mock.MagicMock()
         outer2 = mock.MagicMock()
         response1 = mock.MagicMock()
-        finalizer = mock.MagicMock()
 
         chain = HandlerChain()
 
@@ -55,14 +51,12 @@ class TestCompositeHandler:
         chain.request_handlers.append(composite)
         chain.request_handlers.append(outer2)
         chain.response_handlers.append(response1)
-        chain.finalizers.append(finalizer)
 
         chain.handle(RequestContext(), Response())
         outer1.assert_called_once()
         outer2.assert_not_called()
         inner2.assert_not_called()
         response1.assert_not_called()
-        finalizer.assert_called_once()
 
     def test_composite_handler_with_not_return_on_stop(self):
         def inner1(_chain: HandlerChain, request: RequestContext, response: Response):
@@ -72,7 +66,6 @@ class TestCompositeHandler:
         outer1 = mock.MagicMock()
         outer2 = mock.MagicMock()
         response1 = mock.MagicMock()
-        finalizer = mock.MagicMock()
 
         chain = HandlerChain()
 
@@ -84,14 +77,12 @@ class TestCompositeHandler:
         chain.request_handlers.append(composite)
         chain.request_handlers.append(outer2)
         chain.response_handlers.append(response1)
-        chain.finalizers.append(finalizer)
 
         chain.handle(RequestContext(), Response())
         outer1.assert_called_once()
         outer2.assert_not_called()
         inner2.assert_called_once()
         response1.assert_called_once()
-        finalizer.assert_called_once()
 
     def test_composite_handler_continues_handler_chain(self):
         inner1 = mock.MagicMock()
@@ -99,7 +90,6 @@ class TestCompositeHandler:
         outer1 = mock.MagicMock()
         outer2 = mock.MagicMock()
         response1 = mock.MagicMock()
-        finalizer = mock.MagicMock()
 
         chain = HandlerChain()
 
@@ -111,7 +101,6 @@ class TestCompositeHandler:
         chain.request_handlers.append(composite)
         chain.request_handlers.append(outer2)
         chain.response_handlers.append(response1)
-        chain.finalizers.append(finalizer)
 
         chain.handle(RequestContext(), Response())
         outer1.assert_called_once()
@@ -119,7 +108,6 @@ class TestCompositeHandler:
         inner1.assert_called_once()
         inner2.assert_called_once()
         response1.assert_called_once()
-        finalizer.assert_called_once()
 
     def test_composite_handler_exception_calls_outer_exception_handlers(self):
         def inner1(_chain: HandlerChain, request: RequestContext, response: Response):
@@ -130,7 +118,6 @@ class TestCompositeHandler:
         outer2 = mock.MagicMock()
         exception_handler = mock.MagicMock()
         response1 = mock.MagicMock()
-        finalizer = mock.MagicMock()
 
         chain = HandlerChain()
 
@@ -143,7 +130,6 @@ class TestCompositeHandler:
         chain.request_handlers.append(outer2)
         chain.exception_handlers.append(exception_handler)
         chain.response_handlers.append(response1)
-        chain.finalizers.append(finalizer)
 
         chain.handle(RequestContext(), Response())
         outer1.assert_called_once()
@@ -151,4 +137,3 @@ class TestCompositeHandler:
         inner2.assert_not_called()
         exception_handler.assert_called_once()
         response1.assert_called_once()
-        finalizer.assert_called_once()

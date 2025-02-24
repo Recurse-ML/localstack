@@ -7,13 +7,11 @@ from io import BytesIO
 from typing import Any, Dict, Iterator, List, Optional
 from xml.etree import ElementTree
 
+import cbor2
 import pytest
 from botocore.awsrequest import HeadersDict
 from botocore.endpoint import convert_to_response_dict
 from botocore.parsers import ResponseParser, create_parser
-
-# cbor2: explicitly load from private _decoder module to avoid using the (non-patched) C-version
-from cbor2._decoder import loads as cbor2_loads
 from dateutil.tz import tzlocal, tzutc
 from requests.models import Response as RequestsResponse
 from urllib3 import HTTPResponse as UrlLibHttpResponse
@@ -114,7 +112,7 @@ def _botocore_serializer_integration_test(
 
 
 def _botocore_error_serializer_integration_test(
-    service_model_name: str,
+    service: str,
     action: str,
     exception: ServiceException,
     code: str,
@@ -129,10 +127,10 @@ def _botocore_error_serializer_integration_test(
     - Load the given service (f.e. "sqs")
     - Serialize the _error_ response with the appropriate serializer from the AWS Serivce Framework
     - Parse the serialized error response using the botocore parser
-    - Checks if the metadata is correct (status code, requestID,...)
+    - Checks if the the metadata is correct (status code, requestID,...)
     - Checks if the parsed error response content is correct
 
-    :param service_model_name: to load the correct service specification, serializer, and parser
+    :param service: to load the correct service specification, serializer, and parser
     :param action: to load the correct service specification, serializer, and parser
     :param exception: which should be serialized and tested against
     :param code: expected "code" of the exception (i.e. the AWS specific exception ID, f.e.
@@ -145,7 +143,7 @@ def _botocore_error_serializer_integration_test(
     """
 
     # Load the appropriate service
-    service = load_service(service_model_name)
+    service = load_service(service)
 
     # Use our serializer to serialize the response
     response_serializer = create_serializer(service)
@@ -478,7 +476,7 @@ def test_query_serializer_sqs_none_value_in_map():
 def test_query_protocol_error_serialization():
     exception = InvalidMessageContents("Exception message!")
     _botocore_error_serializer_integration_test(
-        "sqs-query", "SendMessage", exception, "InvalidMessageContents", 400, "Exception message!"
+        "sqs", "SendMessage", exception, "InvalidMessageContents", 400, "Exception message!"
     )
 
 
@@ -488,7 +486,7 @@ def test_query_protocol_error_serialization_plain():
     )
 
     # Load the SQS service
-    service = load_service("sqs-query")
+    service = load_service("sqs")
 
     # Use our serializer to serialize the response
     response_serializer = create_serializer(service)
@@ -530,29 +528,11 @@ def test_query_protocol_error_serialization_plain():
 def test_query_protocol_custom_error_serialization():
     exception = CommonServiceException("InvalidParameterValue", "Parameter x was invalid!")
     _botocore_error_serializer_integration_test(
-        "sqs-query",
-        "SendMessage",
-        exception,
-        "InvalidParameterValue",
-        400,
-        "Parameter x was invalid!",
+        "sqs", "SendMessage", exception, "InvalidParameterValue", 400, "Parameter x was invalid!"
     )
 
 
 def test_query_protocol_error_serialization_sender_fault():
-    exception = UnsupportedOperation("Operation not supported.")
-    _botocore_error_serializer_integration_test(
-        "sqs-query",
-        "SendMessage",
-        exception,
-        "AWS.SimpleQueueService.UnsupportedOperation",
-        400,
-        "Operation not supported.",
-        True,
-    )
-
-
-def test_sqs_json_protocol_error_serialization_sender_fault():
     exception = UnsupportedOperation("Operation not supported.")
     _botocore_error_serializer_integration_test(
         "sqs",
@@ -620,32 +600,6 @@ def test_restxml_protocol_custom_error_serialization():
         451,
         "You shall not access this API! Sincerely, your friendly neighbourhood firefighter.",
     )
-
-
-def test_s3_xml_protocol_custom_error_serialization_headers():
-    class NoSuchKey(ServiceException):
-        code: str = "NoSuchKey"
-        sender_fault: bool = False
-        status_code: int = 404
-        DeleteMarker: Optional[bool]
-        VersionId: Optional[str]
-
-    exception = NoSuchKey(
-        "You shall not access this API! Sincerely, your friendly neighbourhood firefighter.",
-        DeleteMarker=True,
-        VersionId="version-id",
-    )
-
-    response = _botocore_error_serializer_integration_test(
-        "s3",
-        "GetObject",
-        exception,
-        "NoSuchKey",
-        404,
-        "You shall not access this API! Sincerely, your friendly neighbourhood firefighter.",
-    )
-    assert response["ResponseMetadata"]["HTTPHeaders"]["x-amz-delete-marker"] == "true"
-    assert response["ResponseMetadata"]["HTTPHeaders"]["x-amz-version-id"] == "version-id"
 
 
 def test_json_protocol_error_serialization():
@@ -1376,7 +1330,6 @@ def test_restxml_headers_location():
             "ContentType": "application/octet-stream",
             # The content length should explicitly be tested here.
             "ContentLength": 159,
-            "StatusCode": 200,
         },
     )
 
@@ -1498,7 +1451,7 @@ def test_s3_event_streaming():
 
 
 def test_all_non_existing_key():
-    """Tests the different protocols to allow non-existing keys in structures / dicts."""
+    """Tests the different protocols to allow non-existing keys in strucutres / dicts."""
     # query
     _botocore_serializer_integration_test(
         "cloudformation",
@@ -1800,9 +1753,9 @@ def test_accept_header_detection(
     if content_type_header:
         headers["Content-Type"] = content_type_header
     mime_type = response_serializer._get_mime_type(headers)
-    assert mime_type == expected_mime_type, (
-        f"Detected mime type ({mime_type}) was not as expected ({expected_mime_type})"
-    )
+    assert (
+        mime_type == expected_mime_type
+    ), f"Detected mime type ({mime_type}) was not as expected ({expected_mime_type})"
 
 
 @pytest.mark.parametrize(
@@ -1862,13 +1815,13 @@ def test_json_protocol_cbor_serialization(headers_dict):
     assert result is not None
     assert result.content_type is not None
     assert result.content_type == "application/cbor"
-    parsed_data = cbor2_loads(result.data)
+    parsed_data = cbor2.loads(result.data)
     assert parsed_data == response_data
 
 
 class TestAwsResponseSerializerDecorator:
     def test_query_internal_error(self):
-        @aws_response_serializer("sqs-query", "ListQueues")
+        @aws_response_serializer("sqs", "ListQueues")
         def fn(request: Request):
             raise ValueError("oh noes!")
 
@@ -1877,7 +1830,7 @@ class TestAwsResponseSerializerDecorator:
         assert b"<Code>InternalError</Code>" in response.data
 
     def test_query_service_error(self):
-        @aws_response_serializer("sqs-query", "ListQueues")
+        @aws_response_serializer("sqs", "ListQueues")
         def fn(request: Request):
             raise UnsupportedOperation("Operation not supported.")
 
@@ -1887,7 +1840,7 @@ class TestAwsResponseSerializerDecorator:
         assert b"<Message>Operation not supported.</Message>" in response.data
 
     def test_query_valid_response(self):
-        @aws_response_serializer("sqs-query", "ListQueues")
+        @aws_response_serializer("sqs", "ListQueues")
         def fn(request: Request):
             from localstack.aws.api.sqs import ListQueuesResult
 
@@ -1909,7 +1862,7 @@ class TestAwsResponseSerializerDecorator:
 
     def test_query_valid_response_content_negotiation(self):
         # this test verifies that request header values are passed correctly to perform content negotation
-        @aws_response_serializer("sqs-query", "ListQueues")
+        @aws_response_serializer("sqs", "ListQueues")
         def fn(request: Request):
             from localstack.aws.api.sqs import ListQueuesResult
 
@@ -1932,7 +1885,7 @@ class TestAwsResponseSerializerDecorator:
         }
 
     def test_return_invalid_none_type_causes_internal_error(self):
-        @aws_response_serializer("sqs-query", "ListQueues")
+        @aws_response_serializer("sqs", "ListQueues")
         def fn(request: Request):
             return None
 
@@ -1942,7 +1895,7 @@ class TestAwsResponseSerializerDecorator:
 
     def test_response_pass_through(self):
         # returning a response directly will forego the serializer
-        @aws_response_serializer("sqs-query", "ListQueues")
+        @aws_response_serializer("sqs", "ListQueues")
         def fn(request: Request):
             return Response(b"ok", status=201)
 
@@ -1961,7 +1914,7 @@ class TestAwsResponseSerializerDecorator:
 
     def test_invoke_on_bound_method(self):
         class MyHandler:
-            @aws_response_serializer("sqs-query", "ListQueues")
+            @aws_response_serializer("sqs", "ListQueues")
             def handle(self, request: Request):
                 from localstack.aws.api.sqs import ListQueuesResult
 

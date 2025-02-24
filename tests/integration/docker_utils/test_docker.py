@@ -1,35 +1,28 @@
 import datetime
 import ipaddress
-import json
 import logging
 import os
 import re
-import textwrap
 import time
-from typing import Callable, NamedTuple, Type
+from typing import NamedTuple
 
 import pytest
 from docker.models.containers import Container
 
 from localstack import config
 from localstack.config import in_docker
-from localstack.testing.pytest import markers
 from localstack.utils import docker_utils
 from localstack.utils.common import is_ipv4_address, save_file, short_uid, to_str
 from localstack.utils.container_utils.container_client import (
     AccessDenied,
     ContainerClient,
     ContainerException,
-    DockerContainerStats,
     DockerContainerStatus,
-    DockerNotAvailable,
-    LogConfig,
     NoSuchContainer,
     NoSuchImage,
     NoSuchNetwork,
     PortMappings,
     RegistryConnectionError,
-    Ulimit,
     Util,
     VolumeInfo,
 )
@@ -44,7 +37,6 @@ from localstack.utils.docker_utils import (
 )
 from localstack.utils.net import Port, PortNotAvailableException, get_free_tcp_port
 from localstack.utils.strings import to_bytes
-from localstack.utils.sync import retry
 from localstack.utils.threads import FuncThread
 from tests.integration.docker_utils.conftest import is_podman_test, skip_for_podman
 
@@ -86,7 +78,7 @@ def create_container(docker_client: ContainerClient, create_network):
     """
     containers = []
 
-    def _create_container(image_name: str, **kwargs) -> ContainerInfo:
+    def _create_container(image_name: str, **kwargs):
         kwargs["name"] = kwargs.get("name", _random_container_name())
         cid = docker_client.create_container(image_name, **kwargs)
         cid = cid.strip()
@@ -126,16 +118,6 @@ def create_network(docker_client: ContainerClient):
 
 
 class TestDockerClient:
-    def test_get_system_info(self, docker_client: ContainerClient):
-        info = docker_client.get_system_info()
-        assert "ID" in info
-        assert "OperatingSystem" in info
-        assert "Architecture" in info
-
-    def test_get_system_id(self, docker_client: ContainerClient):
-        assert len(docker_client.get_system_id()) > 1
-        assert docker_client.get_system_id() == docker_client.get_system_id()
-
     def test_container_lifecycle_commands(self, docker_client: ContainerClient):
         container_name = _random_container_name()
         output = docker_client.create_container(
@@ -188,29 +170,7 @@ class TestDockerClient:
         # it takes a while for it to be removed
         assert "foobar" in output
 
-    @pytest.mark.parametrize(
-        "entrypoint",
-        [
-            "echo",
-            ["echo"],
-        ],
-    )
-    def test_set_container_entrypoint(
-        self,
-        docker_client: ContainerClient,
-        create_container: Callable[..., ContainerInfo],
-        entrypoint: list[str] | str,
-    ):
-        info = create_container("alpine", entrypoint=entrypoint, command=["true"])
-        assert 1 == len(docker_client.list_containers(f"id={info.container_id}"))
-
-        # start the container
-        output, _ = docker_client.start_container(info.container_id, attach=True)
-        output = to_str(output).strip()
-
-        assert output == "true"
-
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_create_container_non_existing_image(self, docker_client: ContainerClient):
         with pytest.raises(NoSuchImage):
             docker_client.create_container("this_image_does_hopefully_not_exist_42069")
@@ -361,39 +321,9 @@ class TestDockerClient:
         with pytest.raises(NoSuchContainer):
             docker_client.start_container("this_container_does_not_exist")
 
-    def test_docker_not_available(self, docker_client_class: Type[ContainerClient], monkeypatch):
-        monkeypatch.setattr(config, "DOCKER_CMD", "non-existing-binary")
-        monkeypatch.setenv("DOCKER_HOST", "/var/run/docker.sock1")
-        # initialize the client after mocking the environment
-        docker_client = docker_client_class()
-        with pytest.raises(DockerNotAvailable):
-            # perform a command to trigger the exception
-            docker_client.list_containers()
-
-    def test_create_container_with_init(self, docker_client, create_container):
-        try:
-            container_name = _random_container_name()
-            docker_client.create_container(
-                "alpine", init=True, command=["sh", "-c", "/bin/true"], name=container_name
-            )
-            assert docker_client.inspect_container(container_name)["HostConfig"]["Init"]
-        finally:
-            docker_client.remove_container(container_name)
-
-    def test_run_container_with_init(self, docker_client, create_container):
-        try:
-            container_name = _random_container_name()
-            docker_client.run_container(
-                "alpine", init=True, command=["sh", "-c", "/bin/true"], name=container_name
-            )
-            assert docker_client.inspect_container(container_name)["HostConfig"]["Init"]
-        finally:
-            docker_client.remove_container(container_name)
-
-    # TODO: currently failing under Podman in CI (works locally under macOS)
-    @pytest.mark.skipif(
-        condition=_is_podman_test(),
-        reason="Podman get_networks(..) does not return list of networks in CI",
+    # TODO: currently failing under Podman in CI (works locally under MacOS)
+    @pytest.mark.xfail(
+        _is_podman_test(), reason="Podman get_networks(..) does not return list of networks in CI"
     )
     def test_get_network(self, docker_client: ContainerClient, dummy_container):
         networks = docker_client.get_networks(dummy_container.container_name)
@@ -445,9 +375,8 @@ class TestDockerClient:
         assert ipaddress.IPv4Address(result_custom_network) in ipaddress.IPv4Network(custom_network)
 
     # TODO: currently failing under Podman
-    @pytest.mark.skipif(
-        condition=_is_podman_test(),
-        reason="Podman inspect_network does not return `Containers` attribute",
+    @pytest.mark.xfail(
+        _is_podman_test(), reason="Podman inspect_network does not return `Containers` attribute"
     )
     def test_get_container_ip_for_network_wrong_network(
         self, docker_client: ContainerClient, dummy_container, create_network
@@ -466,10 +395,9 @@ class TestDockerClient:
                 container_name_or_id=dummy_container.container_id, container_network=network_name
             )
 
-    # TODO: currently failing under Podman in CI (works locally under macOS)
-    @pytest.mark.skipif(
-        condition=_is_podman_test(),
-        reason="Podman get_networks(..) does not return list of networks in CI",
+    # TODO: currently failing under Podman in CI (works locally under MacOS)
+    @pytest.mark.xfail(
+        _is_podman_test(), reason="Podman get_networks(..) does not return list of networks in CI"
     )
     def test_get_container_ip_for_host_network(
         self, docker_client: ContainerClient, create_container
@@ -494,10 +422,9 @@ class TestDockerClient:
                 container_name_or_id=dummy_container.container_id, container_network=network_name
             )
 
-    # TODO: currently failing under Podman in CI (works locally under macOS)
-    @pytest.mark.skipif(
-        condition=_is_podman_test(),
-        reason="Podman get_networks(..) does not return list of networks in CI",
+    # TODO: currently failing under Podman in CI (works locally under MacOS)
+    @pytest.mark.xfail(
+        _is_podman_test(), reason="Podman get_networks(..) does not return list of networks in CI"
     )
     def test_create_with_host_network(self, docker_client: ContainerClient, create_container):
         info = create_container("alpine", network="host")
@@ -510,32 +437,16 @@ class TestDockerClient:
         ports.add(45180, 80)
         create_container("alpine", ports=ports)
 
-    def test_create_with_exposed_ports(self, docker_client: ContainerClient, create_container):
-        exposed_ports = ["45000", "45001/udp"]
-        container = create_container(
-            "alpine",
-            command=["sh", "-c", "while true; do sleep 1; done"],
-            exposed_ports=exposed_ports,
-        )
-        docker_client.start_container(container.container_id)
-        inspection_result = docker_client.inspect_container(container.container_id)
-        assert inspection_result["Config"]["ExposedPorts"] == {
-            f"{port}/tcp" if "/" not in port else port: {} for port in exposed_ports
-        }
-        assert inspection_result["NetworkSettings"]["Ports"] == {
-            f"{port}/tcp" if "/" not in port else port: None for port in exposed_ports
-        }
-
     @pytest.mark.skipif(
         condition=in_docker(), reason="cannot test volume mounts from host when in docker"
     )
     def test_create_with_volume(self, tmpdir, docker_client: ContainerClient, create_container):
-        volumes = [(tmpdir.realpath(), "/tmp/mypath")]
+        mount_volumes = [(tmpdir.realpath(), "/tmp/mypath")]
 
         c = create_container(
             "alpine",
             command=["sh", "-c", "echo 'foobar' > /tmp/mypath/foo.log"],
-            volumes=volumes,
+            mount_volumes=mount_volumes,
         )
         docker_client.start_container(c.container_id)
         assert tmpdir.join("foo.log").isfile(), "foo.log was not created in mounted dir"
@@ -547,7 +458,7 @@ class TestDockerClient:
     def test_inspect_container_volumes(
         self, tmpdir, docker_client: ContainerClient, create_container
     ):
-        volumes = [
+        mount_volumes = [
             (tmpdir.realpath() / "foo", "/tmp/mypath/foo"),
             ("some_named_volume", "/tmp/mypath/volume"),
         ]
@@ -555,7 +466,7 @@ class TestDockerClient:
         c = create_container(
             "alpine",
             command=["sh", "-c", "while true; do sleep 1; done"],
-            volumes=volumes,
+            mount_volumes=mount_volumes,
         )
         docker_client.start_container(c.container_id)
 
@@ -780,19 +691,6 @@ class TestDockerClient:
         )
         assert "foo" in out.decode(config.DEFAULT_ENCODING)
 
-    def test_create_file_in_container(
-        self, tmpdir, docker_client: ContainerClient, create_container
-    ):
-        content = b"fancy content"
-        container_path = "/tmp/myfile.txt"
-
-        c = create_container("alpine", command=["cat", container_path])
-
-        docker_client.create_file_in_container(c.container_name, content, container_path)
-
-        output, _ = docker_client.start_container(c.container_id, attach=True)
-        assert output == content
-
     def test_get_network_non_existing_container(self, docker_client: ContainerClient):
         with pytest.raises(ContainerException):
             docker_client.get_networks("this_container_does_not_exist")
@@ -872,7 +770,7 @@ class TestDockerClient:
             # Simulate podman API response, Docker returns "sha:..." for Image, podman returns "<image-name>:<tag>".
             #  See https://github.com/containers/podman/issues/8329
             attrs["Image"] = image_name
-            container_init_orig(self, *args, attrs=attrs, **kwargs)
+            container_init_orig(self, attrs=attrs, *args, **kwargs)
 
         monkeypatch.setattr(Container, "__init__", container_init)
 
@@ -1093,7 +991,7 @@ class TestDockerClient:
         finally:
             docker_client.remove_container(container_name)
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_pull_docker_image(self, docker_client: ContainerClient):
         try:
             docker_client.get_image_cmd("alpine", pull=False)
@@ -1105,12 +1003,12 @@ class TestDockerClient:
         docker_client.pull_image("alpine")
         assert ["/bin/sh"] == docker_client.get_image_cmd("alpine", pull=False)
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_pull_non_existent_docker_image(self, docker_client: ContainerClient):
         with pytest.raises(NoSuchImage):
             docker_client.pull_image("localstack_non_existing_image_for_tests")
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_pull_docker_image_with_tag(self, docker_client: ContainerClient):
         try:
             docker_client.get_image_cmd("alpine", pull=False)
@@ -1123,7 +1021,7 @@ class TestDockerClient:
         assert ["/bin/sh"] == docker_client.get_image_cmd("alpine:3.13", pull=False)
         assert "alpine:3.13" in docker_client.inspect_image("alpine:3.13", pull=False)["RepoTags"]
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_pull_docker_image_with_hash(self, docker_client: ContainerClient):
         try:
             docker_client.get_image_cmd("alpine", pull=False)
@@ -1147,7 +1045,7 @@ class TestDockerClient:
             )["RepoDigests"]
         )
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_run_container_automatic_pull(self, docker_client: ContainerClient):
         try:
             docker_client.remove_image("alpine")
@@ -1157,19 +1055,19 @@ class TestDockerClient:
         stdout, _ = docker_client.run_container("alpine", command=["echo", message], remove=True)
         assert message == stdout.decode(config.DEFAULT_ENCODING).strip()
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_push_non_existent_docker_image(self, docker_client: ContainerClient):
         with pytest.raises(NoSuchImage):
             docker_client.push_image("localstack_non_existing_image_for_tests")
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_push_access_denied(self, docker_client: ContainerClient):
         with pytest.raises(AccessDenied):
             docker_client.push_image("alpine")
         with pytest.raises(AccessDenied):
             docker_client.push_image("alpine:latest")
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_push_invalid_registry(self, docker_client: ContainerClient):
         image_name = f"localhost:{get_free_tcp_port()}/localstack_dummy_image"
         try:
@@ -1179,7 +1077,7 @@ class TestDockerClient:
         finally:
             docker_client.remove_image(image_name)
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_tag_image(self, docker_client: ContainerClient):
         if _is_podman_test() and isinstance(docker_client, SdkDockerClient):
             # TODO: Podman raises "normalizing image: normalizing name for compat API: invalid reference format"
@@ -1206,14 +1104,14 @@ class TestDockerClient:
                 except Exception as e:
                     LOG.info("Unable to remove image '%s': %s", img_ref, e)
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_tag_non_existing_image(self, docker_client: ContainerClient):
         with pytest.raises(NoSuchImage):
             docker_client.tag_image(
                 "localstack_non_existing_image_for_tests", "localstack_dummy_image"
             )
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     @pytest.mark.parametrize("custom_context", [True, False])
     @pytest.mark.parametrize("dockerfile_as_dir", [True, False])
     def test_build_image(
@@ -1248,7 +1146,7 @@ class TestDockerClient:
         assert "foo=bar" in result["Config"]["Env"]
         assert "45329/tcp" in result["Config"]["ExposedPorts"]
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_run_container_non_existent_image(self, docker_client: ContainerClient):
         try:
             docker_client.remove_image("alpine")
@@ -1275,7 +1173,7 @@ class TestDockerClient:
         docker_client.stop_container(name)
         assert not docker_client.is_container_running(name)
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_docker_image_names(self, docker_client: ContainerClient):
         try:
             docker_client.remove_image("alpine")
@@ -1320,14 +1218,14 @@ class TestDockerClient:
             candidates = (f"/{dummy_container.container_name}", dummy_container.container_name)
             assert docker_client.inspect_container(identifier)["Name"] in candidates
 
-    @markers.skip_offline
+    @pytest.mark.skip_offline
     def test_inspect_image(self, docker_client: ContainerClient):
         _pull_image_if_not_exists(docker_client, "alpine")
         assert "alpine" in docker_client.inspect_image("alpine")["RepoTags"][0]
 
     # TODO: currently failing under Podman
-    @pytest.mark.skipif(
-        condition=_is_podman_test(), reason="Podman inspect_network does not return `Id` attribute"
+    @pytest.mark.xfail(
+        _is_podman_test(), reason="Podman inspect_network does not return `Id` attribute"
     )
     def test_inspect_network(self, docker_client: ContainerClient, create_network):
         network_name = f"ls_test_network_{short_uid()}"
@@ -1393,20 +1291,6 @@ class TestDockerClient:
         )
         assert "TEST_CONTENT" == file_path.read().strip()
 
-    def test_get_container_ip_non_existing_container(self, docker_client: ContainerClient):
-        with pytest.raises(NoSuchContainer):
-            docker_client.get_container_ip(f"hopefully_non_existent_container_{short_uid()}")
-
-    # TODO: getting container IP not yet working against Podman
-    @skip_for_podman
-    def test_get_container_ip(self, docker_client: ContainerClient, dummy_container):
-        docker_client.start_container(dummy_container.container_id)
-        ip = docker_client.get_container_ip(dummy_container.container_id)
-        assert is_ipv4_address(ip)
-        assert "127.0.0.1" != ip
-
-
-class TestRunWithAdditionalArgs:
     def test_run_with_additional_arguments(self, docker_client: ContainerClient):
         env_variable = "TEST_FLAG=test_str"
         stdout, _ = docker_client.run_container(
@@ -1436,127 +1320,17 @@ class TestRunWithAdditionalArgs:
         assert "127.0.0.1" in stdout
         assert "sometest.localstack.cloud" in stdout
 
-    @pytest.mark.parametrize("pass_dns_in_run_container", [True, False])
-    def test_run_with_additional_arguments_add_dns(
-        self, docker_client: ContainerClient, pass_dns_in_run_container
-    ):
-        kwargs = {}
-        additional_flags = "--dns 1.2.3.4"
-        if pass_dns_in_run_container:
-            kwargs["dns"] = "5.6.7.8"
-        else:
-            additional_flags += " --dns 5.6.7.8"
+    def test_get_container_ip_non_existing_container(self, docker_client: ContainerClient):
+        with pytest.raises(NoSuchContainer):
+            docker_client.get_container_ip(f"hopefully_non_existent_container_{short_uid()}")
 
-        container_name = f"c-{short_uid()}"
-        stdout, _ = docker_client.run_container(
-            "alpine",
-            name=container_name,
-            remove=True,
-            command=["sleep", "3"],
-            additional_flags=additional_flags,
-            detach=True,
-            **kwargs,
-        )
-        result = docker_client.inspect_container(container_name)
-        assert set(result["HostConfig"]["Dns"]) == {"1.2.3.4", "5.6.7.8"}
-
-    def test_run_with_additional_arguments_random_port(
-        self, docker_client: ContainerClient, create_container
-    ):
-        container = create_container(
-            "alpine",
-            command=["sh", "-c", "while true; do sleep 1; done"],
-            additional_flags="-p 0:80",
-        )
-        docker_client.start_container(container.container_id)
-        inspect_result = docker_client.inspect_container(
-            container_name_or_id=container.container_id
-        )
-        automatic_host_port = int(
-            inspect_result["NetworkSettings"]["Ports"]["80/tcp"][0]["HostPort"]
-        )
-        assert automatic_host_port > 0
-
-    def test_run_with_ulimit(self, docker_client: ContainerClient):
-        container_name = f"c-{short_uid()}"
-        stdout, _ = docker_client.run_container(
-            "alpine",
-            name=container_name,
-            remove=True,
-            command=["sh", "-c", "ulimit -n"],
-            ulimits=[Ulimit(name="nofile", soft_limit=1024, hard_limit=1024)],
-        )
-        assert stdout.decode(config.DEFAULT_ENCODING).strip() == "1024"
-
-    def test_run_with_additional_arguments_env_files(
-        self, docker_client: ContainerClient, tmp_path, monkeypatch
-    ):
-        env_variable = "TEST1=VAL1"
-        env_file = tmp_path / "env1"
-        env_vars = textwrap.dedent("""
-            # Some comment
-            TEST1=OVERRIDDEN
-            TEST2=VAL2
-            TEST3=${TEST2}
-            TEST4=VAL # end comment
-            TEST5="VAL"
-            """)
-        env_file.write_text(env_vars)
-
-        stdout, _ = docker_client.run_container(
-            "alpine",
-            remove=True,
-            command=["env"],
-            additional_flags=f"-e {env_variable} --env-file {env_file}",
-        )
-        env_output = stdout.decode(config.DEFAULT_ENCODING)
-        # behavior differs here from more advanced env file parsers
-        assert env_variable in env_output
-        assert "TEST1=VAL1" in env_output
-        assert "TEST2=VAL2" in env_output
-        assert "TEST3=${TEST2}" in env_output
-        assert "TEST4=VAL # end comment" in env_output
-        assert 'TEST5="VAL"' in env_output
-
-        env_vars = textwrap.dedent("""
-            # Some comment
-            TEST1
-            """)
-        env_file.write_text(env_vars)
-
-        stdout, _ = docker_client.run_container(
-            "alpine",
-            remove=True,
-            command=["env"],
-            additional_flags=f"--env-file {env_file}",
-        )
-        env_output = stdout.decode(config.DEFAULT_ENCODING)
-        assert "TEST1" not in env_output
-
-        monkeypatch.setenv("TEST1", "VAL1")
-        stdout, _ = docker_client.run_container(
-            "alpine",
-            remove=True,
-            command=["env"],
-            additional_flags=f"--env-file {env_file}",
-        )
-        env_output = stdout.decode(config.DEFAULT_ENCODING)
-        assert "TEST1=VAL1" in env_output
-
-        env_vars = textwrap.dedent("""
-            # Some comment
-            TEST1=
-            """)
-        env_file.write_text(env_vars)
-
-        stdout, _ = docker_client.run_container(
-            "alpine",
-            remove=True,
-            command=["env"],
-            additional_flags=f"--env-file {env_file}",
-        )
-        env_output = stdout.decode(config.DEFAULT_ENCODING)
-        assert "TEST1=" in env_output.splitlines()
+    # TODO: getting container IP not yet working against Podman
+    @skip_for_podman
+    def test_get_container_ip(self, docker_client: ContainerClient, dummy_container):
+        docker_client.start_container(dummy_container.container_id)
+        ip = docker_client.get_container_ip(dummy_container.container_id)
+        assert is_ipv4_address(ip)
+        assert "127.0.0.1" != ip
 
 
 class TestDockerImages:
@@ -1640,21 +1414,6 @@ class TestDockerNetworking:
             container.container_id
             in docker_client.inspect_network(network_name).get("Containers").keys()
         )
-
-    def test_connect_container_to_network_with_link_local_address(
-        self, docker_client, create_network, create_container
-    ):
-        network_name = f"ls_test_network_{short_uid()}"
-        create_network(network_name)
-        container = create_container("alpine", command=["sh", "-c", "sleep infinity"])
-        docker_client.connect_container_to_network(
-            network_name,
-            container_name_or_id=container.container_id,
-            link_local_ips=["169.254.169.10"],
-        )
-        assert docker_client.inspect_container(container.container_id)["NetworkSettings"][
-            "Networks"
-        ][network_name]["IPAMConfig"]["LinkLocalIPs"] == ["169.254.169.10"]
 
     def test_connect_container_to_nonexistent_network(
         self, docker_client: ContainerClient, create_container
@@ -1779,54 +1538,6 @@ class TestDockerNetworking:
         init_thread.join()
         # verify that the client is available
         assert sdk_client.docker_client is not None
-
-
-class TestDockerLogging:
-    def test_docker_logging_none_disables_logs(
-        self, docker_client: ContainerClient, create_container
-    ):
-        container = create_container(
-            "alpine", command=["sh", "-c", "echo test"], log_config=LogConfig("none")
-        )
-        docker_client.start_container(container.container_id, attach=True)
-        with pytest.raises(ContainerException):
-            docker_client.get_container_logs(container_name_or_id=container.container_id)
-
-    def test_docker_logging_fluentbit(self, docker_client: ContainerClient, create_container):
-        ports = PortMappings(bind_host="0.0.0.0")
-        ports.add(24224, 24224)
-        fluentd_container = create_container(
-            "fluent/fluent-bit",
-            command=["-i", "forward", "-o", "stdout", "-p", "format=json_lines", "-f", "1", "-q"],
-            ports=ports,
-        )
-        docker_client.start_container(fluentd_container.container_id)
-
-        container = create_container(
-            "alpine",
-            command=["sh", "-c", "echo test"],
-            log_config=LogConfig(
-                "fluentd", config={"fluentd-address": "127.0.0.1:24224", "fluentd-async": "true"}
-            ),
-        )
-        docker_client.start_container(container.container_id, attach=True)
-
-        def _get_logs():
-            logs = docker_client.get_container_logs(
-                container_name_or_id=fluentd_container.container_id
-            )
-            message = None
-            for log in logs.splitlines():
-                if log.strip():
-                    message = json.loads(log.strip())
-            assert message
-            return message
-
-        log = retry(_get_logs, retries=10, sleep=1)
-        assert log["log"] == "test"
-        assert log["source"] == "stdout"
-        assert log["container_id"] == container.container_id
-        assert log["container_name"] == f"/{container.container_name}"
 
 
 class TestDockerPermissions:
@@ -1972,43 +1683,6 @@ class TestDockerLabels:
         result = docker_client.inspect_container(container.container_id)
         result_labels = result.get("Config", {}).get("Labels")
         assert result_labels == labels
-
-    def test_run_container_with_labels(self, docker_client):
-        labels = {"foo": "bar", short_uid(): short_uid()}
-        container_name = _random_container_name()
-        try:
-            docker_client.run_container(
-                image_name="alpine",
-                command=["sh", "-c", "while true; do sleep 1; done"],
-                labels=labels,
-                name=container_name,
-                detach=True,
-            )
-            result = docker_client.inspect_container(container_name_or_id=container_name)
-            result_labels = result.get("Config", {}).get("Labels")
-            assert result_labels == labels
-        finally:
-            docker_client.remove_container(container_name=container_name, force=True)
-
-    def test_list_containers_with_labels(self, docker_client, create_container):
-        labels = {"foo": "bar", short_uid(): short_uid()}
-        container = create_container(
-            "alpine", command=["sh", "-c", "while true; do sleep 1; done"], labels=labels
-        )
-        docker_client.start_container(container.container_id)
-
-        containers = docker_client.list_containers(filter=f"id={container.container_id}")
-        assert len(containers) == 1
-        container = containers[0]
-        assert container["labels"] == labels
-
-    def test_get_container_stats(self, docker_client, create_container):
-        container = create_container("alpine", command=["sh", "-c", "while true; do sleep 1; done"])
-        docker_client.start_container(container.container_id)
-        stats: DockerContainerStats = docker_client.get_container_stats(container.container_id)
-        assert stats["Name"] == container.container_name
-        assert container.container_id.startswith(stats["ID"])
-        assert 0.0 <= stats["MemPerc"] <= 100.0
 
 
 def _pull_image_if_not_exists(docker_client: ContainerClient, image_name: str):

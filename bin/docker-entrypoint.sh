@@ -2,9 +2,14 @@
 
 set -eo pipefail
 shopt -s nullglob
+if [[ ! $EDGE_PORT ]]
+then
+  EDGE_PORT=4566
+fi
 
-# When trying to activate pro features in the community version, raise a warning
-if [[ -n $LOCALSTACK_API_KEY || -n $LOCALSTACK_AUTH_TOKEN ]]; then
+# the Dockerfile creates .pro-version file for the pro image and .bigdata-pro-version for the bigdata image.
+# When trying to activate pro features with any other version, a warning is printed.
+if [[ $LOCALSTACK_API_KEY ]] && ! compgen -G /usr/lib/localstack/.*pro-version >/dev/null; then
     echo "WARNING"
     echo "============================================================================"
     echo "  It seems you are trying to use the LocalStack Pro version without using "
@@ -17,7 +22,8 @@ if [[ -n $LOCALSTACK_API_KEY || -n $LOCALSTACK_AUTH_TOKEN ]]; then
     echo ""
 fi
 
-# Strip `LOCALSTACK_` prefix in environment variables name; except LOCALSTACK_HOST and LOCALSTACK_HOSTNAME (deprecated)
+# Strip `LOCALSTACK_` prefix in environment variables name (except
+# LOCALSTACK_HOST and LOCALSTACK_HOSTNAME)
 source <(
   env |
   grep -v -e '^LOCALSTACK_HOSTNAME' |

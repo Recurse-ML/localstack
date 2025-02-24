@@ -10,14 +10,11 @@ from click.testing import CliRunner
 
 import localstack.constants
 import localstack.utils.analytics.cli
-from localstack import config
+from localstack import config, constants
 from localstack.cli.localstack import create_with_plugins, is_frozen_bundle
 from localstack.cli.localstack import localstack as cli
-from localstack.config import HostAndPort
-from localstack.constants import VERSION
-from localstack.http import Request
+from localstack.utils import testutil
 from localstack.utils.common import is_command_available
-from localstack.utils.container_utils.container_client import ContainerException, DockerNotAvailable
 
 cli: click.Group
 
@@ -27,62 +24,23 @@ def runner():
     return CliRunner()
 
 
-@pytest.mark.parametrize(
-    "exception,expected_message",
-    [
-        (KeyboardInterrupt(), "Aborted!"),
-        (DockerNotAvailable(), "Docker could not be found on the system"),
-        (ContainerException("example message"), "example message"),
-        (click.ClickException("example message"), "example message"),
-        (click.exceptions.Exit(code=1), ""),
-    ],
-)
-def test_error_handling(runner: CliRunner, monkeypatch, exception, expected_message):
-    """Test different globally handled exceptions, their status code, and error message."""
-
-    def mock_call(*args, **kwargs):
-        raise exception
-
-    from localstack.utils import bootstrap
-
-    monkeypatch.setattr(bootstrap, "start_infra_locally", mock_call)
-    result = runner.invoke(cli, ["start", "--host"])
-    assert result.exit_code == 1
-    assert expected_message in result.output
-
-
-def test_error_handling_help(runner):
-    """Make sure the help command is not interpreted as an error (Exit exception is raised)."""
-    result = runner.invoke(cli, ["-h"])
-    assert result.exit_code == 0
-    assert "Usage: localstack" in result.output
-
-
 def test_create_with_plugins(runner):
     localstack_cli = create_with_plugins()
     result = runner.invoke(localstack_cli.group, ["--version"])
     assert result.exit_code == 0
-    assert result.output.strip() == f"LocalStack CLI {VERSION}"
+    assert result.output.strip() == constants.VERSION
 
 
 def test_version(runner):
     result = runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
-    assert result.output.strip() == f"LocalStack CLI {VERSION}"
+    assert result.output.strip() == constants.VERSION
 
 
 def test_status_services_error(runner):
     result = runner.invoke(cli, ["status", "services"])
     assert result.exit_code == 1
-    assert "Error" in result.output
-
-
-@pytest.mark.parametrize("command", ["ssh", "stop"])
-def test_container_not_runnin_error(runner, command):
-    result = runner.invoke(cli, [command])
-    assert result.exit_code == 1
-    assert "Error" in result.output
-    assert "Expected a running LocalStack container" in result.output
+    assert "ERROR" in result.output
 
 
 def test_start_docker_is_default(runner, monkeypatch):
@@ -90,7 +48,7 @@ def test_start_docker_is_default(runner, monkeypatch):
 
     called = threading.Event()
 
-    def mock_call(*args, **kwargs):
+    def mock_call():
         called.set()
 
     monkeypatch.setattr(bootstrap, "start_infra_in_docker", mock_call)
@@ -103,7 +61,7 @@ def test_start_host(runner, monkeypatch):
 
     called = threading.Event()
 
-    def mock_call(*args, **kwargs):
+    def mock_call():
         called.set()
 
     monkeypatch.setattr(bootstrap, "start_infra_locally", mock_call)
@@ -112,16 +70,8 @@ def test_start_host(runner, monkeypatch):
 
 
 def test_status_services(runner, httpserver, monkeypatch):
-    # configure LOCALSTACK_HOST because the services endpoint makes a request against the
-    # external URL of LocalStack, which may be different to the edge port
-    monkeypatch.setattr(
-        config,
-        "LOCALSTACK_HOST",
-        HostAndPort(
-            host="localhost.localstack.cloud",
-            port=httpserver.port,
-        ),
-    )
+    monkeypatch.setattr(config, "EDGE_PORT_HTTP", httpserver.port)
+    monkeypatch.setattr(config, "EDGE_PORT", httpserver.port)
 
     services = {"dynamodb": "starting", "s3": "running"}
     httpserver.expect_request("/_localstack/health", method="GET").respond_with_json(
@@ -130,7 +80,7 @@ def test_status_services(runner, httpserver, monkeypatch):
 
     result = runner.invoke(cli, ["status", "services"])
 
-    assert result.exit_code == 0, result
+    assert result.exit_code == 0
 
     assert "dynamodb" in result.output
     assert "s3" in result.output
@@ -155,7 +105,7 @@ def test_validate_config(runner, monkeypatch, tmp_path):
         """version: "3.3"
 services:
   localstack:
-    container_name: "${LOCALSTACK_DOCKER_NAME-localstack-main}"
+    container_name: "${LOCALSTACK_DOCKER_NAME-localstack_main}"
     image: localstack/localstack
     network_mode: bridge
     ports:
@@ -168,9 +118,11 @@ services:
       - SERVICES=${SERVICES- }
       - DEBUG=${DEBUG- }
       - DATA_DIR=${DATA_DIR- }
-      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN- }
+      - LAMBDA_EXECUTOR=${LAMBDA_EXECUTOR- }
+      - LOCALSTACK_API_KEY=${LOCALSTACK_API_KEY- }
       - KINESIS_ERROR_PROBABILITY=${KINESIS_ERROR_PROBABILITY- }
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - HOST_TMP_FOLDER=${TMPDIR}
     volumes:
       - "${TMPDIR:-/tmp/localstack}:/tmp/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
@@ -195,19 +147,19 @@ def test_validate_config_syntax_error(runner, monkeypatch, tmp_path):
     result = runner.invoke(cli, ["config", "validate", "--file", str(file)])
 
     assert result.exit_code == 1
-    assert "Error" in result.output
+    assert "error" in result.output
 
 
 @pytest.mark.parametrize(
     "cli_input,expected_cmd,expected_params",
     [
         ("stop", "localstack stop", []),
-        ("config show", "localstack config show", ["format_"]),
-        ("--debug config show --format plain", "localstack config show", ["format_"]),
+        ("config show", "localstack config show", ["format"]),
+        ("--debug config show --format plain", "localstack config show", ["format"]),
     ],
 )
 def test_publish_analytics_event_on_command_invocation(
-    cli_input, expected_cmd, expected_params, runner, monkeypatch, caplog, httpserver
+    cli_input, expected_cmd, expected_params, runner, monkeypatch, caplog
 ):
     # must suppress pytest logging due to weird issue with click https://github.com/pytest-dev/pytest/issues/3344
     caplog.set_level(logging.CRITICAL)
@@ -215,13 +167,14 @@ def test_publish_analytics_event_on_command_invocation(
     request_data = Queue()
     input = cli_input.split(" ")
 
-    def _handler(_request: Request):
-        request_data.put(_request.data)
+    def handler(request, data):
+        request_data.put((request.__dict__, data))
 
-    httpserver.expect_request("").respond_with_handler(_handler)
-    monkeypatch.setattr(localstack.constants, "ANALYTICS_API", httpserver.url_for("/"))
-    runner.invoke(cli, input)
-    request_payload = request_data.get(timeout=5)
+    with testutil.http_server(handler) as url:
+        monkeypatch.setenv("ANALYTICS_API", url)
+        monkeypatch.setattr(localstack.constants, "ANALYTICS_API", url)
+        runner.invoke(cli, input)
+        _, request_payload = request_data.get(timeout=5)
 
     assert request_data.qsize() == 0
     payload = json.loads(request_payload)
@@ -245,7 +198,7 @@ def test_publish_analytics_event_on_command_invocation(
     ],
 )
 def test_do_not_publish_analytics_event_on_invalid_command_invocation(
-    cli_input, runner, monkeypatch, caplog, httpserver
+    cli_input, runner, monkeypatch, caplog
 ):
     # must suppress pytest logging due to weird issue with click https://github.com/pytest-dev/pytest/issues/3344
     caplog.set_level(logging.CRITICAL)
@@ -253,36 +206,36 @@ def test_do_not_publish_analytics_event_on_invalid_command_invocation(
     request_data = []
     input = cli_input.split(" ")
 
-    def _handler(_request: Request):
-        request_data.append(_request.data)
+    def handler(request, data):
+        request_data.append(data)
 
-    httpserver.expect_request("").respond_with_handler(_handler)
-    monkeypatch.setenv("ANALYTICS_API", httpserver.url_for("/"))
-    runner.invoke(cli, input)
-    assert len(request_data) == 0, (
-        "analytics API should not be invoked when an invalid command is supplied"
-    )
+    with testutil.http_server(handler) as url:
+        monkeypatch.setenv("ANALYTICS_API", url)
+        runner.invoke(cli, input)
+        assert (
+            len(request_data) == 0
+        ), "analytics API should not be invoked when an invalid command is supplied"
 
 
-def test_disable_publish_analytics_event_on_command_invocation(
-    runner, monkeypatch, caplog, httpserver
-):
+def test_disable_publish_analytics_event_on_command_invocation(runner, monkeypatch, caplog):
     # must suppress pytest logging due to weird issue with click https://github.com/pytest-dev/pytest/issues/3344
     caplog.set_level(logging.CRITICAL)
     monkeypatch.setattr(localstack.utils.analytics.cli, "ANALYTICS_API_RESPONSE_TIMEOUT_SECS", 3)
     monkeypatch.setattr(localstack.config, "DISABLE_EVENTS", True)
     request_data = []
 
-    def _handler(_request: Request):
-        request_data.append(_request.data)
+    def handler(request, data):
+        request_data.append(data)
 
-    httpserver.expect_request("").respond_with_handler(_handler)
-    monkeypatch.setenv("ANALYTICS_API", httpserver.url_for("/"))
-    runner.invoke(cli, ["config", "show"])
-    assert len(request_data) == 0, "analytics API should not be invoked when DISABLE_EVENTS is set"
+    with testutil.http_server(handler) as url:
+        monkeypatch.setenv("ANALYTICS_API", url)
+        runner.invoke(cli, ["config", "show"])
+        assert (
+            len(request_data) == 0
+        ), "analytics API should not be invoked when DISABLE_EVENTS is set"
 
 
-def test_timeout_publishing_command_invocation(runner, monkeypatch, caplog, httpserver):
+def test_timeout_publishing_command_invocation(runner, monkeypatch, caplog):
     # must suppress pytest logging due to weird issue with click https://github.com/pytest-dev/pytest/issues/3344
     caplog.set_level(logging.CRITICAL)
     monkeypatch.setattr(
@@ -293,15 +246,15 @@ def test_timeout_publishing_command_invocation(runner, monkeypatch, caplog, http
     )
     request_data = []
 
-    def _handler(_request: Request):
-        request_data.append(_request.data)
+    def handler(request, data):
+        request_data.append(data)
 
-    httpserver.expect_request("").respond_with_handler(_handler)
-    monkeypatch.setenv("ANALYTICS_API", httpserver.url_for("/"))
-    runner.invoke(cli, ["config", "show"])
-    assert len(request_data) == 0, (
-        "analytics event publisher process should time out if request is taking too long"
-    )
+    with testutil.http_server(handler) as url:
+        monkeypatch.setenv("ANALYTICS_API", url)
+        runner.invoke(cli, ["config", "show"])
+        assert (
+            len(request_data) == 0
+        ), "analytics event publisher process should time out if request is taking too long"
 
 
 def test_is_frozen(monkeypatch):
